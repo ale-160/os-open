@@ -10,6 +10,7 @@ import MemberList from './components/MemberList.vue'
 import CreateRoomDialog from './components/CreateRoomDialog.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import RoomManager from './components/RoomManager.vue'
+import PromptInstall from './components/PromptInstall.vue'
 
 const {
   state,
@@ -350,6 +351,9 @@ const currentServerLabel = computed(() => {
         </div>
       </div>
     </div>
+
+    <!-- PWA 安装提示 -->
+    <PromptInstall />
 
     <div v-if="state.booting" class="overlay">
       <div class="overlay-card">
