@@ -24,6 +24,7 @@ import {
   setMeta,
   getAllRooms,
   searchRooms as searchRoomsInDB,
+  searchMessages as searchMessagesInDB,
   clearRoomData,
   getStorageStats
 } from '../lib/db.js'
@@ -63,11 +64,26 @@ const searchKeyword = ref('') // 当前搜索关键词，空则显示全部
 const pendingRequests = ref([]) // 当前房间待处理加入申请
 const storageStats = ref({ rooms: 0, messages: 0, sizeBytes: 0 })
 const notifications = ref([]) // 通知列表 [{ id, type, text, timestamp }]
+const downloadingIds = ref(new Set()) // 正在下载中的 fileId（UI 状态用）
+const fileProgress = ref(new Map()) // fileId -> { received, total, pct }（Phase 2.1 进度条）
 // 本节点能力声明（异构网络角色）+ 已连接节点的角色统计
 const capabilities = ref({ ...DEFAULT_CAPABILITIES })
 const roleStats = ref({ full: 0, normal: 0, light: 0, unknown: 0, relay: 0, alwaysOn: 0 })
 // 多域并行状态（蛛网核心：每域独立 status/peerJsId/reconnectAttempts）
 const domains = ref([])
+// Phase 2.2: 群公告（room -> { text, from, name, timestamp }）
+const announcements = ref(new Map())
+// Phase 2.3: Pin 置顶（room -> [msgId...]）
+const pins = ref(new Map())
+// Phase 2.4: 云文档（room -> [doc...]）
+const docs = ref(new Map())
+// Phase 2.4: 文档冲突提示（docId -> { local, remote }）
+const docConflicts = ref(new Map())
+// Phase 2.5: 消息搜索
+const messageSearchResults = ref([]) // 搜索结果列表
+const searchingMessages = ref(false) // 正在搜索中
+let currentSearchId = null // 当前网络搜索 ID（用于匹配异步回复）
+let searchResultTimer = null // 网络搜索聚合超时计时器
 
 let network = null
 let initialized = false
@@ -293,10 +309,88 @@ function wireEvents(net) {
     pendingDownloads.delete(fileId)
     // 标记对应消息的 file 为下载失败（ChatPanel 检测后立即显示失败提示，无需等 12s 超时）
     const m = messages.value.find((x) => x.file?.fileId === fileId)
-    if (m && m.file && !m.file.dataUrl) {
+    if (m && m.file && !m.file.dataUrl && !m.file.blobUrl) {
       m.file.downloadFailed = true
     }
+    // 清理进度条
+    const fp = new Map(fileProgress.value)
+    fp.delete(fileId)
+    fileProgress.value = fp
     pushNotification('error', '文件不可用：发送者刷新页面后原文件缓存已丢失，请对方重新发送')
+  })
+
+  // 文件分片下载进度（Phase 2.1 bin 通道）
+  net.addEventListener('file:progress', (e) => {
+    const { fileId, received, total } = e.detail || {}
+    if (!fileId || !total) return
+    const fp = new Map(fileProgress.value)
+    fp.set(fileId, { received, total, pct: Math.round((received / total) * 100) })
+    fileProgress.value = fp
+  })
+
+  // Phase 2.2: 群公告
+  net.addEventListener('announcement', (e) => {
+    const ann = e.detail
+    if (!ann || !ann.room) return
+    const next = new Map(announcements.value)
+    next.set(ann.room, ann)
+    announcements.value = next
+  })
+
+  // Phase 2.3: Pin 置顶
+  net.addEventListener('pin_update', (e) => {
+    const pinData = e.detail
+    if (!pinData || !pinData.room) return
+    const next = new Map(pins.value)
+    next.set(pinData.room, pinData.pins || [])
+    pins.value = next
+  })
+
+  // Phase 2.4: 云文档更新
+  net.addEventListener('doc_update', (e) => {
+    const { room, doc } = e.detail || {}
+    if (!room || !doc || !doc.docId) return
+    const next = new Map(docs.value)
+    const list = [...(next.get(room) || [])]
+    const idx = list.findIndex((d) => d.docId === doc.docId)
+    if (doc.deleted) {
+      // 标记删除：从列表移除
+      if (idx >= 0) list.splice(idx, 1)
+    } else {
+      if (idx >= 0) list[idx] = doc
+      else list.push(doc)
+    }
+    // 按更新时间倒序
+    list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+    next.set(room, list)
+    docs.value = next
+  })
+
+  // Phase 2.4: 文档版本冲突
+  net.addEventListener('doc_conflict', (e) => {
+    const { room, docId, local, remote } = e.detail || {}
+    if (!docId) return
+    const next = new Map(docConflicts.value)
+    next.set(docId, { room, local, remote })
+    docConflicts.value = next
+    pushNotification('warning', `文档「${local?.title || '未命名'}」存在版本冲突，对方有更新版本`)
+  })
+
+  // Phase 2.5: 网络搜索结果聚合
+  net.addEventListener('search_result', (e) => {
+    const { searchId, results } = e.detail || {}
+    if (!searchId || searchId !== currentSearchId) return // 非当前搜索，忽略
+    if (!Array.isArray(results) || !results.length) return
+    // 合并去重（按消息 id）
+    const existing = new Map(messageSearchResults.value.map((r) => [r.id, r]))
+    for (const r of results) {
+      if (r && r.id && !existing.has(r.id)) {
+        existing.set(r.id, { ...r, source: 'network' })
+      }
+    }
+    // 按时间倒序
+    const merged = [...existing.values()].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+    messageSearchResults.value = merged
   })
 
   // 历史消息
@@ -341,18 +435,22 @@ function upsertPeer(peerJsId, patch) {
 async function handleChatMessage(chatMsg, fromHistory = false) {
   if (!chatMsg || !chatMsg.id) return
 
-  // 大文件：下载完成后（带完整 dataUrl）替换已有的 meta 卡片消息（同一 fileId）
+  // 大文件：下载完成后（带完整 blobUrl 或 dataUrl）替换已有的 meta 卡片消息（同一 fileId）
   if (chatMsg.file?.fileId) {
     const existing = messages.value.find(
-      (m) => m.file?.fileId === chatMsg.file.fileId && !m.file?.dataUrl
+      (m) => m.file?.fileId === chatMsg.file.fileId && !m.file?.dataUrl && !m.file?.blobUrl
     )
-    if (existing && chatMsg.file.dataUrl) {
+    if (existing && (chatMsg.file.blobUrl || chatMsg.file.dataUrl)) {
       Object.assign(existing, chatMsg)
       pendingDownloads.delete(chatMsg.file.fileId)
       // 主动清理下载中标记，避免 watch 时序导致 timeout 误判失败
       const next = new Set(downloadingIds.value)
       next.delete(chatMsg.file.fileId)
       downloadingIds.value = next
+      // 清理进度条
+      const fp = new Map(fileProgress.value)
+      fp.delete(chatMsg.file.fileId)
+      fileProgress.value = fp
       return
     }
   }
@@ -458,6 +556,97 @@ function canUserApprove() {
   const rules = meta?.rules || known?.rules
   const threshold = rules?.approveThreshold ?? 50
   return network._getMyStars(room) >= threshold
+}
+
+/** Phase 2.2: 当前用户是否有权发布公告（owner 或星标 ≥ 50） */
+function canSetAnnouncement() {
+  const room = currentRoom.value
+  if (!room || !network) return false
+  if (isCurrentUserOwner()) return true
+  return network._getMyStars(room) >= 50
+}
+
+/** Phase 2.2: 设置房间公告 */
+async function setAnnouncement(room, text) {
+  if (!network) return false
+  return network.setAnnouncement(room, text)
+}
+
+/** Phase 2.3: 切换消息置顶（加入房间即可操作） */
+async function togglePin(msgId) {
+  if (!network || !currentRoom.value) return false
+  return network.togglePin(currentRoom.value, msgId)
+}
+
+/** Phase 2.3: 判断消息是否已置顶 */
+function isPinned(msgId) {
+  const room = currentRoom.value
+  if (!room) return false
+  const list = pins.value.get(room) || []
+  return list.includes(msgId)
+}
+
+/** Phase 2.3: 获取当前房间 Pin 列表 */
+function currentRoomPins() {
+  const room = currentRoom.value
+  if (!room) return []
+  return pins.value.get(room) || []
+}
+
+// ---- Phase 2.4: 云文档 ----
+
+/** Phase 2.4: 获取当前房间文档列表 */
+function currentRoomDocs() {
+  const room = currentRoom.value
+  if (!room) return []
+  return docs.value.get(room) || []
+}
+
+/** Phase 2.4: 创建文档 */
+async function createDoc(title) {
+  if (!network || !currentRoom.value) return null
+  return network.createDoc(currentRoom.value, title)
+}
+
+/** Phase 2.4: 更新文档内容（3s 防抖由调用方处理） */
+async function updateDoc(docId, patch) {
+  if (!network || !currentRoom.value) return null
+  return network.updateDoc(currentRoom.value, docId, patch)
+}
+
+/** Phase 2.4: 重命名文档 */
+async function renameDoc(docId, newTitle) {
+  if (!network || !currentRoom.value) return null
+  return network.renameDoc(currentRoom.value, docId, newTitle)
+}
+
+/** Phase 2.4: 删除文档 */
+async function deleteDocRemote(docId) {
+  if (!network || !currentRoom.value) return false
+  return network.deleteDocRemote(currentRoom.value, docId)
+}
+
+/** Phase 2.4: 解决冲突——采用远端版本 */
+function resolveDocConflictAcceptRemote(docId) {
+  const next = new Map(docConflicts.value)
+  next.delete(docId)
+  docConflicts.value = next
+}
+
+/** Phase 2.4: 解决冲突——保留本地版本（强制推送） */
+async function resolveDocConflictKeepLocal(docId) {
+  const conflict = docConflicts.value.get(docId)
+  if (!conflict?.local) return
+  // 强制用本地版本重新发布（version+1）
+  if (network && currentRoom.value) {
+    await network.updateDoc(currentRoom.value, docId, {
+      title: conflict.local.title,
+      content: conflict.local.content
+    })
+  }
+  const next = new Map(docConflicts.value)
+  next.delete(docId)
+  docConflicts.value = next
 }
 
 async function loadCachedRooms() {
@@ -639,6 +828,59 @@ async function searchRooms(keyword) {
 /** 清除搜索，显示全部房间 */
 function clearSearch() {
   searchKeyword.value = ''
+}
+
+// ---------------- Phase 2.5: 消息搜索（本地 + 网络） ----------------
+
+/**
+ * 全局消息搜索：本地 IndexedDB 全文搜索 + 网络广播搜索（2s 聚合）。
+ * @param {string} keyword  搜索关键词
+ */
+async function searchMessagesGlobal(keyword) {
+  const kw = String(keyword || '').trim()
+  if (!kw) {
+    clearMessageSearch()
+    return
+  }
+  searchingMessages.value = true
+  // 清理上一次搜索的超时计时器
+  if (searchResultTimer) {
+    clearTimeout(searchResultTimer)
+    searchResultTimer = null
+  }
+  // 1. 本地搜索（立即渲染）
+  let localResults = []
+  try {
+    localResults = await searchMessagesInDB(kw, { limit: 50 })
+  } catch (e) {
+    localResults = []
+  }
+  const localMarked = localResults.map((r) => ({ ...r, source: 'local' }))
+  messageSearchResults.value = localMarked
+  // 2. 网络搜索（广播，2s 内聚合回复）
+  if (network) {
+    try {
+      currentSearchId = await network.searchMessagesNetwork(kw)
+    } catch (e) {
+      currentSearchId = null
+    }
+  }
+  // 3. 2s 超时：结束搜索状态（验收：空结果 2s 内返回）
+  searchResultTimer = setTimeout(() => {
+    searchingMessages.value = false
+    searchResultTimer = null
+  }, 2000)
+}
+
+/** 清除消息搜索结果 */
+function clearMessageSearch() {
+  messageSearchResults.value = []
+  searchingMessages.value = false
+  currentSearchId = null
+  if (searchResultTimer) {
+    clearTimeout(searchResultTimer)
+    searchResultTimer = null
+  }
 }
 
 /** 过滤后的房间列表（computed，响应式跟踪） */
@@ -844,6 +1086,8 @@ export function useChat() {
     pendingRequests,
     storageStats,
     notifications,
+    downloadingIds,
+    fileProgress,
     // 节点能力（异构角色）
     capabilities,
     roleStats,
@@ -853,6 +1097,13 @@ export function useChat() {
     // 多域并行状态（蛛网核心）
     domains,
     getDomainsInfo,
+    // Phase 2.2: 群公告
+    announcements,
+    // Phase 2.3: Pin 置顶
+    pins,
+    // Phase 2.4: 云文档
+    docs,
+    docConflicts,
     init,
     setOwnName,
     createRoom,
@@ -864,10 +1115,30 @@ export function useChat() {
     downloadFile,
     searchRooms,
     clearSearch,
+    // Phase 2.5: 消息搜索
+    messageSearchResults,
+    searchingMessages,
+    searchMessagesGlobal,
+    clearMessageSearch,
     filteredRooms,
     joinedRooms,
     isCurrentUserOwner,
     canUserApprove,
+    // Phase 2.2: 公告权限与操作
+    canSetAnnouncement,
+    setAnnouncement,
+    // Phase 2.3: Pin 置顶
+    togglePin,
+    isPinned,
+    currentRoomPins,
+    // Phase 2.4: 云文档
+    currentRoomDocs,
+    createDoc,
+    updateDoc,
+    renameDoc,
+    deleteDocRemote,
+    resolveDocConflictAcceptRemote,
+    resolveDocConflictKeepLocal,
     // 审核/邀请/星标
     approveJoin,
     rejectJoin,

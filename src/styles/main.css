@@ -467,7 +467,48 @@ input {
 .room-stats {
   font-size: var(--fs-11);
   color: var(--text-muted);
+}
+/* Phase 2.4: 群内功能 tab（聊天/云文档） */
+.room-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   margin-left: auto;
+  background: var(--bg-elev2);
+  border-radius: var(--r-sm);
+  padding: 2px;
+}
+.room-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.room-tab-btn:hover {
+  color: var(--text);
+}
+.room-tab-btn.active {
+  background: var(--bg);
+  color: var(--accent);
+  font-weight: 600;
+}
+.room-tab-label {
+  line-height: 1;
+}
+@media (max-width: 860px) {
+  .room-tab-label {
+    display: none;
+  }
+  .room-tab-btn {
+    padding: 6px 8px;
+  }
 }
 
 .chat-body {

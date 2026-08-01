@@ -24,6 +24,26 @@ const {
   pendingRequests,
   storageStats,
   notifications,
+  downloadingIds,
+  fileProgress,
+  announcements,
+  // Phase 2.3: Pin 置顶
+  togglePin,
+  currentRoomPins,
+  // Phase 2.4: 云文档
+  currentRoomDocs,
+  createDoc,
+  updateDoc,
+  renameDoc,
+  deleteDocRemote,
+  resolveDocConflictAcceptRemote,
+  resolveDocConflictKeepLocal,
+  docConflicts,
+  // Phase 2.5: 消息搜索
+  messageSearchResults,
+  searchingMessages,
+  searchMessagesGlobal,
+  clearMessageSearch,
   AccessRule,
   SpeakRule,
   init,
@@ -41,6 +61,8 @@ const {
   joinedRooms,
   isCurrentUserOwner,
   canUserApprove,
+  canSetAnnouncement,
+  setAnnouncement,
   // 审核/邀请/星标
   approveJoin,
   rejectJoin,
@@ -75,6 +97,9 @@ const installBannerVisible = ref(false)
 
 // 三栏布局：SideNav 当前激活的导航项（chat/doc/file/search）
 const activeNav = ref('chat')
+
+// Phase 2.5: 从搜索结果跳转定位的消息 ID（传递给 ChatPanel）
+const pendingLocateMsgId = ref('')
 
 // 屏蔽规则计算
 const currentRoomBanBelow = computed(() => {
@@ -221,6 +246,92 @@ const currentServerLabel = computed(() => {
   const s = getCurrentSignaling()
   return s ? `${s.host}:${s.port}` : ''
 })
+
+// Phase 2.2: 当前房间公告
+const currentAnnouncement = computed(() => {
+  if (!currentRoom.value) return null
+  return announcements.value.get(currentRoom.value) || null
+})
+
+// Phase 2.3: 当前房间 Pin 列表
+const currentRoomPinnedIds = computed(() => currentRoomPins())
+
+// Phase 2.4: 当前房间文档列表
+const currentRoomDocsList = computed(() => currentRoomDocs())
+
+// Phase 2.2: 发布/编辑公告
+async function onSetAnnouncement(text) {
+  if (!currentRoom.value) return
+  const ok = await setAnnouncement(currentRoom.value, text)
+  if (!ok) {
+    // 权限不足或未加入房间——setAnnouncement 内部已 emit error
+  }
+}
+
+// Phase 2.3: 切换消息置顶
+async function onTogglePin(msgId) {
+  if (!currentRoom.value) return
+  await togglePin(msgId)
+}
+
+// Phase 2.4: 云文档事件
+async function onCreateDoc(title) {
+  if (!currentRoom.value) return
+  await createDoc(title)
+}
+
+async function onUpdateDoc(payload) {
+  if (!currentRoom.value) return
+  await updateDoc(payload.docId, payload.patch)
+}
+
+async function onRenameDoc(payload) {
+  if (!currentRoom.value) return
+  await renameDoc(payload.docId, payload.title)
+}
+
+async function onDeleteDoc(docId) {
+  if (!currentRoom.value) return
+  await deleteDocRemote(docId)
+}
+
+function onResolveConflictRemote(docId) {
+  resolveDocConflictAcceptRemote(docId)
+}
+
+async function onResolveConflictLocal(docId) {
+  await resolveDocConflictKeepLocal(docId)
+}
+
+// Phase 2.5: 消息搜索事件
+async function onMsgSearch(keyword) {
+  await searchMessagesGlobal(keyword)
+}
+
+function onMsgClear() {
+  clearMessageSearch()
+}
+
+// 从搜索结果跳转：切房 + 定位消息
+async function onMsgLocate(payload) {
+  const { room, msgId } = payload || {}
+  if (!room || !msgId) return
+  // 切到会话视图
+  activeNav.value = 'chat'
+  // 如果不在该房间，先加入
+  if (currentRoom.value !== room) {
+    await joinRoom(room)
+  }
+  // 设置待定位消息 ID（ChatPanel watch 后自动滚动）
+  pendingLocateMsgId.value = msgId
+}
+
+// ChatPanel 定位完成 → 清除待定位 ID
+function onLocated(msgId) {
+  if (pendingLocateMsgId.value === msgId) {
+    pendingLocateMsgId.value = ''
+  }
+}
 </script>
 
 <template>
@@ -245,12 +356,17 @@ const currentServerLabel = computed(() => {
       :current-room="currentRoom"
       :searching="!!searchKeyword"
       :joined-rooms="joinedRooms"
+      :message-search-results="messageSearchResults"
+      :searching-messages="searchingMessages"
       @rename="setOwnName"
       @search="searchRooms"
       @clear="clearSearch"
       @create="showCreateDialog = true"
       @join="onJoinRoom"
       @manage="showRoomManager = true"
+      @msg-search="onMsgSearch"
+      @msg-clear="onMsgClear"
+      @msg-locate="onMsgLocate"
     />
 
     <main class="content-area" :class="{ 'install-banner-visible': installBannerVisible, 'has-aside': !!currentRoom }">
@@ -261,11 +377,27 @@ const currentServerLabel = computed(() => {
           :online="state.online"
           :stats="stats"
           :members="members"
+          :file-progress="fileProgress"
+          :announcement="currentAnnouncement"
+          :can-set-announcement="canSetAnnouncement()"
+          :pinned-msg-ids="currentRoomPinnedIds"
+          :docs="currentRoomDocsList"
+          :doc-conflicts="docConflicts"
+          :locate-msg-id="pendingLocateMsgId"
           @send="sendRoomMessage"
           @send-file="sendFileMessage"
           @download="onDownloadFile"
           @back="backToRoomList"
           @leave="leaveCurrentRoom"
+          @set-announcement="onSetAnnouncement"
+          @toggle-pin="onTogglePin"
+          @create-doc="onCreateDoc"
+          @update-doc="onUpdateDoc"
+          @rename-doc="onRenameDoc"
+          @delete-doc="onDeleteDoc"
+          @resolve-conflict-remote="onResolveConflictRemote"
+          @resolve-conflict-local="onResolveConflictLocal"
+          @located="onLocated"
         />
       </div>
       <aside class="content-aside" v-if="currentRoom">

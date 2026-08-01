@@ -2,15 +2,14 @@
 /**
  * 左侧图标导航栏（64px 宽）。
  * - 顶部：品牌 hexagon
- * - 中部：导航图标（会话/文档/文件/搜索）
+ * - 中部：全局导航图标（会话/搜索）
  * - 底部：设置 + 用户头像（状态点 + 昵称首字母）
  *
- * 导航项切换 ListBar 内容；点击用户头像打开设置面板。
+ * 注：云文档/文件等群内功能已移至 ChatPanel 内的 tab 切换，
+ * SideNav 只保留全局功能。
  */
 import {
   IconChat,
-  IconDoc,
-  IconFile,
   IconSearch,
   IconSettings,
   IconTopology
@@ -25,11 +24,9 @@ const props = defineProps({
 
 const emit = defineEmits(['nav', 'open-settings', 'open-topology'])
 
-// 导航项定义：name → 图标 + 标题
+// 全局导航项（群内功能如云文档/文件在 ChatPanel 内切换）
 const NAV_ITEMS = [
   { key: 'chat', label: '会话', Icon: IconChat },
-  { key: 'doc', label: '云文档', Icon: IconDoc },
-  { key: 'file', label: '文件', Icon: IconFile },
   { key: 'search', label: '搜索', Icon: IconSearch }
 ]
 

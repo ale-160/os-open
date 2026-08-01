@@ -45,7 +45,30 @@ export const MsgType = {
   LCAN_FOUND: 'lcan_found', // 命中返回数据
   LCAN_NOT_FOUND: 'lcan_not_found', // 未命中
   LCAN_HOLDERS: 'lcan_holders', // 副本索引交换（holder 表同步）
-  LCAN_UPDATE: 'lcan_update' // 房间内轻量信号（公告/Pin 变更通知）
+  LCAN_UPDATE: 'lcan_update', // 房间内轻量信号（公告/Pin 变更通知）
+  // ---- Phase 2.2-2.3: 公告 / Pin ----
+  ANNOUNCEMENT: 'announcement', // 公告变更广播（{ room, text, from, ts }）
+  PIN_UPDATE: 'pin_update', // Pin 列表变更广播（{ room, pins: [msgId...], from, ts }）
+  // ---- Phase 3.1: 消息编辑/撤回/回应 ----
+  EDIT: 'edit', // 编辑消息 { msgId, newText, room }
+  DELETE: 'delete', // 撤回消息 { msgId, room }
+  REACT: 'react', // 表情回应 { msgId, emoji, room }
+  // ---- Phase 3.2: @提及 + 已读回执 ----
+  MENTION: 'mention', // @提及通知 { room, msgId, mentioned: [peerId...], from }
+  READ_RECEIPT: 'read_receipt', // 已读回执 { room, msgIds: [id...], from }
+  // ---- Phase 3.3: 话题 ----
+  THREAD_CREATE: 'thread_create', // 创建话题 { rootMsgId, room }
+  THREAD_REPLY: 'thread_reply', // 话题回复 { rootMsgId, msgId, room }
+  // ---- Phase 3.4: 私聊 E2E ----
+  DM_CREATE: 'dm_create', // 私聊会话建立 { to, pubKey }
+  DM_MESSAGE: 'dm_message', // 私聊消息（AES-GCM 加密） { to, iv, ciphertext }
+  DM_KEY: 'dm_key', // 密钥轮换 { to, pubKey }
+  // ---- Phase 2.4: 云文档（LWW + 版本） ----
+  DOC_UPDATE: 'doc_update', // 文档创建/更新/删除广播 { room, doc: { docId, title, content, version, ... } }
+  DOC_LIST: 'doc_list', // 文档列表同步请求/响应 { room }
+  // ---- Phase 2.5: 消息搜索（本地 + 网络） ----
+  MSG_SEARCH: 'msg_search', // 搜索请求 { keyword, from, searchId }
+  MSG_SEARCH_RESULT: 'msg_search_result' // 搜索结果响应 { searchId, results: [...], from }
 }
 
 /**

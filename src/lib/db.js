@@ -318,6 +318,66 @@ export async function hasMessage(id) {
   return false
 }
 
+// ---- Phase 2.5: 消息全文搜索（本地） ----
+
+/**
+ * 本地全文搜索消息（IndexedDB 遍历 includes 匹配）。
+ * @param {string} keyword  搜索关键词
+ * @param {Object} opts { room?: string, limit?: number }
+ * @returns {Promise<Array>} 匹配的消息列表 [{ id, room, text, name, from, timestamp, file }]
+ */
+export async function searchMessages(keyword, opts = {}) {
+  const kw = String(keyword || '').trim().toLowerCase()
+  if (!kw) return []
+  const limit = opts.limit || 50
+  const db = await openMessagesDB()
+  let all = []
+  if (db) {
+    try {
+      await migrateMessagesToIDB(db)
+      if (opts.room) {
+        all = await db.getAllFromIndex(IDB_STORE, 'room', opts.room)
+      } else {
+        all = await db.getAll(IDB_STORE)
+      }
+    } catch (e) {
+      /* 回退 localStorage */
+    }
+  }
+  if (all.length === 0) {
+    const store = readJSON(KEYS.messages, {})
+    if (opts.room) {
+      all = store[opts.room] || []
+    } else {
+      for (const room of Object.keys(store)) {
+        all.push(...(store[room] || []))
+      }
+    }
+  }
+  // includes 匹配（文本消息匹配 text；文件消息匹配 file.name）
+  const results = []
+  for (const m of all) {
+    if (!m || !m.id) continue
+    const text = String(m.text || '').toLowerCase()
+    const fileName = String(m.file?.name || '').toLowerCase()
+    if (text.includes(kw) || fileName.includes(kw)) {
+      results.push({
+        id: m.id,
+        room: m.room,
+        text: m.text || '',
+        name: m.name || '',
+        from: m.from || '',
+        timestamp: m.timestamp || 0,
+        file: m.file ? { name: m.file.name, size: m.file.size, type: m.file.type } : null
+      })
+    }
+    if (results.length >= limit) break
+  }
+  // 按时间倒序
+  results.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+  return results
+}
+
 // ---- Meta KV ----
 export async function setMeta(key, value) {
   const meta = readJSON(KEYS.meta, {})
@@ -666,4 +726,64 @@ export function removePeerFromHolders(peerId) {
   }
   if (touched > 0) writeJSON(HOLDERS_KEY, all)
   return touched
+}
+
+// ---- Phase 2.4: 云文档（IndexedDB docs store + LWW 版本） ----
+
+/** 获取单个云文档 */
+export async function getDoc(docId) {
+  const db = await openMessagesDB()
+  if (!db) return null
+  try {
+    return await db.get(IDB_STORE_DOCS, docId)
+  } catch (e) {
+    return null
+  }
+}
+
+/** 获取房间的全部云文档列表 */
+export async function getAllDocs(room) {
+  const db = await openMessagesDB()
+  if (!db) return []
+  try {
+    const all = await db.getAll(IDB_STORE_DOCS)
+    if (!room) return all
+    return all.filter((d) => d.room === room)
+  } catch (e) {
+    return []
+  }
+}
+
+/**
+ * 写入云文档（LWW：仅当 version >= 已存版本时才覆盖）。
+ * @param {Object} doc { docId, room, title, content, version, updatedAt, author }
+ * @returns {boolean} 是否实际写入（true=已更新，false=被旧版本拒绝）
+ */
+export async function putDoc(doc) {
+  if (!doc || !doc.docId) return false
+  const db = await openMessagesDB()
+  if (!db) return false
+  try {
+    const existing = await db.get(IDB_STORE_DOCS, doc.docId)
+    // LWW：版本号更高的覆盖；同版本按 updatedAt 更新（时间戳为准）
+    if (existing && existing.version > doc.version) return false
+    if (existing && existing.version === doc.version && existing.updatedAt > doc.updatedAt) return false
+    // 标记删除：deleted=true 的文档保留占位但不在列表显示
+    await db.put(IDB_STORE_DOCS, doc)
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
+/** 删除云文档（物理删除） */
+export async function deleteDoc(docId) {
+  const db = await openMessagesDB()
+  if (!db) return false
+  try {
+    await db.delete(IDB_STORE_DOCS, docId)
+    return true
+  } catch (e) {
+    return false
+  }
 }

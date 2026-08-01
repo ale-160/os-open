@@ -2,16 +2,18 @@
 /**
  * 列表栏（280px 宽）。
  * 内容随 SideNav 的 activeNav 切换：
- *   - chat: PeerInfo + RoomSearch + RoomList（当前主用）
- *   - doc / file / search: 占位（后续 Phase 实现）
+ *   - chat: PeerInfo + RoomSearch + RoomList（房间列表）
+ *   - search: PeerInfo + MessageSearch（全局消息搜索）
  *
  * 顶部固定显示用户身份条（PeerInfo），下方为列表内容。
+ * 注：云文档/文件等群内功能已移至 ChatPanel 内的 tab 切换。
  */
 import { computed } from 'vue'
 import PeerInfo from './PeerInfo.vue'
 import RoomSearch from './RoomSearch.vue'
 import RoomList from './RoomList.vue'
-import { IconPlus, IconSearch as IconSearchComp } from './icons'
+import MessageSearch from './MessageSearch.vue'
+import { IconPlus } from './icons'
 
 const props = defineProps({
   activeNav: { type: String, default: 'chat' },
@@ -25,7 +27,10 @@ const props = defineProps({
   filteredRooms: { type: Array, default: () => [] },
   currentRoom: { type: String, default: '' },
   searching: { type: Boolean, default: false },
-  joinedRooms: { type: Array, default: () => [] }
+  joinedRooms: { type: Array, default: () => [] },
+  // Phase 2.5: 消息搜索
+  messageSearchResults: { type: Array, default: () => [] },
+  searchingMessages: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -34,7 +39,11 @@ const emit = defineEmits([
   'clear',
   'create',
   'join',
-  'manage'
+  'manage',
+  // Phase 2.5: 消息搜索
+  'msg-search',
+  'msg-clear',
+  'msg-locate'
 ])
 
 // 当前导航标题
@@ -42,25 +51,18 @@ const navTitle = computed(() => {
   switch (props.activeNav) {
     case 'chat':
       return '会话'
-    case 'doc':
-      return '云文档'
-    case 'file':
-      return '文件'
     case 'search':
       return '搜索'
     default:
-      return ''
+      return '会话'
   }
 })
 
-// 是否显示创建按钮（仅会话与文档）
-const showCreate = computed(() => props.activeNav === 'chat' || props.activeNav === 'doc')
+// 是否显示创建按钮（仅会话）
+const showCreate = computed(() => props.activeNav === 'chat')
 
 // 是否显示管理按钮（仅会话）
 const showManage = computed(() => props.activeNav === 'chat')
-
-// 是否为已实现视图（chat 已实现，其余为占位）
-const isImplemented = computed(() => props.activeNav === 'chat')
 </script>
 
 <template>
@@ -74,7 +76,7 @@ const isImplemented = computed(() => props.activeNav === 'chat')
       />
     </div>
 
-    <!-- 已实现视图：会话 -->
+    <!-- ===== 会话视图（房间列表） ===== -->
     <template v-if="activeNav === 'chat'">
       <div class="listbar-head">
         <span class="listbar-title">{{ navTitle }}</span>
@@ -116,16 +118,18 @@ const isImplemented = computed(() => props.activeNav === 'chat')
       />
     </template>
 
-    <!-- 占位视图（doc / file / search） -->
-    <template v-else>
+    <!-- ===== 搜索视图（全局消息搜索） ===== -->
+    <template v-else-if="activeNav === 'search'">
       <div class="listbar-head">
         <span class="listbar-title">{{ navTitle }}</span>
       </div>
-      <div class="listbar-placeholder">
-        <IconSearchComp :size="36" />
-        <p class="placeholder-title">{{ navTitle }}</p>
-        <p class="placeholder-sub">该模块将在后续版本上线</p>
-      </div>
+      <MessageSearch
+        :results="messageSearchResults"
+        :searching="searchingMessages"
+        @search="emit('msg-search', $event)"
+        @clear="emit('msg-clear')"
+        @locate="emit('msg-locate', $event)"
+      />
     </template>
   </aside>
 </template>
@@ -198,30 +202,6 @@ const isImplemented = computed(() => props.activeNav === 'chat')
 }
 .icon-btn-mini.primary:hover {
   background: var(--accent-hover);
-}
-
-/* 占位视图 */
-.listbar-placeholder {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--sp-2);
-  color: var(--text-muted);
-  padding: var(--sp-4);
-  text-align: center;
-}
-.placeholder-title {
-  margin: 0;
-  font-size: var(--fs-15);
-  font-weight: 600;
-  color: var(--text-dim);
-}
-.placeholder-sub {
-  margin: 0;
-  font-size: var(--fs-12);
-  color: var(--text-muted);
 }
 
 /* RoomSearch 在 ListBar 内去掉自身边框（避免双边界） */

@@ -52,18 +52,61 @@ import {
   getAllHolders,
   addHolder,
   removeHolder,
-  removePeerFromHolders
+  removePeerFromHolders,
+  // Phase 2.4: 云文档
+  getDoc,
+  putDoc,
+  getAllDocs,
+  deleteDoc,
+  // Phase 2.5: 消息搜索
+  searchMessages as searchMessagesInDB
 } from './db.js'
+// 注：saveOutgoingFile/getOutgoingFiles/deleteOutgoingFile 保留导入以兼容 db.js 导出，
+// Phase 2.1 起文件缓存改为 ArrayBuffer 内存模式，不再走 localStorage 持久化。
 import {
   sha256Key,
   keyToHex,
   responsible as lcanResponsible,
   DEFAULT_K as LCAN_DEFAULT_K
 } from './lcan.js'
+import { sha256 } from '@noble/hashes/sha2.js'
+import { sign as edSign, verify as edVerify } from './crypto.js'
 
 const DEBUG = false
 function dbg(...args) {
   if (DEBUG) console.log('[nchat]', ...args)
+}
+
+// ---- Phase 2.1 高性能文件传输常量（蛛网核心） ----
+/** 探测上限：256KB（Chromium usrsctp 上限，512KB 任何浏览器都会断通道） */
+const PROBE_MAX_BYTES = 262144
+/** 探测降级链：256KB → 128KB → 64KB → 32KB */
+const PROBE_TIERS = [262144, 131072, 65536, 32768]
+/** 单档探测超时（ms） */
+const PROBE_TIMEOUT = 1500
+/** 探测结果缓存有效期：24h（同设备不重复探测） */
+const PROBE_CACHE_TTL = 24 * 60 * 60 * 1000
+/** 每条 bin 连接的并发分片数（3 路） */
+const FILE_BIN_CONCURRENCY = 3
+/** 分片头余量（字节），避免消息头叠加后超限 */
+const FILE_CHUNK_HEADER_MARGIN = 64
+/** 拉取模式固定分片大小（64KB，所有浏览器安全；多源取模分配统一尺寸） */
+const PULL_CHUNK_SIZE = 65536
+/** 探测能力缓存 localStorage key */
+const CAP_CACHE_KEY = 'nchat:capability'
+
+/** ArrayBuffer → hex 字符串（用于 sha256 总哈希展示/比对） */
+function bufToHex(buf) {
+  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
+  let s = ''
+  for (let i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, '0')
+  return s
+}
+
+/** 计算 ArrayBuffer 的 sha256 总哈希（hex 字符串）。安全/非安全上下文通用（noble 纯 JS） */
+function sha256Hex(arrayBuffer) {
+  const bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)
+  return bufToHex(sha256(bytes))
 }
 
 /** 生成图片缩略图（canvas 压缩 JPEG）。为保证 FILE_META 消息不超 PeerJS JSON 通道上限
@@ -113,6 +156,60 @@ function makeThumbnail(dataUrl, maxSize = 240) {
       }
       img.onerror = () => resolve(null)
       img.src = dataUrl
+    } catch (e) {
+      resolve(null)
+    }
+  })
+}
+
+/** 从 Blob/File 生成缩略图（避免 ArrayBuffer→dataUrl 中间转换，直接用 object URL 加载） */
+function makeThumbnailFromBlob(blob, maxSize = 240) {
+  return new Promise((resolve) => {
+    try {
+      const url = URL.createObjectURL(blob)
+      const img = new Image()
+      img.onload = () => {
+        URL.revokeObjectURL(url)
+        try {
+          const tiers = [
+            { size: 240, quality: 0.6 },
+            { size: 200, quality: 0.5 },
+            { size: 160, quality: 0.45 },
+            { size: 120, quality: 0.4 }
+          ]
+          for (const tier of tiers) {
+            const scale = Math.min(1, tier.size / Math.max(img.width, img.height))
+            const w = Math.max(1, Math.round(img.width * scale))
+            const h = Math.max(1, Math.round(img.height * scale))
+            const canvas = document.createElement('canvas')
+            canvas.width = w
+            canvas.height = h
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(img, 0, 0, w, h)
+            const data = canvas.toDataURL('image/jpeg', tier.quality)
+            if (data.length <= 11000) {
+              resolve(data)
+              return
+            }
+          }
+          const scale = Math.min(1, 80 / Math.max(img.width, img.height))
+          const w = Math.max(1, Math.round(img.width * scale))
+          const h = Math.max(1, Math.round(img.height * scale))
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL('image/jpeg', 0.35))
+        } catch (e) {
+          resolve(null)
+        }
+      }
+      img.onerror = () => {
+        URL.revokeObjectURL(url)
+        resolve(null)
+      }
+      img.src = url
     } catch (e) {
       resolve(null)
     }
@@ -391,15 +488,12 @@ export class PeerNetwork extends EventTarget {
     if (this._started) return
     this._started = true
 
-    // 恢复持久化的大文件发送缓存（刷新页面后仍可提供下载）
+    // 大文件发送缓存（Phase 2.1 起改为 ArrayBuffer 内存缓存，不再持久化 localStorage）。
+    // 旧版 dataUrl 持久化数据已失效（无 arrayBuffer），清空避免误用。
+    // 发送者刷新页面后的文件可达性由 LCAN 元信息 + 多源拉取保障。
+    if (!this._outgoingFiles) this._outgoingFiles = new Map()
     try {
-      if (!this._outgoingFiles) this._outgoingFiles = new Map()
-      const stored = getOutgoingFiles()
-      for (const [fileId, info] of Object.entries(stored)) {
-        if (info && info.dataUrl) {
-          this._outgoingFiles.set(fileId, info)
-        }
-      }
+      localStorage.removeItem('nchat:outgoing-files')
     } catch (e) {
       /* ignore */
     }
@@ -947,22 +1041,22 @@ export class PeerNetwork extends EventTarget {
     entry.lastSeen = Date.now()
     switch (data.kind) {
       case BinKind.PROBE:
-        // Phase 2.1 能力探测：收到 probe 立即回 ACK（带 size）
+        // Phase 2.1 能力探测：收到 probe 立即回 ACK（带 size + tag）
         this._sendBinary(connKey, {
           kind: BinKind.PROBE_ACK,
-          size: data.size || 0
+          size: data.size || 0,
+          tag: data.tag
         }).catch(() => {})
         break
       case BinKind.PROBE_ACK:
-        // 由 _probeCapability 的等待逻辑处理（通过事件或回调）
-        this._emit('bin:probe_ack', { connKey, size: data.size || 0 })
+        // 由 _probeCapability 的等待逻辑处理（通过事件回调）
+        this._emit('bin:probe_ack', { connKey, size: data.size || 0, tag: data.tag })
         break
       case BinKind.FILE_CHUNK:
         this._onFileChunkBin(connKey, data)
         break
       case BinKind.FILE_META_BIN:
       case BinKind.LCAN_BLOB:
-        // Phase 2.x 占位：后续文件传输 / LCAN 大块逻辑接入
         dbg('bin:blob', connKey, data.kind)
         break
       default:
@@ -971,13 +1065,246 @@ export class PeerNetwork extends EventTarget {
   }
 
   /**
-   * bin 通道文件分片接收（Phase 2.1 接入完整逻辑；此处先聚合缓冲）。
+   * bin 通道文件分片接收：ArrayBuffer 聚合 + 总哈希校验 + 签名验证 + Blob URL 生成。
    * @param {string} connKey
-   * @param {{kind, fileId, index, total, buf:ArrayBuffer}} data
+   * @param {{kind, fileId, index, total, chunkSize, totalHashHex, fileSig, from,
+   *          fileName, fileType, fileSize, room, name, buf:ArrayBuffer}} data
    */
   _onFileChunkBin(connKey, data) {
-    // 占位：Phase 2.1 实现 ArrayBuffer 聚合 + 总签名校验 + Blob URL 生成
-    dbg('bin:file_chunk', connKey, data?.fileId, data?.index, '/', data?.total)
+    const { fileId, index, total, chunkSize, totalHashHex, fileSig, buf } = data
+    if (!fileId || !buf || typeof index !== 'number') return
+    const entry = this.connections.get(connKey)
+    const fromPeerId = data.from || entry?.peerId || ''
+    if (!fromPeerId) return
+
+    if (!this._fileChunks) this._fileChunks = new Map()
+    let agg = this._fileChunks.get(fileId)
+    if (!agg) {
+      agg = {
+        total,
+        chunkSize,
+        totalHashHex,
+        fileSig,
+        from: fromPeerId,
+        chunks: new Map(),
+        meta: {
+          fileName: data.fileName,
+          fileType: data.fileType,
+          fileSize: data.fileSize,
+          room: data.room,
+          from: fromPeerId,
+          name: data.name || fromPeerId.slice(0, 8),
+          timestamp: Date.now()
+        },
+        firstSeen: Date.now()
+      }
+      this._fileChunks.set(fileId, agg)
+    }
+    // 仅接受与首次一致的 chunkSize（避免 push/pull 不同尺寸交叉污染）
+    if (agg.chunkSize && agg.chunkSize !== chunkSize) return
+    agg.chunks.set(index, buf)
+
+    // 进度事件（UI 进度条用）
+    this._emit('file:progress', {
+      fileId,
+      received: agg.chunks.size,
+      total: agg.total,
+      bytes: data.fileSize || 0
+    })
+
+    // 全部到齐：组装
+    if (agg.chunks.size >= agg.total) {
+      this._fileChunks.delete(fileId)
+      this._assembleFile(fileId, agg).catch((e) => {
+        console.warn('[nchat] assemble file failed:', e?.message)
+      })
+    }
+
+    // 惰性清理：超过 10 分钟未完成的聚合丢弃
+    if (this._fileChunks.size > 50) {
+      const cutoff = Date.now() - 10 * 60 * 1000
+      for (const [fid, a] of this._fileChunks) {
+        if (a.firstSeen < cutoff) this._fileChunks.delete(fid)
+      }
+    }
+  }
+
+  /**
+   * 组装完整文件：拼接 ArrayBuffer → 验总哈希 → 验签名 → Blob URL → 发射 chat 事件。
+   * 同时缓存到 _outgoingFiles 成为 holder，供其他节点拉取。
+   * @param {string} fileId
+   * @param {{total, chunkSize, totalHashHex, fileSig, from, chunks:Map, meta:object}} agg
+   */
+  async _assembleFile(fileId, agg) {
+    // 拼接 ArrayBuffer
+    const parts = []
+    let totalLen = 0
+    for (let i = 0; i < agg.total; i++) {
+      const p = agg.chunks.get(i)
+      if (!p) {
+        console.warn('[nchat] file assemble: missing chunk', fileId, i)
+        this._emit('file:unavailable', { fileId, from: agg.from })
+        return
+      }
+      parts.push(p)
+      totalLen += p.byteLength
+    }
+    const combined = new Uint8Array(totalLen)
+    let offset = 0
+    for (const p of parts) {
+      combined.set(new Uint8Array(p), offset)
+      offset += p.byteLength
+    }
+
+    // 验总哈希
+    const hashHex = sha256Hex(combined.buffer)
+    if (hashHex !== agg.totalHashHex) {
+      console.warn('[nchat] file hash mismatch, discard', fileId)
+      this._emit('file:unavailable', { fileId, from: agg.from })
+      return
+    }
+    // 验签名（fileId + ':' + totalHashHex，由原始发送者私钥签署）
+    const sigOk = await edVerify(agg.from, agg.fileSig, fileId + ':' + agg.totalHashHex)
+    if (!sigOk) {
+      console.warn('[nchat] file signature invalid, discard', fileId)
+      this._emit('file:unavailable', { fileId, from: agg.from })
+      return
+    }
+
+    // 创建 Blob URL（全程无 base64，零膨胀）
+    const mime = agg.meta.fileType || 'application/octet-stream'
+    const blob = new Blob([combined.buffer], { type: mime })
+    const blobUrl = URL.createObjectURL(blob)
+
+    // 缓存为 holder（发送者离线后，本节点可向其他节点提供该文件）
+    if (!this._outgoingFiles) this._outgoingFiles = new Map()
+    this._outgoingFiles.set(fileId, {
+      room: agg.meta.room,
+      arrayBuffer: combined.buffer,
+      name: agg.meta.fileName,
+      type: agg.meta.fileType,
+      size: agg.meta.fileSize,
+      totalHashHex: agg.totalHashHex,
+      fileSig: agg.fileSig,
+      chunkSize: agg.chunkSize,
+      totalChunks: agg.total,
+      originalFrom: agg.from, // 原始发送者 peerId（fileSig 验签用）
+      isHolder: true
+    })
+    addHolder('file:' + fileId, this.identity.peerId)
+
+    // 发射 chat 事件（替换 meta 卡片为完整内容）
+    this._emit('chat', {
+      id: fileId,
+      room: agg.meta.room,
+      from: agg.meta.from,
+      name: agg.meta.name,
+      file: {
+        name: agg.meta.fileName,
+        type: agg.meta.fileType,
+        size: agg.meta.fileSize,
+        blobUrl,
+        fileId,
+        fromPeerId: agg.from,
+        totalHashHex: agg.totalHashHex,
+        isMeta: false
+      },
+      timestamp: agg.meta.timestamp
+    })
+    dbg('file:assembled', fileId, totalLen, 'bytes')
+  }
+
+  // ---------------- Phase 2.1 能力探测（蛛网高性能文件通道） ----------------
+  /**
+   * 探测对端 bin 通道最大可接受分片大小。
+   * 优先读 localStorage 缓存（24h 内不重复探测）；否则逐档探测 256KB→128KB→64KB→32KB。
+   * @param {string} connKey
+   * @returns {Promise<number>} 探测到的能力（字节）
+   */
+  async _probeCapability(connKey) {
+    const entry = this.connections.get(connKey)
+    if (!entry || !entry.peerId) return PROBE_TIERS[PROBE_TIERS.length - 1]
+    // 缓存命中
+    const cached = this._loadCapability(entry.peerId)
+    if (cached) {
+      dbg('probe:cache hit', entry.peerId, cached)
+      return cached
+    }
+    // 逐档探测
+    for (const size of PROBE_TIERS) {
+      const ok = await this._probeOnce(connKey, size)
+      if (ok) {
+        this._saveCapability(entry.peerId, size)
+        dbg('probe:success', entry.peerId, size)
+        return size
+      }
+    }
+    // 全部失败：用最小档并缓存（短时间内不再重试）
+    const fallback = PROBE_TIERS[PROBE_TIERS.length - 1]
+    this._saveCapability(entry.peerId, fallback)
+    dbg('probe:all failed, fallback', entry.peerId, fallback)
+    return fallback
+  }
+
+  /**
+   * 单次探测：发 N 字节 ArrayBuffer → 等 PROBE_ACK（1.5s 超时）。
+   * @param {string} connKey
+   * @param {number} size  探测字节数
+   * @returns {Promise<boolean>}
+   */
+  _probeOnce(connKey, size) {
+    const tag = 'probe:' + size + ':' + Math.random().toString(36).slice(2, 10)
+    const buf = new ArrayBuffer(size)
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => {
+        this.removeEventListener('bin:probe_ack', onAck)
+        resolve(false)
+      }, PROBE_TIMEOUT)
+      const onAck = (e) => {
+        if (e.detail?.connKey !== connKey) return
+        if (e.detail?.tag !== tag) return
+        clearTimeout(timer)
+        this.removeEventListener('bin:probe_ack', onAck)
+        resolve(true)
+      }
+      this.addEventListener('bin:probe_ack', onAck)
+      this._sendBinary(connKey, { kind: BinKind.PROBE, size, tag, buf }).catch(() => {
+        clearTimeout(timer)
+        this.removeEventListener('bin:probe_ack', onAck)
+        resolve(false)
+      })
+    })
+  }
+
+  /** 从 localStorage 读取对端能力缓存（过期返回 null） */
+  _loadCapability(peerId) {
+    try {
+      const raw = localStorage.getItem(CAP_CACHE_KEY)
+      if (!raw) return null
+      const map = JSON.parse(raw)
+      const rec = map[peerId]
+      if (!rec) return null
+      if (Date.now() - rec.ts > PROBE_CACHE_TTL) return null
+      return rec.size
+    } catch (e) {
+      return null
+    }
+  }
+
+  /** 持久化对端能力缓存（LRU 100 个 peer） */
+  _saveCapability(peerId, size) {
+    try {
+      const raw = localStorage.getItem(CAP_CACHE_KEY)
+      const map = raw ? JSON.parse(raw) : {}
+      map[peerId] = { size, ts: Date.now() }
+      const keys = Object.keys(map)
+      while (keys.length > 100) {
+        delete map[keys.shift()]
+      }
+      localStorage.setItem(CAP_CACHE_KEY, JSON.stringify(map))
+    } catch (e) {
+      /* ignore */
+    }
   }
 
   /**
@@ -1388,6 +1715,28 @@ export class PeerNetwork extends EventTarget {
         break
       case MsgType.LCAN_HOLDERS:
         this._onLcanHolders(data)
+        break
+      // ---- Phase 2.2: 群公告 ----
+      case MsgType.ANNOUNCEMENT:
+        this._onAnnouncement(data)
+        break
+      // ---- Phase 2.3: Pin 置顶 ----
+      case MsgType.PIN_UPDATE:
+        this._onPinUpdate(data)
+        break
+      // ---- Phase 2.4: 云文档 ----
+      case MsgType.DOC_UPDATE:
+        this._onDocUpdate(data)
+        break
+      case MsgType.DOC_LIST:
+        this._onDocList(connKey, data)
+        break
+      // ---- Phase 2.5: 消息搜索 ----
+      case MsgType.MSG_SEARCH:
+        this._onMsgSearch(connKey, data)
+        break
+      case MsgType.MSG_SEARCH_RESULT:
+        this._onMsgSearchResult(data)
         break
     }
   }
@@ -2064,7 +2413,458 @@ export class PeerNetwork extends EventTarget {
       payload: { room, password: actualPassword }
     })
     await this.requestHistory(room, 0)
+    // Phase 2.2: 入房后拉取群公告
+    this._fetchAnnouncement(room).catch(() => {})
+    // Phase 2.3: 入房后拉取 Pin 列表
+    this._fetchPins(room).catch(() => {})
+    // Phase 2.4: 入房后拉取云文档列表
+    this._fetchDocs(room).catch(() => {})
     this._emit('member:update', { room })
+  }
+
+  // ---------------- Phase 2.2: 群公告 ----------------
+
+  /**
+   * 设置房间公告（仅 owner 或星标 ≥ 50 可操作）。
+   * STORE 到 LCAN（发送者离线后其他节点仍可读）+ 广播 ANNOUNCEMENT 信号。
+   * @param {string} room
+   * @param {string} text  公告文本（空字符串表示清除公告）
+   */
+  async setAnnouncement(room, text) {
+    if (!this._localRoomsSet.has(room)) {
+      this._emit('error', { type: 'announcement_denied', message: '请先加入房间' })
+      return false
+    }
+    // 权限校验：owner 或星标 ≥ 50
+    const meta = this._localRoomMeta.get(room)
+    const known = this.knownRooms.get(room)
+    const owner = meta?.owner || known?.owner
+    const isOwner = owner === this.identity.peerId
+    const myStars = this._getMyStars(room)
+    if (!isOwner && myStars < 50) {
+      this._emit('error', { type: 'announcement_denied', message: '仅房主或星标≥50的成员可发布公告' })
+      return false
+    }
+
+    const ann = {
+      room,
+      text: String(text || ''),
+      from: this.identity.peerId,
+      name: this.ownName,
+      timestamp: Date.now()
+    }
+
+    // LCAN STORE（发送者离线后，其他节点仍可从责任集/holder 获取公告）
+    this.lcanStore('room', room + ':announcement', ann).catch(() => {})
+
+    // 广播 ANNOUNCEMENT 信号（在线节点立即收到）
+    const msg = await buildMessage(
+      {
+        type: MsgType.ANNOUNCEMENT,
+        from: this.identity.peerId,
+        to: room,
+        payload: ann,
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(msg.id)
+    await this._broadcast(msg)
+
+    // 本地立即生效
+    this._emit('announcement', ann)
+    return true
+  }
+
+  /**
+   * 收到公告广播信号。
+   * @param {{ payload: { room, text, from, name, timestamp } }} msg
+   */
+  _onAnnouncement(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const ann = msg.payload
+    if (!ann || !ann.room) return
+    // 屏蔽过滤
+    if (this._isMessageBanned(ann.room, msg.from)) return
+    // 持久化到本地 LCAN（后续入房者可从本地获取）
+    this.lcanStore('room', ann.room + ':announcement', ann).catch(() => {})
+    this._emit('announcement', ann)
+  }
+
+  /**
+   * 从 LCAN 拉取房间公告（入房时调用，离线发送者仍可读）。
+   * @param {string} room
+   */
+  async _fetchAnnouncement(room) {
+    try {
+      const result = await this.lcanGet('room', room + ':announcement')
+      if (result?.payload) {
+        this._emit('announcement', result.payload)
+      }
+    } catch (e) {
+      // NOT_FOUND 或无候选——房间无公告，正常静默
+    }
+  }
+
+  // ---------------- Phase 2.3: Pin 置顶 ----------------
+
+  /**
+   * 切换消息置顶状态（加入房间即可操作；owner/星标≥50 可管理他人消息的 Pin）。
+   * STORE 到 LCAN（发送者离线后其他节点仍可读）+ 广播 PIN_UPDATE 信号。
+   * @param {string} room
+   * @param {string} msgId  目标消息 ID
+   * @returns {Promise<boolean>} 操作是否成功
+   */
+  async togglePin(room, msgId) {
+    if (!this._localRoomsSet.has(room)) {
+      this._emit('error', { type: 'pin_denied', message: '请先加入房间' })
+      return false
+    }
+    // 读取当前 Pin 列表（本地缓存 + LCAN 合并）
+    const current = await this._loadPins(room)
+    const set = new Set(current)
+    const pinned = set.has(msgId)
+    if (pinned) {
+      set.delete(msgId)
+    } else {
+      set.add(msgId)
+    }
+    const pins = [...set]
+    const pinData = {
+      room,
+      pins,
+      from: this.identity.peerId,
+      name: this.ownName,
+      timestamp: Date.now()
+    }
+    // LCAN STORE（发送者离线后，其他节点仍可从责任集/holder 获取 Pin 列表）
+    this.lcanStore('room', room + ':pins', pinData).catch(() => {})
+    // 广播 PIN_UPDATE 信号（在线节点立即收到）
+    const msg = await buildMessage(
+      {
+        type: MsgType.PIN_UPDATE,
+        from: this.identity.peerId,
+        to: room,
+        payload: pinData,
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(msg.id)
+    await this._broadcast(msg)
+    // 本地立即生效
+    this._emit('pin_update', pinData)
+    return true
+  }
+
+  /**
+   * 收到 Pin 列表变更广播信号。
+   * @param {{ payload: { room, pins: string[], from, name, timestamp } }} msg
+   */
+  _onPinUpdate(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const pinData = msg.payload
+    if (!pinData || !pinData.room || !Array.isArray(pinData.pins)) return
+    // 屏蔽过滤
+    if (this._isMessageBanned(pinData.room, msg.from)) return
+    // 持久化到本地 LCAN（后续入房者可从本地获取）
+    this.lcanStore('room', pinData.room + ':pins', pinData).catch(() => {})
+    this._emit('pin_update', pinData)
+  }
+
+  /**
+   * 从 LCAN 拉取房间 Pin 列表（入房时调用，离线发送者仍可读）。
+   * @param {string} room
+   */
+  async _fetchPins(room) {
+    try {
+      const result = await this.lcanGet('room', room + ':pins')
+      if (result?.payload) {
+        this._emit('pin_update', result.payload)
+      }
+    } catch (e) {
+      // NOT_FOUND 或无候选——房间无 Pin，正常静默
+    }
+  }
+
+  /**
+   * 加载当前房间的 Pin 列表（本地 LCAN 读取）。
+   * @param {string} room
+   * @returns {Promise<string[]>}
+   */
+  async _loadPins(room) {
+    try {
+      const result = await this.lcanGet('room', room + ':pins')
+      if (result?.payload?.pins && Array.isArray(result.payload.pins)) {
+        return result.payload.pins
+      }
+    } catch (e) {
+      /* NOT_FOUND 正常 */
+    }
+    return []
+  }
+
+  // ---------------- Phase 2.4: 云文档（LWW + 版本） ----------------
+
+  /**
+   * 创建新云文档。
+   * @param {string} room
+   * @param {string} title
+   * @returns {Promise<Object|null>} 创建的文档对象
+   */
+  async createDoc(room, title) {
+    if (!this._localRoomsSet.has(room)) {
+      this._emit('error', { type: 'doc_denied', message: '请先加入房间' })
+      return null
+    }
+    const doc = {
+      docId: 'doc-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      room,
+      title: String(title || '未命名文档'),
+      content: '',
+      version: 1,
+      updatedAt: Date.now(),
+      author: this.identity.peerId,
+      authorName: this.ownName,
+      deleted: false
+    }
+    await putDoc(doc)
+    this.lcanStore('doc', doc.docId, doc).catch(() => {})
+    await this._broadcastDocUpdate(room, doc)
+    this._emit('doc_update', { room, doc })
+    return doc
+  }
+
+  /**
+   * 更新云文档内容（version+1）。
+   * @param {string} room
+   * @param {string} docId
+   * @param {Object} patch { title?, content? }
+   * @returns {Promise<Object|null>} 更新后的文档；版本冲突返回 null
+   */
+  async updateDoc(room, docId, patch) {
+    if (!this._localRoomsSet.has(room)) {
+      this._emit('error', { type: 'doc_denied', message: '请先加入房间' })
+      return null
+    }
+    const existing = await getDoc(docId)
+    if (!existing) {
+      this._emit('error', { type: 'doc_not_found', message: '文档不存在' })
+      return null
+    }
+    const updated = {
+      ...existing,
+      title: patch.title !== undefined ? patch.title : existing.title,
+      content: patch.content !== undefined ? patch.content : existing.content,
+      version: existing.version + 1,
+      updatedAt: Date.now(),
+      author: this.identity.peerId,
+      authorName: this.ownName
+    }
+    const ok = await putDoc(updated)
+    if (!ok) {
+      // 版本冲突：本地已有更高版本
+      this._emit('doc_conflict', { room, docId, local: existing, remote: updated })
+      return null
+    }
+    this.lcanStore('doc', docId, updated).catch(() => {})
+    await this._broadcastDocUpdate(room, updated)
+    this._emit('doc_update', { room, doc: updated })
+    return updated
+  }
+
+  /**
+   * 重命名云文档。
+   */
+  async renameDoc(room, docId, newTitle) {
+    return this.updateDoc(room, docId, { title: newTitle })
+  }
+
+  /**
+   * 删除云文档（标记删除，version+1，广播）。
+   */
+  async deleteDocRemote(room, docId) {
+    if (!this._localRoomsSet.has(room)) {
+      this._emit('error', { type: 'doc_denied', message: '请先加入房间' })
+      return false
+    }
+    const existing = await getDoc(docId)
+    if (!existing) return false
+    const deleted = {
+      ...existing,
+      deleted: true,
+      version: existing.version + 1,
+      updatedAt: Date.now(),
+      author: this.identity.peerId,
+      authorName: this.ownName
+    }
+    await putDoc(deleted)
+    this.lcanStore('doc', docId, deleted).catch(() => {})
+    await this._broadcastDocUpdate(room, deleted)
+    this._emit('doc_update', { room, doc: deleted })
+    // 本地物理删除（标记删除的文档从 IndexedDB 清除，仅保留 LCAN 中的副本供其他节点同步）
+    await deleteDoc(docId)
+    return true
+  }
+
+  /** 广播 DOC_UPDATE 信号 */
+  async _broadcastDocUpdate(room, doc) {
+    const msg = await buildMessage(
+      {
+        type: MsgType.DOC_UPDATE,
+        from: this.identity.peerId,
+        to: room,
+        payload: { room, doc },
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(msg.id)
+    await this._broadcast(msg)
+  }
+
+  /** 收到文档更新广播 */
+  async _onDocUpdate(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { room, doc } = msg.payload || {}
+    if (!room || !doc || !doc.docId) return
+    if (this._isMessageBanned(room, msg.from)) return
+    // LWW 写入本地
+    const ok = await putDoc(doc)
+    if (ok) {
+      this.lcanStore('doc', doc.docId, doc).catch(() => {})
+      this._emit('doc_update', { room, doc })
+    } else {
+      // 本地版本更高 → 冲突提示（仅当前用户正在编辑该文档时）
+      const local = await getDoc(doc.docId)
+      if (local) {
+        this._emit('doc_conflict', { room, docId: doc.docId, local, remote: doc })
+      }
+    }
+  }
+
+  /** 收到文档列表同步请求 → 回复本地文档列表 */
+  async _onDocList(connKey, msg) {
+    if (!this._markProcessed(msg.id)) return
+    const room = msg.payload?.room
+    if (!room || !this._localRoomsSet.has(room)) return
+    const docs = await getAllDocs(room)
+    for (const doc of docs) {
+      // 逐个广播（复用 DOC_UPDATE 通道，对端 LWW 合并）
+      const reply = await buildMessage(
+        {
+          type: MsgType.DOC_UPDATE,
+          from: this.identity.peerId,
+          to: room,
+          payload: { room, doc },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      // 定向回复（不广播，避免风暴）
+      this._send(connKey, reply).catch(() => {})
+    }
+  }
+
+  /** 入房时拉取云文档列表（本地 + 网络） */
+  async _fetchDocs(room) {
+    // 1. 本地缓存先渲染
+    const localDocs = await getAllDocs(room)
+    for (const doc of localDocs) {
+      if (!doc.deleted) {
+        this._emit('doc_update', { room, doc })
+      }
+    }
+    // 2. 网络请求其他节点的文档列表
+    try {
+      const msg = await buildMessage(
+        {
+          type: MsgType.DOC_LIST,
+          from: this.identity.peerId,
+          to: room,
+          payload: { room },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      this._markProcessed(msg.id)
+      await this._broadcast(msg)
+    } catch (e) {
+      /* 静默 */
+    }
+    // 3. 从 LCAN 拉取已知 docId 的最新版本（补充离线期间的更新）
+    // 此处依赖 DOC_LIST 的回复覆盖，LCAN 兜底由责任集提供
+  }
+
+  // ---------------- Phase 2.5: 消息搜索（本地 + 网络） ----------------
+
+  /**
+   * 网络搜索消息：广播 MSG_SEARCH 给所有已连接节点，2s 内聚合回复。
+   * 本地搜索由调用方（useChat）自行执行，此处仅负责网络部分。
+   * @param {string} keyword  搜索关键词
+   * @returns {Promise<string>} searchId（用于追踪本次搜索）
+   */
+  async searchMessagesNetwork(keyword) {
+    const kw = String(keyword || '').trim()
+    if (!kw) return null
+    const searchId = 'search-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8)
+    // 广播搜索请求
+    try {
+      const msg = await buildMessage(
+        {
+          type: MsgType.MSG_SEARCH,
+          from: this.identity.peerId,
+          to: '',
+          payload: { keyword: kw, searchId },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      this._markProcessed(msg.id)
+      await this._broadcast(msg)
+    } catch (e) {
+      /* 静默 */
+    }
+    return searchId
+  }
+
+  /** 收到搜索请求 → 搜索本地消息 → 定向回复结果 */
+  async _onMsgSearch(connKey, msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { keyword, searchId } = msg.payload || {}
+    if (!keyword || !searchId) return
+    // 搜索本地消息（限制 20 条，避免回复过大）
+    let results = []
+    try {
+      results = await searchMessagesInDB(keyword, { limit: 20 })
+    } catch (e) {
+      results = []
+    }
+    if (!results.length) return // 无结果不回复，减少网络开销
+    try {
+      const reply = await buildMessage(
+        {
+          type: MsgType.MSG_SEARCH_RESULT,
+          from: this.identity.peerId,
+          to: '',
+          payload: { searchId, results },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      // 定向回复（不广播）
+      this._send(connKey, reply).catch(() => {})
+    } catch (e) {
+      /* 静默 */
+    }
+  }
+
+  /** 收到搜索结果 → 合并并 emit */
+  _onMsgSearchResult(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { searchId, results } = msg.payload || {}
+    if (!searchId || !Array.isArray(results)) return
+    this._emit('search_result', { searchId, results, from: msg.from })
   }
 
   /**
@@ -2185,33 +2985,58 @@ export class PeerNetwork extends EventTarget {
     if (!this._localRoomsSet.has(room)) {
       await this.joinRoom(room)
     }
-    // 文件大小上限（大文件通过元信息 + 按需拉取传输，不受 DataChannel 限制）
+    // 文件大小上限
     const MAX_FILE_SIZE = 100 * 1024 * 1024
     if (file.size > MAX_FILE_SIZE) {
       this._emit('error', { type: 'file_too_large', message: `文件超过 100MB 限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）` })
       return false
     }
-    // 读取文件为 base64
-    const dataUrl = await new Promise((resolve, reject) => {
+
+    // ---- 全程 ArrayBuffer（零 base64 膨胀） ----
+    const arrayBuffer = await new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result)
       reader.onerror = () => reject(reader.error)
-      reader.readAsDataURL(file)
+      reader.readAsArrayBuffer(file)
     })
 
-    // 唯一 fileId（用于分片聚合与去重）
+    // 唯一 fileId
     const fileId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
-    // 小文件阈值：≤1MB 直接广播完整内容（接收方立即可见）；>1MB 只广播元信息，按需拉取
-    const SMALL_FILE_LIMIT = 1024 * 1024
-    const isSmall = file.size <= SMALL_FILE_LIMIT
+    // 总哈希（sha256，noble 纯 JS，安全/非安全上下文通用）
+    const totalHashHex = sha256Hex(arrayBuffer)
+    // 每文件一次签名（fileId + ':' + totalHashHex）—— 分片只带 fileId+index，不逐片签
+    const fileSig = await edSign(this.identity.privateKey, fileId + ':' + totalHashHex)
 
-    // 图片缩略图（大文件广播元信息时附带，供接收方预览）
+    // 图片缩略图（meta 卡片预览用，小 dataUrl 走 JSON 通道）
     let thumbDataUrl = null
-    if (!isSmall && file.type && file.type.startsWith('image/')) {
-      thumbDataUrl = await makeThumbnail(dataUrl)
+    if (file.type && file.type.startsWith('image/')) {
+      thumbDataUrl = await makeThumbnailFromBlob(file)
     }
 
-    // 本地立即可见
+    // 缓存完整 ArrayBuffer（供按需拉取；本节点是首个 holder）
+    this._sentFileIds.add(fileId)
+    if (!this._outgoingFiles) this._outgoingFiles = new Map()
+    this._outgoingFiles.set(fileId, {
+      room,
+      arrayBuffer,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+      totalHashHex,
+      fileSig,
+      chunkSize: 0, // 探测后填充
+      totalChunks: 0,
+      originalFrom: this.identity.peerId // 原始发送者（fileSig 验签用）
+    })
+    addHolder('file:' + fileId, this.identity.peerId)
+    // 上限 20 个，超出清理最早的
+    if (this._outgoingFiles.size > 20) {
+      const oldest = this._outgoingFiles.keys().next().value
+      this._outgoingFiles.delete(oldest)
+    }
+
+    // 本地立即可见（blob URL，无 base64）
+    const localBlobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: file.type || 'application/octet-stream' }))
     this._emit('chat', {
       id: fileId,
       room,
@@ -2221,91 +3046,124 @@ export class PeerNetwork extends EventTarget {
         name: file.name,
         type: file.type,
         size: file.size,
-        dataUrl,
+        blobUrl: localBlobUrl,
         fileId,
-        fromPeerId: this.identity.peerId
+        fromPeerId: this.identity.peerId,
+        totalHashHex,
+        isMeta: false,
+        isLocal: true
       },
       timestamp: Date.now()
     })
 
-    // 大文件：缓存完整内容供按需拉取，广播元信息
-    if (!isSmall) {
-      // 记录"本节点发送过该文件"（即使缓存被淘汰也能区分"发过但缓存失效"与"从未发过"）
-      this._sentFileIds.add(fileId)
-      // 缓存发送中的大文件（fileId -> dataUrl），供接收方按需请求
-      if (!this._outgoingFiles) this._outgoingFiles = new Map()
-      this._outgoingFiles.set(fileId, { room, dataUrl, name: file.name, type: file.type, size: file.size })
-      // 持久化到 localStorage（刷新页面后仍可提供下载；超大文件可能超限则跳过）
-      try {
-        saveOutgoingFile(fileId, { room, dataUrl, name: file.name, type: file.type, size: file.size })
-      } catch (e) {
-        /* localStorage 超限时仅内存缓存，可接受 */
-      }
-      // 上限 20 个，超出清理最早的
-      if (this._outgoingFiles.size > 20) {
-        const oldest = this._outgoingFiles.keys().next().value
-        this._outgoingFiles.delete(oldest)
-        deleteOutgoingFile(oldest)
-      }
-      const meta = await buildMessage(
-        {
-          type: MsgType.FILE_META,
-          from: this.identity.peerId,
-          to: room,
-          payload: {
-            room,
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            fileId,
-            thumbDataUrl
-          },
-          extensions: { name: this.ownName }
+    // 广播 FILE_META（控制信息走 JSON 通道；分片内容走 bin 通道）
+    const meta = await buildMessage(
+      {
+        type: MsgType.FILE_META,
+        from: this.identity.peerId,
+        to: room,
+        payload: {
+          room,
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          fileId,
+          thumbDataUrl,
+          totalHashHex,
+          fileSig,
+          bin: true // 标记：使用 bin 通道推送分片
         },
-        this.identity.privateKey
-      )
-      this._markProcessed(meta.id)
-      await this._broadcast(meta)
-      return true
-    }
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(meta.id)
+    await this._broadcast(meta)
 
-    // 小文件：分片广播完整内容。PeerJS JSON 通道单条消息上限 16300 字节
-    // （chunkedMTU，JSON 序列化不自动分片），分片取 13000 字符 base64 保安全
-    const CHUNK_SIZE = 13000
-    const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE)
-    // 并行分片发送（每批 5 片），避免串行等待大幅降低总耗时
-    const CONCURRENCY = 5
-    for (let start = 0; start < totalChunks; start += CONCURRENCY) {
-      const end = Math.min(start + CONCURRENCY, totalChunks)
+    // LCAN STORE 文件元信息（发送者离线后，其他节点仍可从 LCAN 获知文件存在）
+    this.lcanStore('file', fileId, {
+      room,
+      fileName: file.name,
+      fileType: file.type,
+      fileSize: file.size,
+      fileId,
+      totalHashHex,
+      fileSig,
+      from: this.identity.peerId,
+      name: this.ownName
+    }).catch(() => {})
+
+    // 向所有已连接 peer 推送分片（bin 通道，每连接 3 路并发）
+    this._pushFileChunks(fileId).catch((e) => {
+      console.warn('[nchat] push file chunks failed:', e?.message)
+    })
+
+    return true
+  }
+
+  /**
+   * 向所有已连接且 bin 在线的 peer 推送文件分片（每连接独立探测 + 3 路并发）。
+   * @param {string} fileId
+   */
+  async _pushFileChunks(fileId) {
+    const entry = this._outgoingFiles?.get(fileId)
+    if (!entry) return
+    const targets = []
+    for (const [connKey, conn] of this.connections) {
+      if (!conn.peerId) continue
+      if (conn.binStatus !== 'online') continue
+      targets.push(connKey)
+    }
+    if (targets.length === 0) return
+    await Promise.allSettled(
+      targets.map((ck) => this._pushFileChunksToPeer(ck, fileId, entry))
+    )
+  }
+
+  /**
+   * 向单个 peer 推送文件分片：探测能力 → 自适应分片 → 3 路并发发送。
+   * @param {string} connKey
+   * @param {string} fileId
+   * @param {object} entry  _outgoingFiles 条目
+   */
+  async _pushFileChunksToPeer(connKey, fileId, entry) {
+    const { arrayBuffer, totalHashHex, fileSig, name, type, size, room } = entry
+    // 探测能力（缓存命中不重复探测）
+    const cap = await this._probeCapability(connKey)
+    const chunkSize = Math.max(1024, cap - FILE_CHUNK_HEADER_MARGIN)
+    const total = Math.ceil(arrayBuffer.byteLength / chunkSize)
+    // 更新缓存（供 _onFileRequest 用同样的尺寸）
+    entry.chunkSize = chunkSize
+    entry.totalChunks = total
+
+    for (let start = 0; start < total; start += FILE_BIN_CONCURRENCY) {
+      const end = Math.min(start + FILE_BIN_CONCURRENCY, total)
       const tasks = []
       for (let i = start; i < end; i++) {
-        const chunk = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
-        const msg = await buildMessage(
-          {
-            type: MsgType.FILE_MESSAGE,
+        const offset = i * chunkSize
+        const len = Math.min(chunkSize, arrayBuffer.byteLength - offset)
+        const buf = arrayBuffer.slice(offset, offset + len)
+        tasks.push(
+          this._sendBinary(connKey, {
+            kind: BinKind.FILE_CHUNK,
+            fileId,
+            index: i,
+            total,
+            chunkSize,
+            totalHashHex,
+            fileSig,
             from: this.identity.peerId,
-            to: room,
-            payload: {
-              room,
-              fileName: file.name,
-              fileType: file.type,
-              fileSize: file.size,
-              fileId,
-              chunkIndex: i,
-              totalChunks,
-              dataUrl: chunk,
-              fromPeerId: this.identity.peerId
-            },
-            extensions: { name: this.ownName }
-          },
-          this.identity.privateKey
+            fileName: name,
+            fileType: type,
+            fileSize: size,
+            room,
+            name: this.ownName,
+            buf
+          })
         )
-        this._markProcessed(msg.id)
-        tasks.push(this._broadcast(msg))
       }
       await Promise.all(tasks)
     }
-    return true
   }
 
   /** 处理收到的文件消息 */
@@ -2401,6 +3259,10 @@ export class PeerNetwork extends EventTarget {
     // 屏蔽过滤
     if (this._isMessageBanned(room, msg.from)) return
 
+    // 记录文件元信息到 holder 表索引（便于后续多源拉取定位）
+    // 注意：holder 表的 key 是 'file:' + fileId，记录的是"谁持有完整内容"
+    // 此处先不加入 holder（meta 不是完整内容），等收到分片组装完成后再加
+
     this._emit('chat', {
       id: fileId,
       room,
@@ -2412,8 +3274,9 @@ export class PeerNetwork extends EventTarget {
         size: msg.payload.fileSize,
         fileId,
         fromPeerId: msg.from,
-        // 元信息模式：无完整 dataUrl，仅缩略图；点击下载时按需拉取
+        // 元信息模式：无完整内容，仅缩略图；分片由 bin 通道自动推送或点击拉取
         thumbDataUrl: msg.payload.thumbDataUrl || null,
+        totalHashHex: msg.payload.totalHashHex || null,
         isMeta: true
       },
       timestamp: msg.timestamp
@@ -2425,13 +3288,16 @@ export class PeerNetwork extends EventTarget {
     }
   }
 
-  /** 收到文件下载请求：从本地缓存找到完整内容，分片回传 */
+  /**
+   * 收到文件下载请求：从本地 ArrayBuffer 缓存按请求者指定的 chunkSize + 分配索引，
+   * 通过 bin 通道回传分片（多源取模分配：每个 holder 只发自己负责的分片）。
+   */
   async _onFileRequest(peerJsId, msg) {
     const fileId = msg.payload?.fileId
     if (!fileId) return
     if (!this._markProcessed(msg.id)) return
     const entry = this._outgoingFiles?.get(fileId)
-    if (!entry) {
+    if (!entry || !entry.arrayBuffer) {
       // 本节点曾发送过该文件但缓存已失效（如刷新页面后内存缓存丢失）：
       // 回发 FILE_UNAVAILABLE，让请求者立即知道原因（而不是静默超时）
       if (this._sentFileIds.has(fileId) && msg.from !== this.identity.peerId) {
@@ -2440,55 +3306,57 @@ export class PeerNetwork extends EventTarget {
           payload: { fileId }
         }, msg.from)
       }
-      // 从未发过该文件（可能是转发请求）：静默
       return
     }
-    dbg('file:request served', fileId, 'to', peerJsId)
 
-    // 回传目标：优先找请求者（msg.from）的直连连接；
-    // 找不到（请求经转发到达）则用收到请求的连接，让转发节点继续扩散分片
+    // 请求者指定的分片大小（多源统一尺寸，默认 64KB）
+    const chunkSize = msg.payload?.chunkSize || PULL_CHUNK_SIZE
+    const total = Math.ceil(entry.arrayBuffer.byteLength / chunkSize)
+    // 多源取模分配：holder 只发 position, position+modulo, position+2*modulo... 的分片
+    const modulo = msg.payload?.modulo || 1
+    const position = msg.payload?.position || 0
+    const indices = []
+    for (let i = position; i < total; i += modulo) indices.push(i)
+
+    // 回传目标：优先找请求者（msg.from）的直连连接
     let target = peerJsId
     if (msg.from && msg.from !== this.identity.peerId) {
-      for (const [id, e] of this.connections) {
-        if (e.peerId === msg.from) {
-          target = id
-          break
-        }
-      }
+      const ck = this._connKeyForPeerId(msg.from)
+      if (ck) target = ck
     }
 
-    const CHUNK_SIZE = 12000
-    const totalChunks = Math.ceil(entry.dataUrl.length / CHUNK_SIZE)
-    const CONCURRENCY = 5
-    for (let start = 0; start < totalChunks; start += CONCURRENCY) {
-      const end = Math.min(start + CONCURRENCY, totalChunks)
+    dbg('file:request served', fileId, 'to', msg.from, 'indices', indices.length, '/', total)
+
+    const { arrayBuffer, totalHashHex, fileSig, name, type, size, room } = entry
+    // from = 原始发送者 peerId（fileSig 验签用；holder 转发时不变）
+    const fromPeerId = entry.originalFrom || this.identity.peerId
+    for (let start = 0; start < indices.length; start += FILE_BIN_CONCURRENCY) {
+      const end = Math.min(start + FILE_BIN_CONCURRENCY, indices.length)
       const tasks = []
-      for (let i = start; i < end; i++) {
-        const chunk = entry.dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
-        const chunkMsg = await buildMessage(
-          {
-            type: MsgType.FILE_MESSAGE,
-            from: this.identity.peerId,
-            to: entry.room,
-            payload: {
-              room: entry.room,
-              fileName: entry.name,
-              fileType: entry.type,
-              fileSize: entry.size,
-              fileId,
-              chunkIndex: i,
-              totalChunks,
-              dataUrl: chunk
-            },
-            extensions: { name: this.ownName }
-          },
-          this.identity.privateKey
+      for (let k = start; k < end; k++) {
+        const i = indices[k]
+        const offset = i * chunkSize
+        if (offset >= arrayBuffer.byteLength) continue
+        const len = Math.min(chunkSize, arrayBuffer.byteLength - offset)
+        const buf = arrayBuffer.slice(offset, offset + len)
+        tasks.push(
+          this._sendBinary(target, {
+            kind: BinKind.FILE_CHUNK,
+            fileId,
+            index: i,
+            total,
+            chunkSize,
+            totalHashHex,
+            fileSig,
+            from: fromPeerId,
+            fileName: name,
+            fileType: type,
+            fileSize: size,
+            room,
+            name: this.ownName,
+            buf
+          })
         )
-        this._markProcessed(chunkMsg.id)
-        tasks.push(this._send(target, chunkMsg).then(sent => {
-          if (!sent && totalChunks > 1) return this._broadcast(chunkMsg)
-          return true
-        }))
       }
       await Promise.all(tasks)
     }
@@ -2501,14 +3369,50 @@ export class PeerNetwork extends EventTarget {
     this._emit('file:unavailable', { fileId, from: msg.from })
   }
 
-  /** 请求下载大文件完整内容（广播请求，持有该文件的节点响应，不依赖直连） */
-  async requestFile(fileId, fromPeerId) {
+  /**
+   * 请求下载大文件完整内容（多源并行拉取）。
+   * 查 holder 表 → 在线 holder 取模分配 → 各 holder 通过 bin 通道回传分片。
+   * 无已知在线 holder 时退化为广播请求。
+   * @param {string} fileId
+   * @param {string} [_fromPeerId]  原始发送者 peerId（兼容旧 API，未使用）
+   */
+  async requestFile(fileId, _fromPeerId) {
     if (!fileId) return false
-    // 广播请求：房间内任何持有该文件缓存的节点（即发送者）都会响应
-    await this._broadcast({
-      type: MsgType.FILE_REQUEST,
-      payload: { fileId }
+
+    // 确定分片大小：优先用已部分接收的 chunkSize（保证 push/pull 索引对齐），
+    // 否则用默认 64KB
+    let chunkSize = PULL_CHUNK_SIZE
+    if (this._fileChunks?.has(fileId)) {
+      const agg = this._fileChunks.get(fileId)
+      if (agg?.chunkSize) chunkSize = agg.chunkSize
+    }
+
+    // 查 holder 表，过滤出在线的（排除自己）
+    const allHolders = getHolders('file:' + fileId) || []
+    const onlineHolders = allHolders.filter(
+      (pid) => pid !== this.identity.peerId && this._connKeyForPeerId(pid)
+    )
+
+    if (onlineHolders.length === 0) {
+      // 无已知在线 holder：广播请求（房间内任何持有者响应）
+      await this._broadcast({
+        type: MsgType.FILE_REQUEST,
+        payload: { fileId, chunkSize }
+      })
+      return true
+    }
+
+    // 多源并行：按 holder 位置取模分配分片
+    const modulo = onlineHolders.length
+    const tasks = onlineHolders.map((pid, pos) => {
+      const ck = this._connKeyForPeerId(pid)
+      if (!ck) return Promise.resolve()
+      return this._sendRaw(ck, {
+        type: MsgType.FILE_REQUEST,
+        payload: { fileId, chunkSize, modulo, position: pos }
+      }, pid)
     })
+    await Promise.all(tasks)
     return true
   }
 
@@ -2570,25 +3474,37 @@ export class PeerNetwork extends EventTarget {
   }
 
   _discover() {
-    if (!this.peer || this.peer.destroyed) return
-    if (typeof this.peer.listAllPeers !== 'function') return
-    if (!this.peerJsId) return
+    // 兼容：对主域执行发现（定时器调用入口）
+    if (this._primaryDomainKey) {
+      this._discoverDomain(this._primaryDomainKey)
+    }
+  }
+
+  /**
+   * 发现指定域上的所有在线 peer 并主动连接（多域并行发现）。
+   * @param {string} domainKey
+   */
+  _discoverDomain(domainKey) {
+    const d = this.peers.get(domainKey)
+    if (!d || !d.peer || d.peer.destroyed) return
+    if (typeof d.peer.listAllPeers !== 'function') return
+    if (!d.peerJsId) return
     // PeerJS 的 listAllPeers 是回调式（不返回 Promise），
     // 且需要信令 socket 已连接；未连接时回调可能不触发，需防御。
     let done = false
     const finish = (ids) => {
       if (done) return
       done = true
-      dbg('discover:result', Array.isArray(ids) ? ids.length + ' peers' : 'non-array', ids)
+      dbg('discover:domain', domainKey, Array.isArray(ids) ? ids.length + ' peers' : 'non-array')
       if (!Array.isArray(ids)) return
       for (const id of ids) {
-        if (id !== this.peerJsId && !this.connections.has(id)) {
-          this._connectTo(id)
+        if (id !== d.peerJsId) {
+          this._connectTo(id, domainKey)
         }
       }
     }
     try {
-      const ret = this.peer.listAllPeers((...args) => {
+      const ret = d.peer.listAllPeers((...args) => {
         // 兼容 (err, peers) 与 (peers) 两种回调签名
         if (args.length >= 2) finish(args[1])
         else if (args.length === 1) finish(Array.isArray(args[0]) ? args[0] : [])
@@ -2599,7 +3515,7 @@ export class PeerNetwork extends EventTarget {
         ret.then(finish).catch(() => finish([]))
       }
     } catch (e) {
-      dbg('discover:error', e?.message)
+      dbg('discover:domain error', domainKey, e?.message)
     }
     // 兜底：3s 内回调未触发则放弃本次（不阻塞）
     setTimeout(() => finish([]), 3000)
