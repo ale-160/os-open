@@ -106,20 +106,57 @@ function downloadFile(file) {
   }
 }
 
-// 在新标签页打开图片（用 blob URL，避免 Chrome 拦截 data URL 顶层导航）
-function openImageInNewTab(file) {
-  const src = file.dataUrl || file.thumbDataUrl
-  if (!src) return
-  try {
-    const url = dataUrlToBlobUrl(src)
-    window.open(url, '_blank', 'noopener')
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
-  } catch (e) {
-    /* ignore */
+// ===== 图片放大查看（页面内 lightbox，不跳新标签页，避免掉出房间） =====
+const lightboxFileId = ref(null)
+// 当前 lightbox 展示的文件（响应式：meta 下载完成后自动更新为完整内容）
+const lightboxFile = computed(() => {
+  if (!lightboxFileId.value) return null
+  const m = props.messages.find((x) => x.file?.fileId === lightboxFileId.value)
+  return m?.file || null
+})
+// 正在下载中的 fileId（用于按钮显示"下载中…"）
+const downloadingIds = ref(new Set())
+
+// 打开放大查看；若为 meta（未下载）自动触发拉取原图
+function openLightbox(file) {
+  if (!file) return
+  lightboxFileId.value = file.fileId || file.id || null
+  if (file.isMeta && file.fileId) {
+    requestDownload(file)
   }
 }
 
-// 打开预览（图片/视频/音频在模态层展示，文本在新标签页打开）
+function closeLightbox() {
+  lightboxFileId.value = null
+}
+
+// 触发下载（记录状态；数据到达后卡片自动替换为完整内容）
+function requestDownload(file) {
+  if (!file?.fileId) return
+  downloadingIds.value = new Set(downloadingIds.value).add(file.fileId)
+  emit('download', file)
+}
+
+// 监听消息变化：下载完成后清理下载中标记
+watch(
+  () => props.messages,
+  (list) => {
+    if (!downloadingIds.value.size) return
+    const done = new Set()
+    for (const id of downloadingIds.value) {
+      const m = list.find((x) => x.file?.fileId === id)
+      if (m && m.file?.dataUrl) done.add(id)
+    }
+    if (done.size) {
+      const next = new Set(downloadingIds.value)
+      for (const id of done) next.delete(id)
+      downloadingIds.value = next
+    }
+  },
+  { deep: true }
+)
+
+// 打开预览（文本在新标签页打开，媒体走 lightbox/下载）
 function openPreview(file) {
   if (isText(file.type)) {
     // 文本类型在新标签页打开
@@ -127,8 +164,9 @@ function openPreview(file) {
     if (w) {
       w.document.write(`<pre style="white-space:pre-wrap;word-break:break-word;font-family:monospace;padding:16px;">${escapeHtml(file.dataUrl.split(',')[1] ? atob(file.dataUrl.split(',')[1]) : '')}</pre>`)
     }
+  } else if (isImage(file.type)) {
+    openLightbox(file)
   } else {
-    // 媒体类型直接下载或由浏览器处理
     downloadFile(file)
   }
 }
@@ -198,8 +236,8 @@ function escapeHtml(s) {
                 <a
                   v-if="m.file.thumbDataUrl"
                   class="file-image-link"
-                  title="新标签页打开查看"
-                  @click.prevent="openImageInNewTab(m.file)"
+                  title="点击查看（将自动加载原图）"
+                  @click.prevent="openLightbox(m.file)"
                 >
                   <img
                     :src="m.file.thumbDataUrl"
@@ -209,18 +247,22 @@ function escapeHtml(s) {
                   />
                 </a>
                 <div class="file-meta-hint">
-                  大文件（{{ formatSize(m.file.size) }}），点击下载后查看
+                  大文件（{{ formatSize(m.file.size) }}），点击查看/下载
                 </div>
-                <button class="btn-mini primary" @click="emit('download', m.file)">
-                  ⬇ 下载
+                <button
+                  class="btn-mini primary"
+                  :disabled="downloadingIds.has(m.file.fileId)"
+                  @click="requestDownload(m.file)"
+                >
+                  {{ downloadingIds.has(m.file.fileId) ? '下载中…' : '⬇ 下载' }}
                 </button>
               </div>
               <!-- 图片预览 -->
               <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
                 <a
                   class="file-image-link"
-                  title="新标签页打开原图"
-                  @click.prevent="openImageInNewTab(m.file)"
+                  title="点击放大查看"
+                  @click.prevent="openLightbox(m.file)"
                 >
                   <img
                     :src="m.file.dataUrl"
@@ -305,6 +347,46 @@ function escapeHtml(s) {
         发送
       </button>
     </div>
+
+    <!-- 图片放大查看 lightbox（页面内模态，不跳新标签页） -->
+    <div v-if="lightboxFile" class="lightbox-overlay" @click.self="closeLightbox">
+      <div class="lightbox-card">
+        <div class="lightbox-head">
+          <span class="file-name" :title="lightboxFile.name">{{ lightboxFile.name }}</span>
+          <span class="file-size">{{ formatSize(lightboxFile.size) }}</span>
+          <button class="btn-mini" @click="closeLightbox">✕</button>
+        </div>
+        <div class="lightbox-body">
+          <!-- 完整原图 -->
+          <img
+            v-if="lightboxFile.dataUrl"
+            :src="lightboxFile.dataUrl"
+            :alt="lightboxFile.name"
+            class="lightbox-img"
+          />
+          <!-- 元信息模式：缩略图 + 正在加载原图 -->
+          <div v-else-if="lightboxFile.thumbDataUrl" class="lightbox-loading">
+            <img :src="lightboxFile.thumbDataUrl" :alt="lightboxFile.name" class="lightbox-thumb" />
+            <p>正在加载原图…</p>
+          </div>
+          <div v-else class="lightbox-loading">
+            <p>正在加载…</p>
+          </div>
+        </div>
+        <div class="lightbox-foot">
+          <span class="file-hint" v-if="lightboxFile.isMeta && !lightboxFile.dataUrl">
+            下载完成后自动显示原图
+          </span>
+          <button
+            v-if="lightboxFile.dataUrl"
+            class="btn primary"
+            @click="downloadFile(lightboxFile)"
+          >
+            ⬇ 保存
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -356,5 +438,96 @@ function escapeHtml(s) {
   min-height: 36px;
   padding: 6px 14px;
   font-size: 13px;
+}
+
+/* ===== 图片放大 lightbox ===== */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 16px;
+  backdrop-filter: blur(4px);
+}
+.lightbox-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-width: 92vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+.lightbox-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.lightbox-head .file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 13px;
+}
+.lightbox-head .btn-mini {
+  min-height: 36px;
+  min-width: 36px;
+}
+.lightbox-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  background: #000;
+}
+.lightbox-img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+}
+.lightbox-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  color: var(--text-dim);
+}
+.lightbox-thumb {
+  max-width: 40vw;
+  max-height: 50vh;
+  object-fit: contain;
+  opacity: 0.5;
+}
+.lightbox-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.lightbox-foot .btn {
+  min-height: 40px;
+  padding: 8px 18px;
+}
+.file-hint {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 </style>

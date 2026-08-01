@@ -300,11 +300,7 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
     )
     if (existing && chatMsg.file.dataUrl) {
       Object.assign(existing, chatMsg)
-      // 用户在等待此文件下载：完成后自动触发浏览器原生下载
-      if (pendingDownloads.has(chatMsg.file.fileId)) {
-        pendingDownloads.delete(chatMsg.file.fileId)
-        triggerNativeDownload(chatMsg.file)
-      }
+      pendingDownloads.delete(chatMsg.file.fileId)
       return
     }
   }
@@ -534,7 +530,7 @@ async function sendFileMessage(file) {
 }
 
 /** 按需下载大文件完整内容（向发送者拉取，成功后自动替换 meta 卡片） */
-const pendingDownloads = new Set() // 正在下载的 fileId，下载完成时自动触发浏览器原生下载
+const pendingDownloads = new Set() // 正在下载的 fileId
 async function downloadFile(fileId, fromPeerId) {
   if (!network || !fileId) return false
   pendingDownloads.add(fileId)
@@ -543,23 +539,6 @@ async function downloadFile(fileId, fromPeerId) {
   // 15s 超时未完成则放弃（发送者可能离线）
   setTimeout(() => pendingDownloads.delete(fileId), 15000)
   return ok
-}
-
-/** 触发浏览器原生下载（a[download] 点击；用 blob URL，data URL 大文件会被 Chrome 静默拦截） */
-function triggerNativeDownload(file) {
-  try {
-    const url = dataUrlToBlobUrl(file.dataUrl)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = file.name || 'download'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    // 延迟释放，确保浏览器开始下载
-    setTimeout(() => URL.revokeObjectURL(url), 30000)
-  } catch (e) {
-    /* ignore */
-  }
 }
 
 /** data URL → blob URL（同步转换；blob URL 可被新标签页打开/原生下载，不受 Chrome data URL 导航限制） */
