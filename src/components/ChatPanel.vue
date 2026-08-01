@@ -10,7 +10,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['send', 'leave', 'send-file', 'download'])
+const emit = defineEmits(['send', 'leave', 'back', 'send-file', 'download'])
 
 const draft = ref('')
 const bodyRef = ref(null)
@@ -222,6 +222,8 @@ function escapeHtml(s) {
   <div class="chat-panel">
     <div class="chat-head">
       <template v-if="inRoom">
+        <!-- 移动端：返回房间列表（收起的侧边栏） -->
+        <button class="btn-mini back-btn" title="返回房间列表" @click="emit('back')">‹</button>
         <span class="hash">#</span>
         <span class="room-title">{{ currentRoom }}</span>
         <span class="room-stats">

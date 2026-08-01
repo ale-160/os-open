@@ -45,14 +45,39 @@ function dbg(...args) {
   if (DEBUG) console.log('[nchat]', ...args)
 }
 
-/** 生成图片缩略图（canvas 压缩到最长边 240px 的 JPEG） */
+/** 生成图片缩略图（canvas 压缩 JPEG）。为保证 FILE_META 消息不超 PeerJS JSON 通道上限
+ *  （16300 字节），缩略图 base64 需控制在 ~12KB 内：优先 240px/q0.6，超限则逐级降尺寸/质量 */
 function makeThumbnail(dataUrl, maxSize = 240) {
   return new Promise((resolve) => {
     try {
       const img = new Image()
       img.onload = () => {
         try {
-          const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
+          // 尺寸/质量降级阶梯：240px/0.6 → 200px/0.5 → 160px/0.45 → 120px/0.4
+          const tiers = [
+            { size: 240, quality: 0.6 },
+            { size: 200, quality: 0.5 },
+            { size: 160, quality: 0.45 },
+            { size: 120, quality: 0.4 }
+          ]
+          for (const tier of tiers) {
+            const scale = Math.min(1, tier.size / Math.max(img.width, img.height))
+            const w = Math.max(1, Math.round(img.width * scale))
+            const h = Math.max(1, Math.round(img.height * scale))
+            const canvas = document.createElement('canvas')
+            canvas.width = w
+            canvas.height = h
+            const ctx = canvas.getContext('2d')
+            ctx.drawImage(img, 0, 0, w, h)
+            const data = canvas.toDataURL('image/jpeg', tier.quality)
+            // base64 字符数 ≈ 字节数 × 1.37，留出消息头开销，阈值取 11000
+            if (data.length <= 11000) {
+              resolve(data)
+              return
+            }
+          }
+          // 全部超限：用最低档再试一次（此时应已足够小，若仍超则返回 null 走非缩略图分支）
+          const scale = Math.min(1, 80 / Math.max(img.width, img.height))
           const w = Math.max(1, Math.round(img.width * scale))
           const h = Math.max(1, Math.round(img.height * scale))
           const canvas = document.createElement('canvas')
@@ -60,7 +85,7 @@ function makeThumbnail(dataUrl, maxSize = 240) {
           canvas.height = h
           const ctx = canvas.getContext('2d')
           ctx.drawImage(img, 0, 0, w, h)
-          resolve(canvas.toDataURL('image/jpeg', 0.6))
+          resolve(canvas.toDataURL('image/jpeg', 0.35))
         } catch (e) {
           resolve(null)
         }

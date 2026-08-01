@@ -532,6 +532,14 @@ async function leaveCurrentRoom() {
   pendingRequests.value = []
 }
 
+/** 仅退出当前房间视图（不清除成员身份/不广播 leave）——移动端返回房间列表用 */
+function backToRoomList() {
+  currentRoom.value = ''
+  messages.value = []
+  members.value = []
+  pendingRequests.value = []
+}
+
 async function sendRoomMessage(text) {
   if (!network || !currentRoom.value || !text.trim()) return
   const ok = await network.sendRoomMessage(currentRoom.value, text.trim())
@@ -784,6 +792,7 @@ export function useChat() {
     createRoom,
     joinRoom,
     leaveCurrentRoom,
+    backToRoomList,
     sendRoomMessage,
     sendFileMessage,
     downloadFile,

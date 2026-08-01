@@ -15,8 +15,16 @@ const {
   hangupMediaCall
 } = useChat()
 
-// 仅在开发环境显示测试通话按钮
+// 仅开发环境显示测试通话按钮
 const isDev = import.meta.env.DEV
+
+// 移动端（≤860px）默认折叠测试面板，点击标题展开，避免占据聊天区高度
+const panelCollapsed = ref(false)
+const isMobileLayout = typeof window !== 'undefined' && window.innerWidth <= 860
+if (isMobileLayout) panelCollapsed.value = true
+function togglePanel() {
+  panelCollapsed.value = !panelCollapsed.value
+}
 
 // 本地媒体流
 const localStream = ref(null)
@@ -203,11 +211,13 @@ function hangup() {
 
 <template>
   <div v-if="isDev">
-    <!-- 未通话时的测试面板（嵌入聊天区，不遮挡） -->
+    <!-- 未通话时的测试面板（嵌入聊天区，不遮挡；移动端默认折叠） -->
     <div v-if="!isInCall" class="call-controls">
-      <div class="call-section">
-        <label class="form-label">测试音视频通话 (开发模式)</label>
-
+      <div class="call-toggle" @click="togglePanel">
+        <span class="form-label">测试音视频通话 (开发模式)</span>
+        <span class="call-toggle-arrow">{{ panelCollapsed ? '▸' : '▾' }}</span>
+      </div>
+      <div v-if="!panelCollapsed" class="call-section">
         <div v-if="callError" class="call-error">
           {{ callError }}
         </div>
@@ -317,6 +327,20 @@ function hangup() {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--border-soft);
+}
+
+.call-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+  touch-action: manipulation;
+}
+.call-toggle-arrow {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .call-section {

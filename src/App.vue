@@ -31,6 +31,7 @@ const {
   createRoom,
   joinRoom,
   leaveCurrentRoom,
+  backToRoomList,
   sendRoomMessage,
   sendFileMessage,
   downloadFile,
@@ -220,7 +221,7 @@ const currentServerLabel = computed(() => {
 </script>
 
 <template>
-  <div class="app" :class="{ 'is-booting': state.booting }">
+  <div class="app" :class="{ 'is-booting': state.booting, 'in-room': !!currentRoom }">
     <header class="app-header" :class="{ compact: !!currentRoom }">
       <div class="brand">
         <span class="brand-mark">⬡</span>
@@ -287,6 +288,7 @@ const currentServerLabel = computed(() => {
           @send="sendRoomMessage"
           @send-file="sendFileMessage"
           @download="onDownloadFile"
+          @back="backToRoomList"
           @leave="leaveCurrentRoom"
         />
       </section>

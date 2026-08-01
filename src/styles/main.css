@@ -497,6 +497,10 @@ input {
   color: var(--text-muted);
   font-size: 18px;
 }
+/* 返回房间列表按钮：默认隐藏，仅移动端（in-room 时侧边栏收起）显示 */
+.back-btn {
+  display: none;
+}
 .room-title {
   font-size: 15px;
   font-weight: 700;
@@ -944,10 +948,32 @@ select.input {
   .sidebar {
     border-right: none;
     border-bottom: 1px solid var(--border-soft);
-    max-height: 40vh;
+    max-height: 35vh;
   }
   .members-bar {
     display: none;
+  }
+  /* 移动端进入聊天室：顶部内容（header + 侧边栏）全部收起，聊天区占满全屏 */
+  .app.in-room .app-header {
+    display: none;
+  }
+  .app.in-room .sidebar {
+    display: none;
+  }
+  .app.in-room .app-main {
+    grid-template-rows: 1fr;
+  }
+  .app.in-room .chat-area {
+    grid-column: 1 / -1;
+  }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 22px;
+    padding: 0 8px;
   }
   .app-header {
     flex-wrap: wrap;
