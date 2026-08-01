@@ -14,10 +14,15 @@ import Peer from 'peerjs'
 import { CONFIG, getSignaling, getAllSignalingServers } from '../config.js'
 import {
   MsgType,
+  BinKind,
   AccessRule,
   SpeakRule,
   DEFAULT_RULES,
   Stars,
+  NodeRole,
+  DEFAULT_CAPABILITIES,
+  STORAGE_LIMITS,
+  normalizeCapabilities,
   buildMessage,
   verifyMessage
 } from './protocol.js'
@@ -37,8 +42,24 @@ import {
   deleteRoomBans,
   saveOutgoingFile,
   getOutgoingFiles,
-  deleteOutgoingFile
+  deleteOutgoingFile,
+  lcanPut,
+  lcanGet,
+  lcanDelete,
+  lcanCount,
+  lcanCleanExpired,
+  getHolders,
+  getAllHolders,
+  addHolder,
+  removeHolder,
+  removePeerFromHolders
 } from './db.js'
+import {
+  sha256Key,
+  keyToHex,
+  responsible as lcanResponsible,
+  DEFAULT_K as LCAN_DEFAULT_K
+} from './lcan.js'
 
 const DEBUG = false
 function dbg(...args) {
@@ -107,11 +128,25 @@ export class PeerNetwork extends EventTarget {
     super()
     this.identity = identity
     this.ownName = ownName || ''
+
+    // ---- 多域并行（蛛网核心：域 = 信令服务器） ----
+    // domainKey -> { peer, peerJsId, server, status, reconnectAttempts, reconnectTimer, error }
+    // status: 'connecting' | 'online' | 'reconnecting' | 'offline' | 'error'
+    this.peers = new Map()
+    /** 主域 key（首个成功连接的域，用于兼容旧代码 this.peer / this.peerJsId） */
+    this._primaryDomainKey = null
+
+    // 兼容旧代码：this.peer / this.peerJsId 指向主域
+    // 新代码应使用 this.peers.get(domainKey) 或 this._peerForConnection(peerJsId)
     this.peer = null
     this.peerJsId = null
 
-    // peerJsId -> { conn, peerId, name, lastSeen, status, rooms: Set }
+    // connectionKey -> { conn, peerId, name, lastSeen, status, rooms: Set, domainKey, peerJsId }
+    // connectionKey = domainKey + '/' + remotePeerJsId（多域下保证唯一）
+    // 同时维护 peerJsId -> connectionKey 反向索引（同一域内 peerJsId 唯一）
     this.connections = new Map()
+    this._connKeyByPeerJsId = new Map() // peerJsId(per domain) -> connectionKey
+
     // 已知房间聚合：name -> { name, members:Map, activity, lastUpdate, aliases:Set, rules, owner }
     this.knownRooms = new Map()
 
@@ -125,7 +160,7 @@ export class PeerNetwork extends EventTarget {
     this._localRoomMeta = new Map()
     /** 本地房间密码内存缓存：roomName -> password（仅密码房间，已验证） */
     this._passwordCache = new Map()
-    /** 当前使用的信令服务器 */
+    /** 当前主信令服务器（兼容旧 API） */
     this._activeServer = null
     /** 待处理的加入申请：roomName -> [{ peerId, name, timestamp }] */
     this._pendingJoinRequests = new Map()
@@ -133,6 +168,203 @@ export class PeerNetwork extends EventTarget {
     this._processedMsgs = new Map()
     /** 本节点发送过的大文件 fileId 集合（用于请求时判断"缓存是否已失效"） */
     this._sentFileIds = new Set()
+
+    /** 本节点能力声明（异构网络角色） */
+    this._capabilities = this._loadCapabilities()
+
+    // ---- LCAN 多副本分布式存储（蛛网核心） ----
+    /** 饱和请求超时（ms）：全部候选 1.5s 内返回成功或明确失败，绝不干等 */
+    this._lcanGetTimeout = 1500
+    /** 待处理的 STORE：reqId -> { resolve, ackCount, targetCount, timer, keyHex } */
+    this._pendingStores = new Map()
+    /** 待处理的 GET：reqId -> { resolve, reject, found, notFound, targetCount, timer, keyHex } */
+    this._pendingGets = new Map()
+    /** 本地 LCAN 自愈定时器 */
+    this._lcanHealTimer = null
+    /** LCAN TTL 清扫定时器 */
+    this._lcanCleanTimer = null
+
+    // ---- 存储滥用防护（SPAM 防御） ----
+    /** 单对端 STORE 速率限制：peerId -> { count, windowStart }（10s 窗口 ≤20 次） */
+    this._storeRateMap = new Map()
+    /** 被限流的 peer 集合（SET peerId，窗口内超限则加入） */
+    this._rateLimitedPeers = new Set()
+    /** 累计被拒 STORE 次数（设置面板展示） */
+    this._rejectedStoreCount = 0
+    /** 累计被限流次数 */
+    this._rateLimitedCount = 0
+    /** 速率窗口（ms）与上限 */
+    this._storeRateWindow = 10 * 1000
+    this._storeRateMax = 20
+  }
+
+  // ---------------- 多域基础设施 ----------------
+  /** 域唯一 key：ws/wss://host:port/path */
+  _domainKey(server) {
+    return `${server.secure ? 'wss' : 'ws'}://${server.host}:${server.port}${server.path || '/'}`
+  }
+
+  /** connection key：域 + 远端 peerJsId */
+  _connKey(domainKey, peerJsId) {
+    return domainKey + '/' + peerJsId
+  }
+
+  /**
+   * 获取所有域的运行状态（UI 用）。
+   * @returns {Array<{key, host, port, path, secure, status, peerJsId, error, reconnectAttempts}>}
+   */
+  getDomains() {
+    const out = []
+    for (const [key, d] of this.peers) {
+      const s = d.server
+      out.push({
+        key,
+        host: s.host,
+        port: s.port,
+        path: s.path,
+        secure: !!s.secure,
+        label: s.label || `${s.host}:${s.port}`,
+        status: d.status,
+        peerJsId: d.peerJsId || '',
+        error: d.error || '',
+        reconnectAttempts: d.reconnectAttempts || 0
+      })
+    }
+    return out
+  }
+
+  /** 发射 domains:update 事件（UI 刷新） */
+  _emitDomainsUpdate() {
+    this._emit('domains:update', { domains: this.getDomains() })
+  }
+
+  /**
+   * 域独立 backoff 重连（2s/5s/10s，封顶 10s）。
+   * 每个域独立计数，互不影响。
+   */
+  _scheduleReconnect(domainKey) {
+    const d = this.peers.get(domainKey)
+    if (!d) return
+    if (d.reconnectTimer) return // 已在重连中
+    if (d.status === 'online') return
+    const attempts = d.reconnectAttempts || 0
+    const backoff = attempts === 0 ? 2000 : attempts === 1 ? 5000 : 10000
+    d.status = 'reconnecting'
+    d.reconnectAttempts = attempts + 1
+    this._emitDomainsUpdate()
+    dbg('domain:reconnect scheduled', domainKey, 'in', backoff, 'ms, attempt', d.reconnectAttempts)
+    d.reconnectTimer = setTimeout(() => {
+      d.reconnectTimer = null
+      this._reconnectDomain(domainKey)
+    }, backoff)
+  }
+
+  /** 实际执行重连：销毁旧实例，重建 Peer */
+  _reconnectDomain(domainKey) {
+    const d = this.peers.get(domainKey)
+    if (!d) return
+    if (d.status === 'online') {
+      d.reconnectAttempts = 0
+      this._emitDomainsUpdate()
+      return
+    }
+    // 销毁旧实例（可能已失效）
+    try {
+      if (d.peer && !d.peer.destroyed) d.peer.destroy()
+    } catch (e) {
+      /* ignore */
+    }
+    d.peer = null
+    d.peerJsId = null
+    d.status = 'connecting'
+    this._emitDomainsUpdate()
+    // 重建（不等 await，让事件驱动）
+    this._bootstrapDomain(domainKey, d.server).catch((e) => {
+      console.warn('[nchat] 域重连失败：', domainKey, e?.message)
+      this._scheduleReconnect(domainKey)
+    })
+  }
+
+  // ---------------- 节点能力（异构角色） ----------------
+  /** 从 localStorage 读取角色偏好，缺省返回 DEFAULT_CAPABILITIES */
+  _loadCapabilities() {
+    try {
+      const raw = localStorage.getItem('nchat:capabilities')
+      if (raw) return normalizeCapabilities(JSON.parse(raw))
+    } catch (e) {
+      /* ignore */
+    }
+    return { ...DEFAULT_CAPABILITIES }
+  }
+
+  /** 持久化能力声明 */
+  _saveCapabilities() {
+    try {
+      localStorage.setItem('nchat:capabilities', JSON.stringify(this._capabilities))
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
+  /** 获取本节点能力声明（只读副本） */
+  getCapabilities() {
+    return { ...this._capabilities }
+  }
+
+  /**
+   * 更新本节点能力声明（设置面板调用）。
+   * @param {Partial<{storage:string, relay:boolean, alwaysOn:boolean}>} patch
+   */
+  async setCapabilities(patch) {
+    const next = normalizeCapabilities({ ...this._capabilities, ...patch })
+    this._capabilities = next
+    this._saveCapabilities()
+    // 重新广播 hello 让对端学习新角色
+    for (const id of this.connections.keys()) {
+      await this._sendHello(id).catch(() => {})
+    }
+    this._emit('capabilities:update', { capabilities: { ...next } })
+    return true
+  }
+
+  /** 本节点是否愿意承担存储责任（light 节点不存） */
+  _canStore() {
+    return this._capabilities.storage !== NodeRole.LIGHT
+  }
+
+  /** 本节点 LCAN 存储条目上限（按角色） */
+  _storageLimit() {
+    return STORAGE_LIMITS[this._capabilities.storage] ?? 0
+  }
+
+  /** 本节点是否愿意中继转发 */
+  _canRelay() {
+    return !!this._capabilities.relay
+  }
+
+  /** 统计当前已连接节点的角色分布（调试/拓扑视图用） */
+  getRoleStats() {
+    const stats = { full: 0, normal: 0, light: 0, unknown: 0, relay: 0, alwaysOn: 0 }
+    for (const entry of this.connections.values()) {
+      const c = entry.capabilities
+      if (!c) {
+        stats.unknown++
+        continue
+      }
+      if (c.storage === NodeRole.FULL) stats.full++
+      else if (c.storage === NodeRole.NORMAL) stats.normal++
+      else if (c.storage === NodeRole.LIGHT) stats.light++
+      else stats.unknown++
+      if (c.relay) stats.relay++
+      if (c.alwaysOn) stats.alwaysOn++
+    }
+    // 包含自己
+    if (this._capabilities.storage === NodeRole.FULL) stats.full++
+    else if (this._capabilities.storage === NodeRole.NORMAL) stats.normal++
+    else if (this._capabilities.storage === NodeRole.LIGHT) stats.light++
+    if (this._capabilities.relay) stats.relay++
+    if (this._capabilities.alwaysOn) stats.alwaysOn++
+    return stats
   }
 
   /** 检查并标记消息是否已处理过（返回 true 表示首次处理） */
@@ -149,10 +381,11 @@ export class PeerNetwork extends EventTarget {
     return true
   }
 
-  // ---------------- 生命周期 ----------------
+  // ---------------- 生命周期（多域并行） ----------------
   /**
-   * 启动 P2P 连接。
-   * @param {object} [explicitServer] 指定信令服务器（覆盖配置）
+   * 启动 P2P 连接：并行挂载全部候选信令域（Promise.allSettled）。
+   * 任一域成功即视为在线；全部失败才抛错。
+   * @param {object} [explicitServer] 指定信令服务器（追加到候选列表）
    */
   async start(explicitServer) {
     if (this._started) return
@@ -178,37 +411,71 @@ export class PeerNetwork extends EventTarget {
     if (explicitServer) candidates.push(explicitServer)
     candidates.push(active)
     for (const s of allServers) {
-      if (!candidates.find((c) => c.host === s.host && c.port === s.port && c.path === s.path)) {
+      const key = this._domainKey(s)
+      if (!candidates.find((c) => this._domainKey(c) === key)) {
         candidates.push(s)
       }
     }
 
-    // 逐个尝试，首个成功即用
-    for (let i = 0; i < candidates.length; i++) {
-      const server = candidates[i]
-      try {
-        await this._tryStartWith(server)
-        this._activeServer = server
-        return
-      } catch (e) {
-        console.warn(`[nchat] 信令服务器 ${server.host}:${server.port} 连接失败：`, e?.type || e?.message)
-        this._emit('error', {
-          type: 'server-failed',
-          message: `${server.host}:${server.port} 不可用`
-        })
-        // 最后一个也失败才抛出
-        if (i === candidates.length - 1) {
-          this._started = false
-          throw e
-        }
-      }
+    // 并行连接全部候选域（蛛网核心：不再"首个成功即用"）
+    // 每个域独立 bootstrap，互不阻塞
+    const tasks = candidates.map((server) =>
+      this._bootstrapDomain(this._domainKey(server), server).then(
+        () => ({ server, ok: true }),
+        (e) => ({ server, ok: false, error: e })
+      )
+    )
+    const results = await Promise.allSettled(tasks)
+    const succeeded = results.filter(
+      (r) => r.status === 'fulfilled' && r.value?.ok
+    )
+
+    if (succeeded.length === 0) {
+      // 全部失败：抛出第一个错误（但域重连已在 _bootstrapDomain 内调度，不放弃）
+      this._started = false
+      const firstErr =
+        results.find((r) => r.status === 'rejected')?.reason ||
+        new Error('所有信令服务器均不可用')
+      throw firstErr
     }
+    // 至少一个域在线即视为启动成功（其余失败域已自动调度重连）
   }
 
-  _tryStartWith(server) {
+  /**
+   * 引导单个域：创建 Peer 实例，注册到 this.peers，绑定事件。
+   * 成功（peer 'open'）时 resolve；失败/超时 reject 并自动调度重连。
+   * @param {string} domainKey
+   * @param {object} server
+   * @returns {Promise<void>}
+   */
+  _bootstrapDomain(domainKey, server) {
     return new Promise((resolve, reject) => {
+      // 注册域状态
+      let d = this.peers.get(domainKey)
+      if (!d) {
+        d = {
+          peer: null,
+          peerJsId: null,
+          server,
+          status: 'connecting',
+          reconnectAttempts: 0,
+          reconnectTimer: null,
+          error: ''
+        }
+        this.peers.set(domainKey, d)
+      }
+      // 清理旧定时器
+      if (d.reconnectTimer) {
+        clearTimeout(d.reconnectTimer)
+        d.reconnectTimer = null
+      }
+      d.status = 'connecting'
+      d.error = ''
+      this._emitDomainsUpdate()
+
+      // 创建 Peer 实例
       const peer = new Peer(server)
-      this.peer = peer
+      d.peer = peer
 
       let settled = false
       const settle = (fn, arg) => {
@@ -217,36 +484,53 @@ export class PeerNetwork extends EventTarget {
         fn(arg)
       }
 
-      // 单服务器超时 8s，失败后尝试下一个
+      // 单域超时 8s
       const timeout = setTimeout(() => {
-        if (!this.peerJsId) {
-          settle(reject, { type: 'timeout', message: '信令服务器连接超时' })
+        if (!d.peerJsId) {
+          settle(reject, { type: 'timeout', message: `信令服务器 ${server.host}:${server.port} 连接超时` })
         }
       }, 8000)
 
       peer.on('open', (id) => {
         clearTimeout(timeout)
-        this.peerJsId = id
-        dbg('peer:open peerJsId=', id, 'server=', server.host + ':' + server.port)
-        this._emit('identity', { peerId: this.identity.peerId, peerJsId: id })
-        this._emit('status', { online: true, server })
+        d.peerJsId = id
+        d.status = 'online'
+        d.reconnectAttempts = 0
+        d.error = ''
+        // 主域：兼容旧代码 this.peer / this.peerJsId / this._activeServer
+        if (!this._primaryDomainKey) {
+          this._primaryDomainKey = domainKey
+          this.peer = peer
+          this.peerJsId = id
+          this._activeServer = server
+          this._emit('identity', { peerId: this.identity.peerId, peerJsId: id })
+        }
+        dbg('domain:open', domainKey, 'peerJsId=', id)
+        this._emit('status', { online: this._anyDomainOnline(), server, domainKey })
+        this._emitDomainsUpdate()
         settle(resolve)
         this._startTimers()
-        this._discover()
+        this._discoverDomain(domainKey)
       })
 
+      // 收到入站连接（per-domain）
+      // 双通道：json（控制）+ bin（大数据），通过 metadata.channel 区分
       peer.on('connection', (conn) => {
-        dbg('peer:incoming from', conn.peer)
-        this._attachConnection(conn)
+        const channel = conn.metadata?.channel
+        dbg('domain:incoming from', conn.peer, 'on', domainKey, 'channel=', channel || 'json')
+        if (channel === 'bin') {
+          this._attachBinaryConnection(conn, domainKey)
+        } else {
+          this._attachConnection(conn, domainKey)
+        }
       })
 
-      // 处理媒体通话请求
+      // 收到媒体通话请求（per-domain）
       peer.on('call', (call) => {
-        dbg('peer:call from', call.peer)
-        // 尝试从连接中查找发送方的 peerId
+        dbg('domain:call from', call.peer, 'on', domainKey)
         let fromPeerId = null
         for (const entry of this.connections.values()) {
-          if (entry.peerJsId === call.peer) {
+          if (entry.peerJsId === call.peer && entry.domainKey === domainKey) {
             fromPeerId = entry.peerId
             break
           }
@@ -255,29 +539,98 @@ export class PeerNetwork extends EventTarget {
       })
 
       peer.on('error', (err) => {
-        console.warn('[nchat] Peer error:', err?.type, err?.message)
-        this._emit('error', { type: err?.type, message: err?.message })
-        if (!this.peerJsId) settle(reject, err)
+        console.warn(`[nchat] Peer error [${domainKey}]:`, err?.type, err?.message)
+        clearTimeout(timeout)
+        d.error = err?.message || String(err)
+        // 不可恢复错误（如 unavailable-id）：不重连
+        const noReconnect = err?.type === 'unavailable-id' || err?.type === 'browser-incompatible'
+        if (!settled) {
+          settle(reject, err)
+        }
+        if (noReconnect) {
+          d.status = 'error'
+          this._emitDomainsUpdate()
+        } else {
+          // 可恢复：调度重连
+          d.status = 'offline'
+          this._emitDomainsUpdate()
+          this._scheduleReconnect(domainKey)
+        }
+        this._emit('error', { type: err?.type, message: err?.message, domainKey })
       })
 
       peer.on('disconnected', () => {
-        this._emit('status', { online: false, reason: 'disconnected' })
-        setTimeout(() => {
-          if (this.peer && !this.peer.destroyed) {
-            try {
-              this.peer.reconnect()
-            } catch (e) {
-              /* ignore */
-            }
-          }
-        }, 2000)
+        dbg('domain:disconnected', domainKey)
+        d.status = 'offline'
+        d.peerJsId = null
+        // 如果是主域断开，更新兼容字段
+        if (this._primaryDomainKey === domainKey) {
+          this.peerJsId = null
+        }
+        this._emit('status', { online: this._anyDomainOnline(), reason: 'disconnected', domainKey })
+        this._emitDomainsUpdate()
+        // 独立 backoff 重连（不影响其他域）
+        this._scheduleReconnect(domainKey)
+      })
+
+      peer.on('close', () => {
+        dbg('domain:close', domainKey)
+        if (d.status !== 'error') {
+          d.status = 'offline'
+          this._emitDomainsUpdate()
+        }
       })
     })
   }
 
-  /** 当前使用的信令服务器 */
+  /** 是否有任一域在线 */
+  _anyDomainOnline() {
+    for (const d of this.peers.values()) {
+      if (d.status === 'online') return true
+    }
+    return false
+  }
+
+  /** 当前主信令服务器（兼容旧 API；主域离线时回退到首个在线域） */
   getActiveServer() {
+    if (this._primaryDomainKey) {
+      const d = this.peers.get(this._primaryDomainKey)
+      if (d && d.status === 'online') return d.server
+    }
+    for (const d of this.peers.values()) {
+      if (d.status === 'online') return d.server
+    }
     return this._activeServer || getSignaling()
+  }
+
+  /**
+   * 重启并切换到指定信令服务器（兼容旧 API）。
+   * 多域模式下：若该域已存在则销毁重建，否则新增域。
+   */
+  async restartWithServer(server) {
+    const domainKey = this._domainKey(server)
+    const existing = this.peers.get(domainKey)
+    if (existing) {
+      // 销毁旧实例后重建
+      if (existing.reconnectTimer) {
+        clearTimeout(existing.reconnectTimer)
+        existing.reconnectTimer = null
+      }
+      try {
+        if (existing.peer && !existing.peer.destroyed) existing.peer.destroy()
+      } catch (e) {
+        /* ignore */
+      }
+      existing.peer = null
+      existing.peerJsId = null
+      existing.status = 'connecting'
+      existing.reconnectAttempts = 0
+      this._emitDomainsUpdate()
+      await this._bootstrapDomain(domainKey, server)
+    } else {
+      // 新增域
+      await this._bootstrapDomain(domainKey, server)
+    }
   }
 
   async stop() {
@@ -301,19 +654,38 @@ export class PeerNetwork extends EventTarget {
     for (const roomName of this.localRooms()) {
       await this._broadcast({ type: MsgType.LEAVE_ROOM, payload: { room: roomName } })
     }
-    for (const { conn } of this.connections.values()) {
+    // 关闭所有连接（json + bin 双通道）
+    for (const entry of this.connections.values()) {
       try {
-        conn.close()
+        if (entry.conn) entry.conn.close()
+      } catch (e) {
+        /* ignore */
+      }
+      try {
+        if (entry.binConn) entry.binConn.close()
       } catch (e) {
         /* ignore */
       }
     }
     this.connections.clear()
-    if (this.peer) {
-      this.peer.destroy()
-      this.peer = null
+    this._connKeyByPeerJsId.clear()
+    // 销毁所有域的 Peer 实例
+    for (const [key, d] of this.peers) {
+      if (d.reconnectTimer) {
+        clearTimeout(d.reconnectTimer)
+        d.reconnectTimer = null
+      }
+      try {
+        if (d.peer && !d.peer.destroyed) d.peer.destroy()
+      } catch (e) {
+        /* ignore */
+      }
     }
+    this.peers.clear()
+    this.peer = null
     this.peerJsId = null
+    this._primaryDomainKey = null
+    this._activeServer = null
   }
 
   setOwnName(name) {
@@ -324,11 +696,17 @@ export class PeerNetwork extends EventTarget {
     }
   }
 
-  // ---------------- 连接管理 ----------------
-  _attachConnection(conn) {
+  // ---------------- 连接管理（多域） ----------------
+  /**
+   * 挂载一条入站/出站 DataConnection。
+   * @param {object} conn  PeerJS DataConnection
+   * @param {string} domainKey  该连接所属的域
+   */
+  _attachConnection(conn, domainKey) {
     const peerJsId = conn.peer
-    if (this.connections.has(peerJsId)) {
-      dbg('conn:skip duplicate', peerJsId)
+    const connKey = this._connKey(domainKey, peerJsId)
+    if (this.connections.has(connKey)) {
+      dbg('conn:skip duplicate', connKey)
       // 已有连接，关闭新的
       try {
         conn.close()
@@ -337,65 +715,326 @@ export class PeerNetwork extends EventTarget {
       }
       return
     }
-    dbg('conn:attach', peerJsId)
-    this.connections.set(peerJsId, {
+    dbg('conn:attach', connKey)
+    this.connections.set(connKey, {
       conn,
+      connKey,
+      domainKey,
+      peerJsId, // 远端在该域的 PeerJS ID
       peerId: null,
       name: '',
       lastSeen: Date.now(),
       status: 'connecting',
       rooms: new Set(),
-      helloExchanged: false
+      helloExchanged: false,
+      capabilities: null, // 对端能力声明，hello 后学习
+      // ---- 双通道：json（控制）+ bin（大数据） ----
+      binConn: null, // 二进制 DataConnection（serialization:'binary'）
+      binStatus: 'none', // 'none' | 'opening' | 'online' | 'closed'
+      _binWaiters: [] // binConn open 等待队列（_sendBinary 在 open 前调用时挂起）
     })
+    // 反向索引：同域内 peerJsId -> connKey（用于 _send 等按 peerJsId 查找）
+    this._connKeyByPeerJsId.set(connKey, peerJsId)
 
     conn.on('open', async () => {
-      dbg('conn:open', peerJsId)
-      const entry = this.connections.get(peerJsId)
+      dbg('conn:open', connKey)
+      const entry = this.connections.get(connKey)
       if (entry) {
         entry.status = 'online'
         entry.lastSeen = Date.now()
       }
       // 主动发送 hello
-      await this._sendHello(peerJsId)
-      this._emitPeerStatus(peerJsId)
+      await this._sendHello(connKey)
+      this._emitPeerStatus(connKey)
     })
 
     conn.on('data', (data) => {
-      dbg('conn:data', peerJsId, data?.type)
-      this._onData(peerJsId, data)
+      dbg('conn:data', connKey, data?.type)
+      this._onData(connKey, data)
     })
 
     conn.on('close', () => {
-      dbg('conn:close', peerJsId)
-      this._handleDisconnect(peerJsId)
+      dbg('conn:close', connKey)
+      this._handleDisconnect(connKey)
     })
 
     conn.on('error', (err) => {
       console.warn('[nchat] conn error:', err?.message)
-      this._handleDisconnect(peerJsId)
+      this._handleDisconnect(connKey)
     })
   }
 
-  async _connectTo(peerJsId) {
-    if (peerJsId === this.peerJsId) return
-    if (this.connections.has(peerJsId)) return
+  // ---------------- 双通道：二进制连接（蛛网高性能文件通道） ----------------
+  /**
+   * 确定性发起 bin 连接：peerId 字典序较小的一方主动发起，避免双方同时发起造成重复。
+   * bin 连接承载 ArrayBuffer / 大对象，规避 JSON 通道 16KB 上限。
+   * @param {string} connKey  已建立 json 连接的 key（peerId 已知）
+   */
+  _ensureBinaryConnection(connKey) {
+    const entry = this.connections.get(connKey)
+    if (!entry || !entry.peerId) return
+    if (entry.binStatus === 'online' || entry.binStatus === 'opening') return
+    // 确定性发起方：peerId 字典序较小的一方。另一方只接收（_attachBinaryConnection）。
+    const mine = this.identity.peerId
+    const theirs = entry.peerId
+    if (mine >= theirs) return // 由对端发起
+    const d = this.peers.get(entry.domainKey)
+    if (!d || !d.peer || d.status !== 'online') return
+    try {
+      entry.binStatus = 'opening'
+      dbg('bin:connect to', entry.peerJsId, 'on', entry.domainKey)
+      const binConn = d.peer.connect(entry.peerJsId, {
+        reliable: true,
+        serialization: 'binary',
+        metadata: { channel: 'bin' }
+      })
+      this._wireBinaryConnection(connKey, binConn)
+    } catch (e) {
+      entry.binStatus = 'none'
+      console.warn('[nchat] bin connect failed:', e?.message)
+    }
+  }
+
+  /**
+   * 接收对端发起的 bin 连接（incoming）。
+   * bin 连接可能在 json hello 之前到达，也可能之后；找不到 entry 时暂存待绑定。
+   */
+  _attachBinaryConnection(conn, domainKey) {
+    const peerJsId = conn.peer
+    const connKey = this._connKey(domainKey, peerJsId)
+    const entry = this.connections.get(connKey)
+    if (!entry) {
+      // json 连接尚未建立：暂存到 pending，_attachConnection 建好后绑定
+      dbg('bin:pending (no json entry yet)', connKey)
+      // 直接绑定等待 json entry 出现；最多保留 10s
+      const wait = () => {
+        const e = this.connections.get(connKey)
+        if (e) {
+          this._wireBinaryConnection(connKey, conn)
+        } else {
+          // json entry 还没来，bin 连接先挂着开监听，避免数据丢失
+          this._wireBinaryConnection(connKey, conn, /* pending */ true)
+        }
+      }
+      wait()
+      return
+    }
+    if (entry.binStatus === 'online' || entry.binStatus === 'opening') {
+      // 已有 bin 连接，关闭重复的
+      try {
+        conn.close()
+      } catch (e) {
+        /* ignore */
+      }
+      return
+    }
+    this._wireBinaryConnection(connKey, conn)
+  }
+
+  /**
+   * 绑定 bin 连接事件到指定 connKey 的 entry。
+   * @param {string} connKey
+   * @param {DataConnection} binConn
+   * @param {boolean} [pending=false]  json entry 尚未建立（暂存模式）
+   */
+  _wireBinaryConnection(connKey, binConn, pending = false) {
+    let entry = this.connections.get(connKey)
+    // pending 模式：entry 可能不存在，仅绑定 data 事件，待 entry 出现后补登记
+    if (entry) {
+      entry.binConn = binConn
+      if (entry.binStatus !== 'online') entry.binStatus = 'opening'
+    }
+    binConn.on('open', () => {
+      const e = this.connections.get(connKey)
+      if (e) {
+        e.binConn = binConn
+        e.binStatus = 'online'
+        // 唤醒所有等待 binConn open 的 _sendBinary 调用
+        const waiters = e._binWaiters || []
+        e._binWaiters = []
+        for (const w of waiters) w.resolve()
+      }
+      dbg('bin:open', connKey)
+    })
+    binConn.on('data', (data) => {
+      this._onBinaryData(connKey, data)
+    })
+    binConn.on('close', () => {
+      const e = this.connections.get(connKey)
+      if (e && e.binConn === binConn) {
+        e.binConn = null
+        e.binStatus = 'closed'
+        // 唤醒等待者并拒绝（连接已关）
+        const waiters = e._binWaiters || []
+        e._binWaiters = []
+        for (const w of waiters) w.reject(new Error('bin conn closed'))
+      }
+      dbg('bin:close', connKey)
+    })
+    binConn.on('error', (err) => {
+      console.warn('[nchat] bin conn error:', err?.message)
+      const e = this.connections.get(connKey)
+      if (e && e.binConn === binConn) {
+        e.binConn = null
+        e.binStatus = 'closed'
+        const waiters = e._binWaiters || []
+        e._binWaiters = []
+        for (const w of waiters) w.reject(new Error('bin conn error'))
+      }
+    })
+    // pending 模式下没有 entry，data 事件仍会被 _onBinaryData 丢弃（找不到 entry）
+  }
+
+  /**
+   * 等待 bin 连接 open（若已 open 立即 resolve）。
+   * @returns {Promise<void>}
+   */
+  _waitForBinOpen(connKey) {
+    const entry = this.connections.get(connKey)
+    if (!entry) return Promise.reject(new Error('no entry'))
+    if (entry.binStatus === 'online' && entry.binConn && entry.binConn.open) {
+      return Promise.resolve()
+    }
+    // 尚未 open：加入等待队列
+    return new Promise((resolve, reject) => {
+      entry._binWaiters.push({ resolve, reject })
+    })
+  }
+
+  /**
+   * 通过 bin 通道发送数据（ArrayBuffer / 大对象）。
+   * 若 bin 连接尚未 open 则等待；超时 5s 则回退 false。
+   * @param {string} connKey
+   * @param {object} obj  消息对象（含 kind 字段，可携带 ArrayBuffer）
+   * @returns {Promise<boolean>} 是否发送成功
+   */
+  async _sendBinary(connKey, obj) {
+    const entry = this.connections.get(connKey)
+    if (!entry) return false
+    if (entry.binStatus !== 'online') {
+      // 等待 bin open，最多 5s
+      try {
+        await Promise.race([
+          this._waitForBinOpen(connKey),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('bin open timeout')), 5000))
+        ])
+      } catch (e) {
+        return false
+      }
+    }
+    const e = this.connections.get(connKey)
+    if (!e || !e.binConn || !e.binConn.open) return false
+    try {
+      e.binConn.send(obj)
+      return true
+    } catch (err) {
+      console.warn('[nchat] bin send failed:', err?.message)
+      return false
+    }
+  }
+
+  /**
+   * 处理 bin 通道收到的数据（按 kind 分发）。
+   * bin 消息不走签名校验（大块数据签名在 json 控制通道完成，分片只带 fileId+index）。
+   */
+  _onBinaryData(connKey, data) {
+    if (!data || typeof data !== 'object') return
+    const entry = this.connections.get(connKey)
+    if (!entry) {
+      dbg('bin:data no entry, drop', connKey, data?.kind)
+      return
+    }
+    entry.lastSeen = Date.now()
+    switch (data.kind) {
+      case BinKind.PROBE:
+        // Phase 2.1 能力探测：收到 probe 立即回 ACK（带 size）
+        this._sendBinary(connKey, {
+          kind: BinKind.PROBE_ACK,
+          size: data.size || 0
+        }).catch(() => {})
+        break
+      case BinKind.PROBE_ACK:
+        // 由 _probeCapability 的等待逻辑处理（通过事件或回调）
+        this._emit('bin:probe_ack', { connKey, size: data.size || 0 })
+        break
+      case BinKind.FILE_CHUNK:
+        this._onFileChunkBin(connKey, data)
+        break
+      case BinKind.FILE_META_BIN:
+      case BinKind.LCAN_BLOB:
+        // Phase 2.x 占位：后续文件传输 / LCAN 大块逻辑接入
+        dbg('bin:blob', connKey, data.kind)
+        break
+      default:
+        dbg('bin:unknown kind', data.kind)
+    }
+  }
+
+  /**
+   * bin 通道文件分片接收（Phase 2.1 接入完整逻辑；此处先聚合缓冲）。
+   * @param {string} connKey
+   * @param {{kind, fileId, index, total, buf:ArrayBuffer}} data
+   */
+  _onFileChunkBin(connKey, data) {
+    // 占位：Phase 2.1 实现 ArrayBuffer 聚合 + 总签名校验 + Blob URL 生成
+    dbg('bin:file_chunk', connKey, data?.fileId, data?.index, '/', data?.total)
+  }
+
+  /**
+   * 主动连接某域内的一个 peer。
+   * @param {string} peerJsId  目标在指定域的 PeerJS ID
+   * @param {string} domainKey 目标所在域
+   */
+  async _connectTo(peerJsId, domainKey) {
+    if (!domainKey) return
+    const d = this.peers.get(domainKey)
+    if (!d || !d.peer || d.status !== 'online') return
+    if (peerJsId === d.peerJsId) return // 自己
+    const connKey = this._connKey(domainKey, peerJsId)
+    if (this.connections.has(connKey)) return
     if (this.connections.size >= CONFIG.MAX_PEERS) return
-    dbg('conn:connect to', peerJsId)
-    const conn = this.peer.connect(peerJsId, {
+    dbg('conn:connect to', peerJsId, 'on', domainKey)
+    const conn = d.peer.connect(peerJsId, {
       reliable: true,
       serialization: 'json'
     })
-    this._attachConnection(conn)
+    this._attachConnection(conn, domainKey)
   }
 
-  _handleDisconnect(peerJsId) {
-    const entry = this.connections.get(peerJsId)
-    const peerId = entry?.peerId
-    this.connections.delete(peerJsId)
-    if (peerId) deletePeer(peerId)
+  _handleDisconnect(connKey) {
+    const entry = this.connections.get(connKey)
+    if (!entry) return
+    const peerId = entry.peerId
+    const peerJsId = entry.peerJsId
+    const domainKey = entry.domainKey
+    // 关闭 bin 连接（若有）+ 拒绝等待者
+    if (entry.binConn) {
+      try {
+        entry.binConn.close()
+      } catch (e) {
+        /* ignore */
+      }
+      entry.binConn = null
+      entry.binStatus = 'closed'
+    }
+    if (entry._binWaiters && entry._binWaiters.length) {
+      const ws = entry._binWaiters
+      entry._binWaiters = []
+      for (const w of ws) w.reject(new Error('json conn disconnected'))
+    }
+    this.connections.delete(connKey)
+    this._connKeyByPeerJsId.delete(connKey)
+    // 仅当该 peer 在所有域都没有连接时才删除（跨域多连接去重）
+    if (peerId && !this._hasConnectionForPeerId(peerId)) {
+      deletePeer(peerId)
+      // LCAN 副本自愈：节点全部域断开 → 从 holder 表移除，触发副本数下降
+      // （Phase 1.6 的自愈定时器会检测副本数 <2 并补齐）
+      const touched = removePeerFromHolders(peerId)
+      if (touched > 0) dbg('lcan:holder removed for offline peer', peerId, touched)
+    }
 
-    // 继承制：如果离线者是某房间的 owner，由星标最高的在线成员继承
-    if (peerId) {
+    // 继承制：如果离线者在所有域都断开且是某房间 owner，由星标最高的在线成员继承
+    if (peerId && !this._hasConnectionForPeerId(peerId)) {
       for (const [roomName, r] of this.knownRooms) {
         if (r.owner === peerId) {
           this._handleInheritance(roomName, peerId)
@@ -404,7 +1043,16 @@ export class PeerNetwork extends EventTarget {
     }
 
     this._recomputeRooms()
-    this._emit('peer:disconnected', { peerJsId, peerId })
+    this._emit('peer:disconnected', { peerJsId, peerId, domainKey, connKey })
+  }
+
+  /** 检查某 peerId 是否还有任意域的活跃连接（跨域去重判断） */
+  _hasConnectionForPeerId(peerId) {
+    if (!peerId) return false
+    for (const entry of this.connections.values()) {
+      if (entry.peerId === peerId && entry.status !== 'disconnected') return true
+    }
+    return false
   }
 
   /**
@@ -494,10 +1142,15 @@ export class PeerNetwork extends EventTarget {
     return true
   }
 
-  // ---------------- 数据收发 ----------------
-  async _send(peerJsId, msg) {
-    const entry = this.connections.get(peerJsId)
-    if (!entry || !entry.conn.open) return false
+  // ---------------- 数据收发（多域） ----------------
+  /**
+   * 通过指定连接发送消息。
+   * @param {string} connKey  连接 key（domainKey/peerJsId）
+   * @param {object} msg
+   */
+  async _send(connKey, msg) {
+    const entry = this.connections.get(connKey)
+    if (!entry || !entry.conn || !entry.conn.open) return false
     // 防御：PeerJS JSON 通道单条消息上限 16300 字节（chunkedMTU），
     // 超限消息进入 PeerJS 内部 buffer 后 _tryBuffer() 会无限递归爆栈（CPU 100%）。
     // 发送前先估算 JSON 大小，超限直接丢弃并告警，绝不让它进 PeerJS 队列。
@@ -519,7 +1172,7 @@ export class PeerNetwork extends EventTarget {
     }
   }
 
-  async _sendRaw(peerJsId, partial, to = '') {
+  async _sendRaw(connKey, partial, to = '') {
     const msg = await buildMessage(
       {
         type: partial.type,
@@ -530,9 +1183,14 @@ export class PeerNetwork extends EventTarget {
       },
       this.identity.privateKey
     )
-    return this._send(peerJsId, msg)
+    return this._send(connKey, msg)
   }
 
+  /**
+   * 广播给所有已连接 peer（跨域去重：同一 peerId 只发一次，选任一在线域连接）。
+   * @param {object} partial  消息体（不含签名）
+   * @param {string} [to]     to 字段
+   */
   async _broadcast(partial, to = '') {
     const msg = await buildMessage(
       {
@@ -544,11 +1202,39 @@ export class PeerNetwork extends EventTarget {
       },
       this.identity.privateKey
     )
-    const targets = [...this.connections.keys()]
-    await Promise.all(targets.map((id) => this._send(id, msg)))
+    // 跨域去重：按 peerId 选一条在线连接（peerId 未知时按 connKey 全发，hello 后才有 peerId）
+    const sent = new Set() // peerId 集合，已发送的 peer 不重复
+    const tasks = []
+    for (const [connKey, entry] of this.connections) {
+      if (entry.status === 'disconnected') continue
+      // 已知 peerId 的连接去重；peerId 未知的连接（尚未 hello）全发
+      if (entry.peerId) {
+        if (sent.has(entry.peerId)) continue
+        sent.add(entry.peerId)
+      }
+      tasks.push(this._send(connKey, msg))
+    }
+    await Promise.all(tasks)
   }
 
-  async _sendHello(peerJsId) {
+  /**
+   * 按 peerId 查找任一在线连接 key（跨域：优先选在线连接）。
+   * @param {string} peerId
+   * @returns {string|null} connKey
+   */
+  _connKeyForPeerId(peerId) {
+    if (!peerId) return null
+    let fallback = null
+    for (const [connKey, entry] of this.connections) {
+      if (entry.peerId === peerId) {
+        if (entry.status === 'online') return connKey
+        if (!fallback) fallback = connKey
+      }
+    }
+    return fallback
+  }
+
+  async _sendHello(connKey) {
     const rooms = this.localRooms().map((name) => {
       const meta = this._localRoomMeta.get(name)
       return {
@@ -561,22 +1247,27 @@ export class PeerNetwork extends EventTarget {
       }
     })
     await this._sendRaw(
-      peerJsId,
+      connKey,
       {
         type: MsgType.HELLO,
-        payload: { name: this.ownName, rooms }
+        payload: {
+          name: this.ownName,
+          rooms,
+          // 异构网络能力声明：让对端知道本节点的存储/中继/常驻意愿
+          capabilities: this._capabilities
+        }
       }
     )
   }
 
-  async _onData(peerJsId, data) {
+  async _onData(connKey, data) {
     if (!data || typeof data !== 'object') return
-    const entry = this.connections.get(peerJsId)
+    const entry = this.connections.get(connKey)
     if (!entry) return
     entry.lastSeen = Date.now()
     if (entry.status !== 'online') {
       entry.status = 'online'
-      this._emitPeerStatus(peerJsId)
+      this._emitPeerStatus(connKey)
     }
 
     // 校验签名
@@ -586,35 +1277,45 @@ export class PeerNetwork extends EventTarget {
       return
     }
 
-    // 学习对端身份
+    // 学习对端身份（跨域：同一 peerId 可能在多域都有连接，仅首次 emit peer:connected）
     if (data.from && data.from !== entry.peerId) {
       entry.peerId = data.from
       entry.name = data.extensions?.name || entry.name
       await savePeer({
         id: data.from,
         name: entry.name,
-        peerJsId,
+        peerJsId: entry.peerJsId,
         lastSeen: Date.now()
       })
-      this._emit('peer:connected', {
-        peerJsId,
-        peerId: data.from,
-        name: entry.name
-      })
+      // 跨域去重：仅当该 peerId 之前没有任何连接时才 emit peer:connected
+      const otherConns = [...this.connections.values()].filter(
+        (e) => e.peerId === data.from && e.connKey !== connKey
+      )
+      if (otherConns.length === 0) {
+        this._emit('peer:connected', {
+          peerJsId: entry.peerJsId,
+          peerId: data.from,
+          name: entry.name,
+          domainKey: entry.domainKey
+        })
+      }
+      // 双通道：peerId 已知后，确定性发起 bin 连接（避免双方同时发起）
+      // 规则：peerId 字典序较小的一方主动发起 bin 连接
+      this._ensureBinaryConnection(connKey)
     }
 
     switch (data.type) {
       case MsgType.HELLO:
-        await this._onHello(peerJsId, data)
+        await this._onHello(connKey, data)
         break
       case MsgType.HEARTBEAT:
         // 仅更新 lastSeen，已处理
         break
       case MsgType.JOIN_ROOM:
-        await this._onJoinRoom(peerJsId, data)
+        await this._onJoinRoom(connKey, data)
         break
       case MsgType.LEAVE_ROOM:
-        this._onLeaveRoom(peerJsId, data)
+        this._onLeaveRoom(connKey, data)
         break
       case MsgType.ROOM_MESSAGE:
         this._onRoomMessage(data)
@@ -623,10 +1324,10 @@ export class PeerNetwork extends EventTarget {
         this._onRoomList(data)
         break
       case MsgType.QUERY_ROOMS:
-        await this._onQueryRooms(peerJsId, data)
+        await this._onQueryRooms(connKey, data)
         break
       case MsgType.HISTORY_REQUEST:
-        await this._onHistoryRequest(peerJsId, data)
+        await this._onHistoryRequest(connKey, data)
         break
       case MsgType.HISTORY_RESPONSE:
         this._onHistoryResponse(data)
@@ -635,10 +1336,10 @@ export class PeerNetwork extends EventTarget {
         this._emit('join:rejected', { room: data.payload?.room, reason: data.payload?.reason })
         break
       case MsgType.JOIN_APPROVED:
-        await this._onJoinApproved(peerJsId, data)
+        await this._onJoinApproved(connKey, data)
         break
       case MsgType.JOIN_REQUEST:
-        await this._onJoinRequest(peerJsId, data)
+        await this._onJoinRequest(connKey, data)
         break
       case MsgType.INVITE:
         this._onInvite(data)
@@ -656,7 +1357,7 @@ export class PeerNetwork extends EventTarget {
         this._onFileMeta(data)
         break
       case MsgType.FILE_REQUEST:
-        this._onFileRequest(peerJsId, data)
+        await this._onFileRequest(connKey, data)
         // 请求也转发（meta 是转发来的，请求也要能到达发送者，否则间接节点无法下载）
         if (data.from !== this.identity.peerId) {
           this._forward(data)
@@ -669,11 +1370,30 @@ export class PeerNetwork extends EventTarget {
           this._forward(data)
         }
         break
+      // ---- LCAN 多副本分布式存储 ----
+      case MsgType.LCAN_STORE:
+        await this._onLcanStore(connKey, data)
+        break
+      case MsgType.LCAN_ACK:
+        this._onLcanAck(data)
+        break
+      case MsgType.LCAN_GET:
+        await this._onLcanGet(connKey, data)
+        break
+      case MsgType.LCAN_FOUND:
+        this._onLcanFound(data)
+        break
+      case MsgType.LCAN_NOT_FOUND:
+        this._onLcanNotFound(data)
+        break
+      case MsgType.LCAN_HOLDERS:
+        this._onLcanHolders(data)
+        break
     }
   }
 
   /** 收到加入申请（审核制房间） */
-  async _onJoinRequest(peerJsId, msg) {
+  async _onJoinRequest(connKey, msg) {
     const room = msg.payload?.room
     if (!room) return
     // 判断我们是否有审核权限：owner 或星标 >= approveThreshold
@@ -697,7 +1417,7 @@ export class PeerNetwork extends EventTarget {
       peerId: msg.from,
       name: msg.extensions?.name || msg.from.slice(0, 8),
       timestamp: Date.now(),
-      peerJsId
+      connKey // 记录连接 key，审核通过时通过该连接回发
     })
     this._pendingJoinRequests.set(room, filtered)
     this._emit('join:request', {
@@ -708,7 +1428,7 @@ export class PeerNetwork extends EventTarget {
   }
 
   /** 收到加入批准 */
-  async _onJoinApproved(peerJsId, msg) {
+  async _onJoinApproved(connKey, msg) {
     const room = msg.payload?.room
     if (!room) return
     // 真正加入房间
@@ -774,10 +1494,16 @@ export class PeerNetwork extends EventTarget {
     const filtered = list.filter((r) => r.peerId !== peerId)
     this._pendingJoinRequests.set(room, filtered)
     if (req) {
-      await this._sendRaw(req.peerJsId, {
-        type: MsgType.JOIN_APPROVED,
-        payload: { room }
-      }, peerId)
+      // 优先用记录的 connKey 回发；若该连接已断开，按 peerId 查找任一在线连接
+      const targetConnKey = this.connections.has(req.connKey)
+        ? req.connKey
+        : this._connKeyForPeerId(peerId)
+      if (targetConnKey) {
+        await this._sendRaw(targetConnKey, {
+          type: MsgType.JOIN_APPROVED,
+          payload: { room }
+        }, peerId)
+      }
     }
     this._emit('join:request:update', { room })
     return true
@@ -792,10 +1518,15 @@ export class PeerNetwork extends EventTarget {
     const filtered = list.filter((r) => r.peerId !== peerId)
     this._pendingJoinRequests.set(room, filtered)
     if (req) {
-      await this._sendRaw(req.peerJsId, {
-        type: MsgType.JOIN_REJECTED,
-        payload: { room, reason }
-      }, peerId)
+      const targetConnKey = this.connections.has(req.connKey)
+        ? req.connKey
+        : this._connKeyForPeerId(peerId)
+      if (targetConnKey) {
+        await this._sendRaw(targetConnKey, {
+          type: MsgType.JOIN_REJECTED,
+          payload: { room, reason }
+        }, peerId)
+      }
     }
     this._emit('join:request:update', { room })
     return true
@@ -813,16 +1544,10 @@ export class PeerNetwork extends EventTarget {
     const threshold = rules?.approveThreshold ?? DEFAULT_RULES.approveThreshold
     const myStars = this._getMyStars(room)
     if (!isOwner && myStars < threshold) return false
-    // 找到该 peerId 对应的连接
-    let targetPeerJsId = null
-    for (const [pid, entry] of this.connections) {
-      if (entry.peerId === peerId) {
-        targetPeerJsId = pid
-        break
-      }
-    }
-    if (!targetPeerJsId) return false
-    await this._sendRaw(targetPeerJsId, {
+    // 跨域查找该 peerId 对应的任一在线连接
+    const targetConnKey = this._connKeyForPeerId(peerId)
+    if (!targetConnKey) return false
+    await this._sendRaw(targetConnKey, {
       type: MsgType.INVITE,
       payload: { room }
     }, peerId)
@@ -835,28 +1560,38 @@ export class PeerNetwork extends EventTarget {
   }
 
   // ---------------- 协议处理 ----------------
-  async _onHello(peerJsId, msg) {
-    const entry = this.connections.get(peerJsId)
+  async _onHello(connKey, msg) {
+    const entry = this.connections.get(connKey)
     if (!entry) return
     entry.name = msg.payload?.name || entry.name
+    // 学习对端能力声明（异构角色：full / normal / light + relay + alwaysOn）
+    const caps = msg.payload?.capabilities
+    if (caps) {
+      const before = entry.capabilities
+      entry.capabilities = normalizeCapabilities(caps)
+      if (!before || JSON.stringify(before) !== JSON.stringify(entry.capabilities)) {
+        dbg('peer:capabilities', connKey, entry.capabilities)
+        this._emit('peer:capabilities', { peerJsId: entry.peerJsId, peerId: entry.peerId, capabilities: entry.capabilities })
+      }
+    }
     // 学习对端所在房间（含别名和规则）
     const rooms = msg.payload?.rooms || []
     for (const r of rooms) {
       entry.rooms.add(r.name)
-      this._mergeRoom(r.name, peerJsId, entry.peerId, entry.name, null, null, r.aliases, r.rules, r.owner)
+      this._mergeRoom(r.name, entry.peerJsId, entry.peerId, entry.name, null, null, r.aliases, r.rules, r.owner)
       // 通知 UI 刷新成员列表（新成员/改名通过 hello 同步后立即显示，无需刷新页面）
       this._emit('member:update', { room: r.name })
     }
     // 仅在首次 hello 时回复，避免无限 hello 循环
     if (!entry.helloExchanged) {
       entry.helloExchanged = true
-      await this._sendHello(peerJsId)
-      await this._sendRoomList(peerJsId)
+      await this._sendHello(connKey)
+      await this._sendRoomList(connKey)
     }
     this._recomputeRooms()
   }
 
-  async _onJoinRoom(peerJsId, msg) {
+  async _onJoinRoom(connKey, msg) {
     const room = msg.payload?.room
     if (!room) return
 
@@ -871,7 +1606,7 @@ export class PeerNetwork extends EventTarget {
       const expected = this._passwordCache.get(room) || getRoomPassword(room)
       const provided = msg.payload?.password || ''
       if (provided !== expected) {
-        await this._sendRaw(peerJsId, {
+        await this._sendRaw(connKey, {
           type: MsgType.JOIN_REJECTED,
           payload: { room, reason: '密码错误' }
         }, msg.from)
@@ -880,17 +1615,17 @@ export class PeerNetwork extends EventTarget {
       // 密码正确，新成员也缓存密码
     }
 
-    const entry = this.connections.get(peerJsId)
+    const entry = this.connections.get(connKey)
     if (entry) entry.rooms.add(room)
-    this._mergeRoom(room, peerJsId, msg.from, msg.extensions?.name || entry?.name)
+    this._mergeRoom(room, entry?.peerJsId, msg.from, msg.extensions?.name || entry?.name)
     this._recomputeRooms()
     this._emit('member:update', { room })
   }
 
-  _onLeaveRoom(peerJsId, msg) {
+  _onLeaveRoom(connKey, msg) {
     const room = msg.payload?.room
     if (!room) return
-    const entry = this.connections.get(peerJsId)
+    const entry = this.connections.get(connKey)
     if (entry) entry.rooms.delete(room)
     this._removeMember(room, msg.from)
     this._recomputeRooms()
@@ -1821,6 +2556,9 @@ export class PeerNetwork extends EventTarget {
         /* ignore */
       }
     }, 2000)
+
+    // LCAN 维护定时器（TTL 清扫 + 副本自愈 + holder 同步，60s 周期）
+    this._startLcanTimers()
   }
 
   _stopTimers() {
@@ -1828,6 +2566,7 @@ export class PeerNetwork extends EventTarget {
     clearInterval(this._discoveryTimer)
     clearInterval(this._checkTimer)
     this._heartbeatTimer = this._discoveryTimer = this._checkTimer = null
+    this._stopLcanTimers()
   }
 
   _discover() {
@@ -2002,8 +2741,504 @@ export class PeerNetwork extends EventTarget {
     }
   }
 
+  // ---------------- LCAN 多副本分布式存储（蛛网核心） ----------------
+  /**
+   * 收集在线节点 peerId 列表（排除自己；可选排除 light 节点）。
+   * @param {boolean} [excludeLight=true]  light 节点不参与责任集
+   * @returns {string[]}
+   */
+  _onlinePeerIds(excludeLight = true) {
+    const out = []
+    for (const entry of this.connections.values()) {
+      if (entry.status === 'disconnected') continue
+      if (!entry.peerId) continue
+      if (excludeLight && entry.capabilities?.storage === NodeRole.LIGHT) continue
+      out.push(entry.peerId)
+    }
+    return out
+  }
+
+  /** 计算 LCAN key 的 hex 字符串（IndexedDB keyPath 用） */
+  _lcanKeyHex(namespace, objectId) {
+    return keyToHex(sha256Key(namespace, objectId))
+  }
+
+  /**
+   * 计算某 key 的责任集（k=3 最近在线节点，排除 light）。
+   * @param {string} keyHex
+   * @returns {Array<{peerId:string, dist:bigint}>}
+   */
+  _responsiblePeers(keyHex) {
+    const online = this._onlinePeerIds(true)
+    // 加入自己（自己也是候选责任节点）
+    online.push(this.identity.peerId)
+    return lcanResponsible(keyHex, online, LCAN_DEFAULT_K)
+  }
+
+  /**
+   * 饱和写入：向责任集 k=3 同时发 STORE，任一 ACK 即成功。
+   * 发送者本人也保留一份副本（TTL=7d）。
+   * @param {string} namespace  命名空间（如 'room' / 'doc' / 'thread'）
+   * @param {string} objectId   对象标识
+   * @param {*} payload         任意可序列化数据
+   * @param {object} [opts]
+   * @param {number} [opts.ttl]  存活时长 ms（默认 7 天）
+   * @returns {Promise<{ok:boolean, acks:number, keyHex:string}>}
+   */
+  async lcanStore(namespace, objectId, payload, opts = {}) {
+    const keyHex = this._lcanKeyHex(namespace, objectId)
+    const ttl = opts.ttl != null ? opts.ttl : 7 * 24 * 60 * 60 * 1000
+    // 发送者本人保留副本
+    if (this._canStore()) {
+      await lcanPut(keyHex, payload, { ttl, author: this.identity.peerId })
+      addHolder(keyHex, this.identity.peerId)
+    }
+    // 责任集（排除自己，只发给远端）
+    const resp = this._responsiblePeers(keyHex).filter(
+      (r) => r.peerId !== this.identity.peerId
+    )
+    if (resp.length === 0) {
+      // 没有其他在线节点：本地副本即全部，视为成功
+      return { ok: true, acks: 0, keyHex }
+    }
+    const reqId = keyHex + ':store:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    return new Promise((resolve) => {
+      const state = { resolve, ackCount: 0, targetCount: resp.length, timer: null, keyHex }
+      this._pendingStores.set(reqId, state)
+      state.timer = setTimeout(() => {
+        if (this._pendingStores.has(reqId)) {
+          this._pendingStores.delete(reqId)
+          resolve({ ok: state.ackCount > 0, acks: state.ackCount, keyHex })
+        }
+      }, this._lcanGetTimeout)
+      // 饱和发送：同时发给全部责任节点
+      for (const r of resp) {
+        const ck = this._connKeyForPeerId(r.peerId)
+        if (!ck) continue
+        this._sendRaw(ck, {
+          type: MsgType.LCAN_STORE,
+          payload: { keyHex, reqId, ttl, payload, ns: namespace, oid: objectId },
+          extensions: { lcan: true }
+        }).catch(() => {})
+      }
+    })
+  }
+
+  /** 收到 LCAN_STORE：按角色 + 命名空间策略 + 速率限制决定是否落库，回 ACK */
+  async _onLcanStore(connKey, msg) {
+    const { keyHex, reqId, ttl, payload, ns, oid } = msg.payload || {}
+    if (!keyHex || !reqId) return
+    const fromPeerId = msg.from
+    let stored = false
+    let rejected = false
+
+    // ---- 存储滥用防护 ----
+    // 1. 速率限制：单对端 10s 窗口内 STORE ≤ 20 次
+    if (this._isRateLimited(fromPeerId)) {
+      this._rejectedStoreCount++
+      this._rateLimitedCount++
+      rejected = true
+      dbg('lcan:store rate-limited', fromPeerId, keyHex)
+    }
+    // 2. 命名空间接受策略：只接受已订阅命名空间
+    if (!rejected && !this._isNamespaceAccepted(ns, oid)) {
+      this._rejectedStoreCount++
+      rejected = true
+      dbg('lcan:store namespace rejected', ns, oid, keyHex)
+    }
+
+    // ---- 角色判断 + 落库 ----
+    if (!rejected && this._canStore()) {
+      const limit = this._storageLimit()
+      if (limit > 0) {
+        const count = await lcanCount().catch(() => 0)
+        if (count >= limit) {
+          // 超限：LRU 淘汰低引用 key 后再存（Phase 1.7 Step 3）
+          await this._lcanEvictLowRef(1)
+          const count2 = await lcanCount().catch(() => 0)
+          if (count2 < limit) {
+            stored = await lcanPut(keyHex, payload, { ttl, author: fromPeerId })
+            if (stored) addHolder(keyHex, this.identity.peerId)
+          } else {
+            dbg('lcan:store over quota, skip', keyHex, count2, '/', limit)
+          }
+        } else {
+          stored = await lcanPut(keyHex, payload, { ttl, author: fromPeerId })
+          if (stored) addHolder(keyHex, this.identity.peerId)
+        }
+      }
+    }
+    // 回 ACK（即使拒绝也回，避免发送者干等；stored=false 表示未落库）
+    await this._sendRaw(connKey, {
+      type: MsgType.LCAN_ACK,
+      payload: { keyHex, reqId, stored }
+    })
+  }
+
+  /**
+   * 命名空间接受策略：只接受本节点已加入/已订阅的命名空间。
+   * - room:*  → 仅当本节点已加入该房间时接受
+   * - doc:* / thread:* / announce:* / pin:* → 接受（协作数据，按配额限流）
+   * - 未知命名空间 → 拒绝（防垃圾）
+   * @param {string} ns  命名空间
+   * @param {string} oid 对象标识
+   * @returns {boolean}
+   */
+  _isNamespaceAccepted(ns, oid) {
+    if (!ns) return true // 兼容旧消息（无 ns 字段时默认接受）
+    const ACCEPTED_NS = ['doc', 'thread', 'announce', 'pin', 'search', 'file']
+    if (ns === 'room') {
+      // 仅当已加入该房间时接受（防止垃圾房间数据填满配额）
+      return this._localRoomsSet.has(oid)
+    }
+    return ACCEPTED_NS.includes(ns)
+  }
+
+  /**
+   * 速率限制检查：单对端 10s 窗口内 STORE ≤ 20 次，超限则加入限流集合。
+   * @param {string} peerId
+   * @returns {boolean} true 表示已被限流（应拒绝）
+   */
+  _isRateLimited(peerId) {
+    if (!peerId) return false
+    if (this._rateLimitedPeers.has(peerId)) return true
+    const now = Date.now()
+    let entry = this._storeRateMap.get(peerId)
+    if (!entry || now - entry.windowStart > this._storeRateWindow) {
+      entry = { count: 0, windowStart: now }
+      this._storeRateMap.set(peerId, entry)
+    }
+    entry.count++
+    if (entry.count > this._storeRateMax) {
+      this._rateLimitedPeers.add(peerId)
+      // 10s 后自动解除限流
+      setTimeout(() => this._rateLimitedPeers.delete(peerId), this._storeRateWindow)
+      return true
+    }
+    return false
+  }
+
+  /**
+   * LRU 淘汰低引用 key（配额保护）：优先淘汰 holder 表中引用计数少的 key。
+   * @param {number} n  淘汰条数
+   */
+  async _lcanEvictLowRef(n) {
+    const db = await import('./db.js').then((m) => m).catch(() => null)
+    if (!db) return
+    const idb = db._idbProxy || null
+    // 直接用 openMessagesDB 不可访问（私有），通过 lcanDelete 逐条删
+    // 策略：从 holder 表找引用最少的 key，再查本地是否有，有则删
+    const all = getAllHolders()
+    // 按 holder 数升序排列（引用少的优先淘汰）
+    const candidates = Object.entries(all)
+      .map(([key, peers]) => ({ key, ref: peers ? peers.length : 0 }))
+      .sort((a, b) => a.ref - b.ref)
+    let evicted = 0
+    for (const c of candidates) {
+      if (evicted >= n) break
+      // 只淘汰引用 ≤1 的 key（低引用 = 几乎没人用）
+      if (c.ref > 1) break
+      await lcanDelete(c.key)
+      removeHolder(c.key, this.identity.peerId)
+      evicted++
+      dbg('lcan:evict low-ref', c.key, 'ref=', c.ref)
+    }
+  }
+
+  /** 获取存储统计（设置面板展示用） */
+  getStorageDefenseStats() {
+    return {
+      rejectedStoreCount: this._rejectedStoreCount,
+      rateLimitedCount: this._rateLimitedCount,
+      rateLimitedPeers: [...this._rateLimitedPeers],
+      storeRateMax: this._storeRateMax,
+      storeRateWindow: this._storeRateWindow
+    }
+  }
+
+  /** 收到 LCAN_ACK：唤醒等待中的 lcanStore */
+  _onLcanAck(msg) {
+    const { reqId, stored } = msg.payload || {}
+    if (!reqId) return
+    const state = this._pendingStores.get(reqId)
+    if (!state) return
+    state.ackCount++
+    // 记录持有者
+    if (stored) addHolder(state.keyHex, msg.from)
+    // 任一 ACK（无论 stored true/false）即视为送达；
+    // stored=true 优先成功，stored=false 至少知道对端在线
+    if (state.ackCount >= 1) {
+      clearTimeout(state.timer)
+      this._pendingStores.delete(reqId)
+      state.resolve({ ok: true, acks: state.ackCount, keyHex: state.keyHex })
+    }
+  }
+
+  /**
+   * 饱和读取：同时向全部已知副本持有者（责任集 + holder 表）发 GET，
+   * 第一个 FOUND 返回即成功；全失败/超时 → reject('not_found')。
+   * @param {string} namespace
+   * @param {string} objectId
+   * @returns {Promise<{payload:*, keyHex:string, from:string}>}
+   */
+  async lcanGet(namespace, objectId) {
+    const keyHex = this._lcanKeyHex(namespace, objectId)
+    // 先查本地
+    const local = await lcanGet(keyHex)
+    if (local) {
+      return { payload: local.payload, keyHex, from: this.identity.peerId }
+    }
+    // 候选 = 责任集 ∪ holder 表（去重，排除自己）
+    const resp = this._responsiblePeers(keyHex).map((r) => r.peerId)
+    const holders = getHolders(keyHex)
+    const candidates = [...new Set([...resp, ...holders])].filter(
+      (p) => p !== this.identity.peerId
+    )
+    if (candidates.length === 0) {
+      throw new Error('not_found')
+    }
+    const reqId = keyHex + ':get:' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+    return new Promise((resolve, reject) => {
+      const state = {
+        resolve,
+        reject,
+        found: false,
+        notFound: 0,
+        targetCount: candidates.length,
+        timer: null,
+        keyHex
+      }
+      this._pendingGets.set(reqId, state)
+      state.timer = setTimeout(() => {
+        if (this._pendingGets.has(reqId)) {
+          this._pendingGets.delete(reqId)
+          reject(new Error('not_found'))
+        }
+      }, this._lcanGetTimeout)
+      // 饱和请求：同时发给全部候选
+      for (const peerId of candidates) {
+        const ck = this._connKeyForPeerId(peerId)
+        if (!ck) {
+          // 该候选无连接，计为未命中
+          state.notFound++
+          continue
+        }
+        this._sendRaw(ck, {
+          type: MsgType.LCAN_GET,
+          payload: { keyHex, reqId }
+        }).catch(() => {
+          state.notFound++
+          this._checkLcanGetComplete(reqId)
+        })
+      }
+      // 如果全部候选都无连接，立即失败
+      this._checkLcanGetComplete(reqId)
+    })
+  }
+
+  /** 检查饱和 GET 是否全部 NOT_FOUND（提前 reject） */
+  _checkLcanGetComplete(reqId) {
+    const state = this._pendingGets.get(reqId)
+    if (!state || state.found) return
+    if (state.notFound >= state.targetCount) {
+      clearTimeout(state.timer)
+      this._pendingGets.delete(reqId)
+      state.reject(new Error('not_found'))
+    }
+  }
+
+  /** 收到 LCAN_GET：查本地，命中回 FOUND，未命中回 NOT_FOUND */
+  async _onLcanGet(connKey, msg) {
+    const { keyHex, reqId } = msg.payload || {}
+    if (!keyHex || !reqId) return
+    const rec = await lcanGet(keyHex)
+    if (rec) {
+      await this._sendRaw(connKey, {
+        type: MsgType.LCAN_FOUND,
+        payload: { keyHex, reqId, payload: rec.payload }
+      })
+    } else {
+      await this._sendRaw(connKey, {
+        type: MsgType.LCAN_NOT_FOUND,
+        payload: { keyHex, reqId }
+      })
+    }
+  }
+
+  /** 收到 LCAN_FOUND：唤醒等待中的 lcanGet（先到先用） */
+  _onLcanFound(msg) {
+    const { reqId, payload } = msg.payload || {}
+    if (!reqId) return
+    const state = this._pendingGets.get(reqId)
+    if (!state || state.found) return
+    state.found = true
+    clearTimeout(state.timer)
+    this._pendingGets.delete(reqId)
+    // 记录持有者（下载成功 → 该节点有副本）
+    addHolder(state.keyHex, msg.from)
+    state.resolve({ payload, keyHex: state.keyHex, from: msg.from })
+  }
+
+  /** 收到 LCAN_NOT_FOUND：累计，全部未命中则 reject */
+  _onLcanNotFound(msg) {
+    const { reqId } = msg.payload || {}
+    if (!reqId) return
+    const state = this._pendingGets.get(reqId)
+    if (!state || state.found) return
+    state.notFound++
+    this._checkLcanGetComplete(reqId)
+  }
+
+  /** 收到 LCAN_HOLDERS：合并对端的 holder 表到本地（副本索引交换） */
+  _onLcanHolders(msg) {
+    const entries = msg.payload?.entries
+    if (!entries || typeof entries !== 'object') return
+    for (const [key, peers] of Object.entries(entries)) {
+      if (!Array.isArray(peers)) continue
+      for (const p of peers) addHolder(key, p)
+    }
+  }
+
+  /** 广播本地的 holder 表给对端（心跳/定期同步副本索引） */
+  async _broadcastHolders() {
+    const all = getAllHolders()
+    // 只发有意义的条目（避免空广播）
+    const entries = {}
+    let n = 0
+    for (const [key, peers] of Object.entries(all)) {
+      if (peers && peers.length) {
+        entries[key] = peers
+        n++
+      }
+      if (n >= 200) break // 单次最多 200 条，避免消息过大
+    }
+    if (n === 0) return
+    await this._broadcast({
+      type: MsgType.LCAN_HOLDERS,
+      payload: { entries }
+    })
+  }
+
+  /** 启动 LCAN 定时器（TTL 清扫 + 副本自愈 + holder 同步） */
+  _startLcanTimers() {
+    if (this._lcanCleanTimer) return
+    // 60s 清扫过期 + 自愈检查 + holder 同步
+    this._lcanCleanTimer = setInterval(() => {
+      this._lcanMaintenance().catch(() => {})
+    }, 60 * 1000)
+  }
+
+  _stopLcanTimers() {
+    if (this._lcanCleanTimer) {
+      clearInterval(this._lcanCleanTimer)
+      this._lcanCleanTimer = null
+    }
+    // 清理待处理请求
+    for (const [, s] of this._pendingStores) {
+      clearTimeout(s.timer)
+      s.resolve({ ok: false, acks: s.ackCount, keyHex: s.keyHex })
+    }
+    this._pendingStores.clear()
+    for (const [, g] of this._pendingGets) {
+      clearTimeout(g.timer)
+      g.reject(new Error('shutdown'))
+    }
+    this._pendingGets.clear()
+  }
+
+  /** LCAN 维护：TTL 清扫 + 副本自愈 + holder 同步（60s 周期） */
+  async _lcanMaintenance() {
+    // 1. 清扫过期条目
+    const removed = await lcanCleanExpired()
+    if (removed > 0) dbg('lcan:clean expired', removed)
+    // 2. 副本自愈：检查 holder 表，副本数 <2 且本地有数据则补齐
+    await this._lcanSelfHeal()
+    // 3. 同步 holder 表
+    await this._broadcastHolders()
+  }
+
+  /**
+   * 副本自愈：遍历 holder 表，对副本数 <2 的 key，
+   * 若本地持有则重新饱和 STORE 到当前责任集补齐副本。
+   * 每轮最多补齐 20 个 key（避免单次维护耗时过长）。
+   */
+  async _lcanSelfHeal() {
+    const all = getAllHolders()
+    const self = this.identity.peerId
+    let healed = 0
+    for (const [keyHex, peers] of Object.entries(all)) {
+      if (healed >= 20) break
+      // 只处理我们持有的 key（我们才能提供数据补齐）
+      if (!peers || !peers.includes(self)) continue
+      // 在线持有者数（排除已下线的）
+      const onlineHolders = peers.filter((p) =>
+        p === self ? true : this._hasConnectionForPeerId(p)
+      )
+      if (onlineHolders.length >= 2) continue // 副本充足
+      // 副本不足：从本地取数据，重新饱和存储补齐
+      const rec = await lcanGet(keyHex)
+      if (!rec) {
+        // 本地也没有了（可能已过期）→ 从 holder 表移除自己
+        removeHolder(keyHex, self)
+        continue
+      }
+      // 重新 STORE（会发给当前责任集，补齐副本）
+      dbg('lcan:self-heal', keyHex, 'holders=', onlineHolders.length)
+      await this._lcanReStore(keyHex, rec)
+      healed++
+    }
+    if (healed > 0) dbg('lcan:self-heal done', healed, 'keys re-published')
+  }
+
+  /**
+   * 重新饱和存储一条已有数据（自愈用，不发给自己，只补齐远端副本）。
+   * @param {string} keyHex
+   * @param {{payload, expires, author}} rec  本地 LCAN 记录
+   */
+  async _lcanReStore(keyHex, rec) {
+    const resp = this._responsiblePeers(keyHex).filter(
+      (r) => r.peerId !== this.identity.peerId
+    )
+    if (resp.length === 0) return
+    // 计算剩余 TTL
+    const ttl = rec.expires > 0 ? Math.max(0, rec.expires - Date.now()) : 0
+    for (const r of resp) {
+      const ck = this._connKeyForPeerId(r.peerId)
+      if (!ck) continue
+      this._sendRaw(ck, {
+        type: MsgType.LCAN_STORE,
+        payload: { keyHex, reqId: keyHex + ':heal:' + Date.now().toString(36), ttl, payload: rec.payload },
+        extensions: { lcan: true }
+      }).catch(() => {})
+    }
+  }
+
   // ---------------- 事件工具 ----------------
   _emit(type, detail) {
     this.dispatchEvent(new CustomEvent(type, { detail }))
+  }
+
+  // ---------------- 双通道调试 / 验收工具 ----------------
+  /**
+   * 【验收用】向指定 peerId 发送一个 ~1MB 的 ArrayBuffer 走 bin 通道。
+   * 用于 Phase 1.4 验收："双浏览器互发 1MB 对象走 bin，控制台无 Message too big"。
+   * 在浏览器控制台执行：await window.__nchat.network.binTestSend('<peerId>')
+   * @param {string} peerId
+   * @returns {Promise<{ok:boolean, bytes:number, ms:number}>}
+   */
+  async binTestSend(peerId) {
+    const connKey = this._connKeyForPeerId(peerId)
+    if (!connKey) return { ok: false, bytes: 0, ms: 0, error: 'no connection' }
+    const bytes = 1024 * 1024 // 1MB
+    const buf = new ArrayBuffer(bytes)
+    const t0 = performance.now()
+    const ok = await this._sendBinary(connKey, {
+      kind: BinKind.LCAN_BLOB,
+      testTag: 'bin-1mb-probe',
+      buf
+    })
+    const ms = Math.round(performance.now() - t0)
+    dbg('bin:test send', ok ? 'ok' : 'fail', bytes, 'bytes in', ms, 'ms')
+    return { ok, bytes, ms }
   }
 }

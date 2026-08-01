@@ -6,10 +6,22 @@ import {
 } from '../config.js'
 import { formatBytes } from '../lib/db.js'
 import { IconClose } from './icons'
+import { useChat } from '../composables/useChat.js'
 
 const emit = defineEmits(['close', 'add-server', 'remove-server', 'switch-server', 'reset-servers'])
 
-const tab = ref('diagnostics') // diagnostics | signaling | lan
+const {
+  capabilities,
+  roleStats,
+  domains,
+  NodeRole,
+  getCapabilities,
+  setCapabilities,
+  getRoleStatsInfo,
+  getDomainsInfo
+} = useChat()
+
+const tab = ref('diagnostics') // diagnostics | signaling | network | role | lan
 const diagnostics = ref({})
 const servers = ref([])
 const currentServer = ref(null)
@@ -22,8 +34,18 @@ const newSecure = ref(false)
 const newLabel = ref('')
 const addError = ref('')
 
+// 节点角色表单（本地编辑，提交时调 setCapabilities）
+const roleStorage = ref(capabilities.value?.storage || NodeRole.NORMAL)
+const roleRelay = ref(!!capabilities.value?.relay)
+const roleAlwaysOn = ref(!!capabilities.value?.alwaysOn)
+const roleSaving = ref(false)
+
 onMounted(() => {
   refresh()
+  // 同步表单初值
+  roleStorage.value = capabilities.value?.storage || NodeRole.NORMAL
+  roleRelay.value = !!capabilities.value?.relay
+  roleAlwaysOn.value = !!capabilities.value?.alwaysOn
 })
 
 function refresh() {
@@ -31,6 +53,65 @@ function refresh() {
   servers.value = getAllSignalingServers()
   // 当前激活：优先 state.activeServer，否则第一个
 }
+
+async function onSaveRole() {
+  roleSaving.value = true
+  try {
+    await setCapabilities({
+      storage: roleStorage.value,
+      relay: roleRelay.value,
+      alwaysOn: roleAlwaysOn.value
+    })
+  } finally {
+    roleSaving.value = false
+  }
+}
+
+/** 根据角色返回存储上限文本 */
+function storageLimitText(role) {
+  const map = { [NodeRole.FULL]: '20,000 条', [NodeRole.NORMAL]: '5,000 条', [NodeRole.LIGHT]: '0 条（只读转发）' }
+  return map[role] || '—'
+}
+
+// ---- 多域状态展示（蛛网核心） ----
+/** 域状态文本 */
+function domainStatusText(s) {
+  switch (s) {
+    case 'online':
+      return '在线'
+    case 'connecting':
+      return '连接中…'
+    case 'reconnecting':
+      return '重连中…'
+    case 'offline':
+      return '已断开'
+    case 'error':
+      return '错误'
+    default:
+      return s || '未知'
+  }
+}
+
+/** 域状态 CSS class（用于染色） */
+function domainStatusClass(s) {
+  switch (s) {
+    case 'online':
+      return 'ok'
+    case 'connecting':
+    case 'reconnecting':
+      return 'warn'
+    case 'offline':
+    case 'error':
+      return 'err'
+    default:
+      return ''
+  }
+}
+
+/** 在线域数量统计（拓扑摘要用） */
+const onlineDomainCount = computed(() => {
+  return (domains.value || []).filter((d) => d.status === 'online').length
+})
 
 function serverId(s) {
   return `${s.secure ? 'wss' : 'ws'}://${s.host}:${s.port}${s.path}`
@@ -107,6 +188,20 @@ function copyToClipboard(text) {
           @click="tab = 'signaling'"
         >
           信令服务器
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: tab === 'network' }"
+          @click="tab = 'network'"
+        >
+          网络
+        </button>
+        <button
+          class="tab-btn"
+          :class="{ active: tab === 'role' }"
+          @click="tab = 'role'"
+        >
+          节点角色
         </button>
         <button
           class="tab-btn"
@@ -231,6 +326,143 @@ function copyToClipboard(text) {
         </div>
 
         <button class="btn-link danger" @click="emit('reset-servers')">重置为默认</button>
+      </div>
+
+      <!-- 多域网络状态（蛛网核心） -->
+      <div v-if="tab === 'network'" class="modal-body">
+        <p class="form-hint">
+          nchat v2 蛛网网络：节点并行挂载全部信令域，任一域断开不影响其他域的通信。
+          域 = 信令服务器；路径 = 直连 / 跨域桥接 / 中继转发。
+        </p>
+
+        <div class="role-section">
+          <h4>域连接状态</h4>
+          <div class="diag-row">
+            <span class="diag-label">在线域</span>
+            <span class="diag-value" :class="onlineDomainCount > 0 ? 'ok' : 'err'">
+              {{ onlineDomainCount }} / {{ domains.length }}
+            </span>
+          </div>
+
+          <div class="domain-list" v-if="domains.length">
+            <div
+              v-for="d in domains"
+              :key="d.key"
+              class="domain-item"
+              :class="domainStatusClass(d.status)"
+            >
+              <div class="domain-head">
+                <span class="domain-dot" :class="domainStatusClass(d.status)"></span>
+                <span class="domain-label">{{ d.label }}</span>
+                <span class="domain-status" :class="domainStatusClass(d.status)">
+                  {{ domainStatusText(d.status) }}
+                </span>
+              </div>
+              <div class="domain-meta">
+                <span class="mono">{{ d.secure ? 'wss' : 'ws' }}://{{ d.host }}:{{ d.port }}{{ d.path }}</span>
+              </div>
+              <div class="domain-meta" v-if="d.peerJsId">
+                <span class="diag-label">PeerJS ID</span>
+                <span class="diag-value mono">{{ d.peerJsId }}</span>
+              </div>
+              <div class="domain-meta" v-if="d.reconnectAttempts > 0">
+                <span class="diag-label">重连次数</span>
+                <span class="diag-value warn">{{ d.reconnectAttempts }}</span>
+              </div>
+              <div class="domain-meta" v-if="d.error">
+                <span class="diag-label">错误</span>
+                <span class="diag-value err">{{ d.error }}</span>
+              </div>
+            </div>
+          </div>
+          <p class="form-hint" v-else>
+            尚未连接任何域。请在「信令服务器」标签页配置可用服务器，或检查网络后重试。
+          </p>
+        </div>
+
+        <div class="role-section">
+          <h4>当前网络形态</h4>
+          <div class="role-stats">
+            <span class="stat-chip full">全量 {{ roleStats.full }}</span>
+            <span class="stat-chip normal">普通 {{ roleStats.normal }}</span>
+            <span class="stat-chip light">轻量 {{ roleStats.light }}</span>
+            <span class="stat-chip unknown" v-if="roleStats.unknown">未知 {{ roleStats.unknown }}</span>
+            <span class="stat-chip relay">中继 {{ roleStats.relay }}</span>
+            <span class="stat-chip alwayson" v-if="roleStats.alwayson">常驻 {{ roleStats.alwaysOn }}</span>
+          </div>
+          <p class="form-hint">
+            域并行 + 异构节点 = 蛛网。任一域/节点下线只减少副本，不断路径。
+          </p>
+        </div>
+      </div>
+
+      <!-- 节点角色（异构网络能力声明） -->
+      <div v-if="tab === 'role'" class="modal-body">
+        <p class="form-hint">
+          nchat v2 采用异构网络：每个节点可声明自己的存储/中继/常驻意愿。
+          不同节点组合 = 不同形态的网络，天然"没有两片相同的网络"。
+        </p>
+
+        <div class="role-section">
+          <h4>存储意愿</h4>
+          <div class="role-options">
+            <label class="role-option" :class="{ active: roleStorage === NodeRole.FULL }">
+              <input type="radio" :value="NodeRole.FULL" v-model="roleStorage" />
+              <div class="role-option-body">
+                <span class="role-name">全量节点（full）</span>
+                <span class="role-desc">自愿持久化更多副本（责任集外最近 10 个 key），适合 NAS/服务器常驻节点</span>
+                <span class="role-meta">存储上限：{{ storageLimitText(NodeRole.FULL) }}</span>
+              </div>
+            </label>
+            <label class="role-option" :class="{ active: roleStorage === NodeRole.NORMAL }">
+              <input type="radio" :value="NodeRole.NORMAL" v-model="roleStorage" />
+              <div class="role-option-body">
+                <span class="role-name">普通节点（normal）</span>
+                <span class="role-desc">默认。只存自己责任区（k=3 内）</span>
+                <span class="role-meta">存储上限：{{ storageLimitText(NodeRole.NORMAL) }}</span>
+              </div>
+            </label>
+            <label class="role-option" :class="{ active: roleStorage === NodeRole.LIGHT }">
+              <input type="radio" :value="NodeRole.LIGHT" v-model="roleStorage" />
+              <div class="role-option-body">
+                <span class="role-name">轻量节点（light）</span>
+                <span class="role-desc">几乎不存（移动端/低配额），只做路由与转发</span>
+                <span class="role-meta">存储上限：{{ storageLimitText(NodeRole.LIGHT) }}</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="role-section">
+          <h4>其他能力</h4>
+          <label class="role-toggle">
+            <input type="checkbox" v-model="roleRelay" />
+            <span>愿意中继转发（帮其他节点跨域/跨连接桥接）</span>
+          </label>
+          <label class="role-toggle">
+            <input type="checkbox" v-model="roleAlwaysOn" />
+            <span>常驻节点（NAS/服务器，长时间在线）</span>
+          </label>
+        </div>
+
+        <div class="role-section">
+          <h4>当前网络形态</h4>
+          <div class="role-stats">
+            <span class="stat-chip full">全量 {{ roleStats.full }}</span>
+            <span class="stat-chip normal">普通 {{ roleStats.normal }}</span>
+            <span class="stat-chip light">轻量 {{ roleStats.light }}</span>
+            <span class="stat-chip unknown" v-if="roleStats.unknown">未知 {{ roleStats.unknown }}</span>
+            <span class="stat-chip relay">中继 {{ roleStats.relay }}</span>
+            <span class="stat-chip alwayson" v-if="roleStats.alwaysOn">常驻 {{ roleStats.alwaysOn }}</span>
+          </div>
+          <p class="form-hint">
+            full 节点越多 → 副本越多 → 韧性越强。网络形态随各节点能力组合而变。
+          </p>
+        </div>
+
+        <button class="btn primary" :disabled="roleSaving" @click="onSaveRole">
+          {{ roleSaving ? '保存中…' : '保存并广播' }}
+        </button>
       </div>
 
       <!-- 连接帮助 -->

@@ -15,7 +15,7 @@
 import { reactive, ref, shallowRef, readonly, computed } from 'vue'
 import { loadOrCreateIdentity } from '../lib/crypto.js'
 import { PeerNetwork } from '../lib/peer.js'
-import { AccessRule, SpeakRule } from '../lib/protocol.js'
+import { AccessRule, SpeakRule, NodeRole, DEFAULT_CAPABILITIES } from '../lib/protocol.js'
 import {
   addMessage,
   hasMessage,
@@ -63,6 +63,11 @@ const searchKeyword = ref('') // 当前搜索关键词，空则显示全部
 const pendingRequests = ref([]) // 当前房间待处理加入申请
 const storageStats = ref({ rooms: 0, messages: 0, sizeBytes: 0 })
 const notifications = ref([]) // 通知列表 [{ id, type, text, timestamp }]
+// 本节点能力声明（异构网络角色）+ 已连接节点的角色统计
+const capabilities = ref({ ...DEFAULT_CAPABILITIES })
+const roleStats = ref({ full: 0, normal: 0, light: 0, unknown: 0, relay: 0, alwaysOn: 0 })
+// 多域并行状态（蛛网核心：每域独立 status/peerJsId/reconnectAttempts）
+const domains = ref([])
 
 let network = null
 let initialized = false
@@ -92,6 +97,10 @@ async function init() {
     await refreshStorageStats()
 
     network = new PeerNetwork(identity, state.ownName)
+    // 初始化本节点能力声明（从 localStorage 读取，同步到响应式状态）
+    capabilities.value = network.getCapabilities()
+    // 初始化多域状态（启动前先空数组，start 后 domains:update 事件会持续刷新）
+    domains.value = network.getDomains().map((d) => ({ ...d }))
     wireEvents(network)
 
     // dev 调试钩子
@@ -207,6 +216,7 @@ function wireEvents(net) {
     const { peerJsId, peerId, name } = e.detail
     upsertPeer(peerJsId, { peerId, name, status: 'online' })
     if (currentRoom.value) refreshMembers()
+    if (network) roleStats.value = network.getRoleStats()
   })
 
   net.addEventListener('peer:disconnected', (e) => {
@@ -214,6 +224,7 @@ function wireEvents(net) {
     const idx = peers.value.findIndex((p) => p.peerJsId === peerJsId)
     if (idx >= 0) peers.value.splice(idx, 1)
     if (peerId && currentRoom.value) refreshMembers()
+    if (network) roleStats.value = network.getRoleStats()
   })
 
   // 音视频通话事件
@@ -235,6 +246,23 @@ function wireEvents(net) {
   net.addEventListener('peer:status', (e) => {
     const { peerJsId, status } = e.detail
     upsertPeer(peerJsId, { status })
+  })
+
+  // 对端能力声明变更 → 角色统计刷新
+  net.addEventListener('peer:capabilities', () => {
+    if (network) roleStats.value = network.getRoleStats()
+  })
+
+  // 本节点能力声明变更（设置面板触发） → 同步响应式状态
+  net.addEventListener('capabilities:update', (e) => {
+    capabilities.value = { ...e.detail.capabilities }
+    if (network) roleStats.value = network.getRoleStats()
+  })
+
+  // 多域状态变更 → 同步 domains 响应式数组（UI 拓扑/域状态展示用）
+  net.addEventListener('domains:update', (e) => {
+    const list = e.detail?.domains || (network ? network.getDomains() : [])
+    domains.value = list.map((d) => ({ ...d }))
   })
 
   // 房间列表（合并而非替换，保留缓存房间和别名）
@@ -757,6 +785,28 @@ function getDiagnosticsInfo() {
   return getDiagnostics()
 }
 
+// ---------------- 节点能力（异构角色） ----------------
+function getCapabilities() {
+  return network ? network.getCapabilities() : { ...DEFAULT_CAPABILITIES }
+}
+
+async function setCapabilities(patch) {
+  if (!network) return false
+  const ok = await network.setCapabilities(patch)
+  capabilities.value = network.getCapabilities()
+  roleStats.value = network.getRoleStats()
+  return ok
+}
+
+function getRoleStatsInfo() {
+  return network ? network.getRoleStats() : { full: 0, normal: 0, light: 0, unknown: 0, relay: 0, alwaysOn: 0 }
+}
+
+/** 获取多域状态快照（UI 用） */
+function getDomainsInfo() {
+  return network ? network.getDomains() : []
+}
+
 // ---------------- 音视频通话（开发测试用） ----------------
 async function startMediaCall(targetPeerId, localStream) {
   if (!network) return false
@@ -794,8 +844,15 @@ export function useChat() {
     pendingRequests,
     storageStats,
     notifications,
+    // 节点能力（异构角色）
+    capabilities,
+    roleStats,
+    NodeRole,
     AccessRule,
     SpeakRule,
+    // 多域并行状态（蛛网核心）
+    domains,
+    getDomainsInfo,
     init,
     setOwnName,
     createRoom,
@@ -833,6 +890,10 @@ export function useChat() {
     switchSignalingServer,
     resetSignalingServers,
     getDiagnosticsInfo,
+    // 节点能力
+    getCapabilities,
+    setCapabilities,
+    getRoleStatsInfo,
     // 通知
     dismissNotification,
     // 音视频通话（开发测试用）

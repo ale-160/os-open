@@ -1526,3 +1526,209 @@ code {
   margin-top: var(--sp-2);
   text-align: center;
 }
+
+/* ===== 多域网络状态（蛛网核心） ===== */
+.domain-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: var(--sp-2) 0;
+}
+.domain-item {
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-dim);
+  border-radius: var(--radius);
+  background: var(--bg-elev);
+  transition: border-color 0.2s;
+}
+.domain-item.ok {
+  border-left-color: var(--c-success);
+}
+.domain-item.warn {
+  border-left-color: var(--c-warning);
+}
+.domain-item.err {
+  border-left-color: var(--c-danger);
+}
+.domain-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-1);
+}
+.domain-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  flex-shrink: 0;
+}
+.domain-dot.ok {
+  background: var(--c-success);
+}
+.domain-dot.warn {
+  background: var(--c-warning);
+}
+.domain-dot.err {
+  background: var(--c-danger);
+}
+.domain-label {
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.domain-status {
+  font-size: var(--fs-11);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-elev2);
+  color: var(--text-muted);
+}
+.domain-status.ok {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}
+.domain-status.warn {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+}
+.domain-status.err {
+  background: var(--c-danger-soft);
+  color: var(--c-danger);
+}
+.domain-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-12);
+  color: var(--text-muted);
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.domain-meta .diag-label {
+  font-size: var(--fs-11);
+  color: var(--text-dim);
+  min-width: auto;
+}
+.domain-meta .diag-value {
+  font-size: var(--fs-12);
+}
+
+/* ===== 节点角色（异构网络能力声明） ===== */
+.role-section {
+  margin-bottom: var(--sp-4);
+}
+.role-section h4 {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-13);
+  font-weight: 600;
+  color: var(--text);
+}
+.role-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.role-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.role-option:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+.role-option.active {
+  border-color: var(--c-primary);
+  background: var(--c-primary-soft);
+}
+.role-option input[type='radio'] {
+  margin-top: 3px;
+  accent-color: var(--c-primary);
+}
+.role-option-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.role-name {
+  font-size: var(--fs-14);
+  font-weight: 600;
+  color: var(--text);
+}
+.role-desc {
+  font-size: var(--fs-12);
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.role-meta {
+  font-size: var(--fs-11);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.role-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) 0;
+  font-size: var(--fs-13);
+  color: var(--text);
+  cursor: pointer;
+}
+.role-toggle input[type='checkbox'] {
+  accent-color: var(--c-primary);
+}
+.role-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-2);
+}
+.stat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: var(--fs-11);
+  font-weight: 600;
+  background: var(--bg-elev2);
+  color: var(--text-muted);
+  border: 1px solid var(--border-soft);
+}
+.stat-chip.full {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+  border-color: var(--c-success);
+}
+.stat-chip.normal {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  border-color: var(--c-primary);
+}
+.stat-chip.light {
+  background: var(--bg-elev2);
+  color: var(--text-muted);
+}
+.stat-chip.unknown {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+  border-color: var(--c-warning);
+}
+.stat-chip.relay {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+}
+.stat-chip.alwayson {
+  background: var(--c-success-soft);
+  color: var(--c-success);
+}

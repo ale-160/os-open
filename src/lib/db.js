@@ -29,8 +29,10 @@ const KEYS = {
 }
 
 const IDB_NAME = 'nchat-db'
-const IDB_VERSION = 1
+const IDB_VERSION = 2
 const IDB_STORE = 'messages'
+const IDB_STORE_LCAN = 'lcan'
+const IDB_STORE_DOCS = 'docs'
 // IndexedDB 打开超时（ms）：部分环境 open 回调不触发，超时后回退 localStorage
 const IDB_TIMEOUT = 4000
 
@@ -44,9 +46,18 @@ function openMessagesDB() {
     idbPromise = Promise.race([
       openDB(IDB_NAME, IDB_VERSION, {
         upgrade(db) {
+          // v1: messages store
           if (!db.objectStoreNames.contains(IDB_STORE)) {
             const store = db.createObjectStore(IDB_STORE, { keyPath: 'id' })
             store.createIndex('room', 'room')
+          }
+          // v2: LCAN 多副本分布式存储 + 云文档
+          if (!db.objectStoreNames.contains(IDB_STORE_LCAN)) {
+            const lcan = db.createObjectStore(IDB_STORE_LCAN, { keyPath: 'key' })
+            lcan.createIndex('expires', 'expires')
+          }
+          if (!db.objectStoreNames.contains(IDB_STORE_DOCS)) {
+            db.createObjectStore(IDB_STORE_DOCS, { keyPath: 'docId' })
           }
         }
       }),
@@ -491,4 +502,168 @@ export function formatBytes(bytes) {
   if (!bytes || bytes < 1024) return bytes + ' B'
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
   return (bytes / 1024 / 1024).toFixed(2) + ' MB'
+}
+
+// ---- LCAN 多副本分布式存储 ----
+// objectStore 'lcan': { key, payload, expires, author, ts }
+// holder 表（localStorage）：{ key: [peerId...] } 记录哪些节点持有该 key 的副本
+
+/**
+ * 写入一条 LCAN 数据（多副本责任区存储）。
+ * @param {string} key   LCAN key（hex 字符串）
+ * @param {*} payload    任意可序列化数据
+ * @param {object} [opts]
+ * @param {number} [opts.ttl=604800000]  存活时长 ms（默认 7 天）
+ * @param {string} [opts.author]         原始写入者 peerId
+ * @returns {Promise<boolean>}
+ */
+export async function lcanPut(key, payload, opts = {}) {
+  const ttl = opts.ttl != null ? opts.ttl : 7 * 24 * 60 * 60 * 1000
+  const db = await openMessagesDB()
+  if (!db) return false
+  try {
+    const rec = {
+      key,
+      payload,
+      expires: ttl > 0 ? Date.now() + ttl : 0, // 0 = 永不过期
+      author: opts.author || '',
+      ts: Date.now()
+    }
+    await db.put(IDB_STORE_LCAN, rec)
+    return true
+  } catch (e) {
+    console.warn('[nchat] lcanPut failed:', e?.message)
+    return false
+  }
+}
+
+/**
+ * 读取一条 LCAN 数据。过期则删除并返回 null。
+ * @param {string} key
+ * @returns {Promise<{key,payload,expires,author,ts}|null>}
+ */
+export async function lcanGet(key) {
+  const db = await openMessagesDB()
+  if (!db) return null
+  try {
+    const rec = await db.get(IDB_STORE_LCAN, key)
+    if (!rec) return null
+    if (rec.expires && rec.expires < Date.now()) {
+      await db.delete(IDB_STORE_LCAN, key)
+      return null
+    }
+    return rec
+  } catch (e) {
+    return null
+  }
+}
+
+/** 删除一条 LCAN 数据 */
+export async function lcanDelete(key) {
+  const db = await openMessagesDB()
+  if (!db) return
+  try {
+    await db.delete(IDB_STORE_LCAN, key)
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+/**
+ * 清扫所有过期的 LCAN 条目（Phase 1.6 定时调用）。
+ * @returns {Promise<number>} 清理条数
+ */
+export async function lcanCleanExpired() {
+  const db = await openMessagesDB()
+  if (!db) return 0
+  try {
+    const now = Date.now()
+    const tx = db.transaction(IDB_STORE_LCAN, 'readwrite')
+    const store = tx.objectStore(IDB_STORE_LCAN)
+    let removed = 0
+    let cursor = await store.openCursor()
+    while (cursor) {
+      const rec = cursor.value
+      if (rec.expires && rec.expires < now) {
+        await cursor.delete()
+        removed++
+      }
+      cursor = await cursor.continue()
+    }
+    await tx.done
+    return removed
+  } catch (e) {
+    return 0
+  }
+}
+
+/** 统计 LCAN 存储条目数（角色限流用） */
+export async function lcanCount() {
+  const db = await openMessagesDB()
+  if (!db) return 0
+  try {
+    return await db.count(IDB_STORE_LCAN)
+  } catch (e) {
+    return 0
+  }
+}
+
+// ---- 副本持有者表（holder table，localStorage） ----
+// { key: [peerId, peerId, ...] } —— 记录哪些节点声称持有该 key 的副本
+const HOLDERS_KEY = 'nchat:holders'
+
+/** 读取某 key 的持有者列表 */
+export function getHolders(key) {
+  const all = readJSON(HOLDERS_KEY, {})
+  return all[key] || []
+}
+
+/** 读取全部 holder 表（拓扑/自愈用） */
+export function getAllHolders() {
+  return readJSON(HOLDERS_KEY, {})
+}
+
+/** 向某 key 的持有者列表添加一个 peerId（去重） */
+export function addHolder(key, peerId) {
+  if (!key || !peerId) return
+  const all = readJSON(HOLDERS_KEY, {})
+  const list = all[key] || []
+  if (!list.includes(peerId)) {
+    list.push(peerId)
+    all[key] = list
+    writeJSON(HOLDERS_KEY, all)
+  }
+}
+
+/** 从某 key 的持有者列表移除一个 peerId */
+export function removeHolder(key, peerId) {
+  if (!key || !peerId) return
+  const all = readJSON(HOLDERS_KEY, {})
+  const list = all[key] || []
+  const idx = list.indexOf(peerId)
+  if (idx >= 0) {
+    list.splice(idx, 1)
+    if (list.length === 0) delete all[key]
+    else all[key] = list
+    writeJSON(HOLDERS_KEY, all)
+  }
+}
+
+/** 节点下线时，从全部 holder 表中移除该 peerId（副本自愈触发用） */
+export function removePeerFromHolders(peerId) {
+  if (!peerId) return 0
+  const all = readJSON(HOLDERS_KEY, {})
+  let touched = 0
+  for (const key of Object.keys(all)) {
+    const list = all[key]
+    const idx = list.indexOf(peerId)
+    if (idx >= 0) {
+      list.splice(idx, 1)
+      if (list.length === 0) delete all[key]
+      else all[key] = list
+      touched++
+    }
+  }
+  if (touched > 0) writeJSON(HOLDERS_KEY, all)
+  return touched
 }
