@@ -1012,21 +1012,17 @@ select.input {
     align-items: flex-start;
     width: 100%;
   }
-  /* 移动端房间列表只显示列表本身：隐藏 PeerInfo、搜索提示、别名/时间/加载更多等辅助文本 */
-  .app-header .peer-info {
+  /* 移动端未进入房间：房间列表不在左侧，聊天占位内容（"选择左侧房间开始聊天"、
+     欢迎语、底部输入框）无意义且占空间，整个聊天区隐藏，区域留给房间列表 */
+  .app:not(.in-room) .chat-area {
     display: none;
   }
-  .room-search .hint,
-  .room-search .search-status {
-    display: none;
+  .app:not(.in-room) .app-main {
+    grid-template-rows: 1fr;
   }
-  .room-aliases,
-  .room-meta .ago {
-    display: none;
-  }
-  .room-list .empty,
-  .load-more-btn {
-    display: none;
+  .app:not(.in-room) .sidebar {
+    max-height: none;
+    border-bottom: none;
   }
   .chat-head {
     padding: 8px 10px;
