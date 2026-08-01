@@ -10,7 +10,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['send', 'leave', 'send-file'])
+const emit = defineEmits(['send', 'leave', 'send-file', 'download'])
 
 const draft = ref('')
 const bodyRef = ref(null)
@@ -159,8 +159,29 @@ function escapeHtml(s) {
             <span v-if="m.text" class="msg-text">{{ m.text }}</span>
             <!-- 文件消息 -->
             <div v-else-if="m.file" class="msg-file">
+              <!-- 大文件元信息卡片：仅缩略图/大小，点击下载按需拉取完整内容 -->
+              <div v-if="m.file.isMeta" class="file-meta-wrap">
+                <div class="file-meta">
+                  <span class="file-icon">{{ m.file.thumbDataUrl ? '🖼' : (isAudio(m.file.type) ? '🎵' : '📦') }}</span>
+                  <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
+                  <span class="file-size">{{ formatSize(m.file.size) }}</span>
+                </div>
+                <img
+                  v-if="m.file.thumbDataUrl"
+                  :src="m.file.thumbDataUrl"
+                  :alt="m.file.name"
+                  class="file-image thumb"
+                  loading="lazy"
+                />
+                <div class="file-meta-hint">
+                  大文件（{{ formatSize(m.file.size) }}），点击下载后查看
+                </div>
+                <button class="btn-mini primary" @click="emit('download', m.file)">
+                  ⬇ 下载
+                </button>
+              </div>
               <!-- 图片预览 -->
-              <div v-if="isImage(m.file.type)" class="file-image-wrap">
+              <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
                 <img
                   :src="m.file.dataUrl"
                   :alt="m.file.name"
@@ -257,5 +278,32 @@ function escapeHtml(s) {
   min-height: 44px;
   min-width: 44px;
   touch-action: manipulation;
+}
+/* 大文件元信息卡片 */
+.file-meta-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm);
+  max-width: 320px;
+}
+.file-meta-wrap .file-image.thumb {
+  max-width: 240px;
+  max-height: 160px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.file-meta-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.file-meta-wrap .btn-mini {
+  align-self: flex-start;
+  min-height: 36px;
+  padding: 6px 14px;
+  font-size: 13px;
 }
 </style>

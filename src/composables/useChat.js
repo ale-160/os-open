@@ -292,6 +292,18 @@ function upsertPeer(peerJsId, patch) {
 
 async function handleChatMessage(chatMsg, fromHistory = false) {
   if (!chatMsg || !chatMsg.id) return
+
+  // 大文件：下载完成后（带完整 dataUrl）替换已有的 meta 卡片消息（同一 fileId）
+  if (chatMsg.file?.fileId) {
+    const existing = messages.value.find(
+      (m) => m.file?.fileId === chatMsg.file.fileId && !m.file?.dataUrl
+    )
+    if (existing && chatMsg.file.dataUrl) {
+      Object.assign(existing, chatMsg)
+      return
+    }
+  }
+
   // 去重
   const set = roomMessageIndex.get(chatMsg.room) || new Set()
   if (set.has(chatMsg.id)) return
@@ -516,6 +528,12 @@ async function sendFileMessage(file) {
   if (ok) stats.value.sent++
 }
 
+/** 按需下载大文件完整内容（向发送者拉取，成功后自动替换 meta 卡片） */
+async function downloadFile(fileId, fromPeerId) {
+  if (!network || !fileId) return false
+  return await network.requestFile(fileId, fromPeerId)
+}
+
 /** 搜索房间：设置关键词过滤 + 查询网络节点和本地缓存 */
 async function searchRooms(keyword) {
   searchKeyword.value = keyword || ''
@@ -736,6 +754,7 @@ export function useChat() {
     leaveCurrentRoom,
     sendRoomMessage,
     sendFileMessage,
+    downloadFile,
     searchRooms,
     clearSearch,
     filteredRooms,

@@ -32,7 +32,10 @@ export const MsgType = {
   // 放逐/屏蔽：广播屏蔽规则更新
   BAN_UPDATE: 'ban_update',
   // 文件传输
-  FILE_MESSAGE: 'file_message'
+  FILE_MESSAGE: 'file_message',
+  // 大文件：元信息广播（缩略图/大小），完整内容按需拉取
+  FILE_META: 'file_meta',
+  FILE_REQUEST: 'file_request'
 }
 
 // ---- 房间规则 ----

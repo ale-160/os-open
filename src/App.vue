@@ -33,6 +33,7 @@ const {
   leaveCurrentRoom,
   sendRoomMessage,
   sendFileMessage,
+  downloadFile,
   searchRooms,
   clearSearch,
   filteredRooms,
@@ -129,6 +130,15 @@ async function onJoinWithPassword() {
   }
   passwordPrompt.value = null
   passwordInput.value = ''
+}
+
+// 大文件按需下载
+async function onDownloadFile(file) {
+  if (!file?.fileId) return
+  const ok = await downloadFile(file.fileId, file.fromPeerId)
+  if (!ok) {
+    alert('下载失败：文件发送者已离线或无法连接')
+  }
 }
 
 function onCreateRoom(name, options) {
@@ -276,6 +286,7 @@ const currentServerLabel = computed(() => {
           :members="members"
           @send="sendRoomMessage"
           @send-file="sendFileMessage"
+          @download="onDownloadFile"
           @leave="leaveCurrentRoom"
         />
       </section>

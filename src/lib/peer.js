@@ -42,6 +42,34 @@ function dbg(...args) {
   if (DEBUG) console.log('[nchat]', ...args)
 }
 
+/** 生成图片缩略图（canvas 压缩到最长边 240px 的 JPEG） */
+function makeThumbnail(dataUrl, maxSize = 240) {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image()
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, maxSize / Math.max(img.width, img.height))
+          const w = Math.max(1, Math.round(img.width * scale))
+          const h = Math.max(1, Math.round(img.height * scale))
+          const canvas = document.createElement('canvas')
+          canvas.width = w
+          canvas.height = h
+          const ctx = canvas.getContext('2d')
+          ctx.drawImage(img, 0, 0, w, h)
+          resolve(canvas.toDataURL('image/jpeg', 0.6))
+        } catch (e) {
+          resolve(null)
+        }
+      }
+      img.onerror = () => resolve(null)
+      img.src = dataUrl
+    } catch (e) {
+      resolve(null)
+    }
+  })
+}
+
 export class PeerNetwork extends EventTarget {
   /**
    * @param {object} identity  { privateKey, publicKey, peerId }
@@ -223,6 +251,9 @@ export class PeerNetwork extends EventTarget {
       }
       this._mediaCalls.clear()
     }
+    // 清理大文件缓存与分片聚合（防止内存泄漏）
+    if (this._outgoingFiles) this._outgoingFiles.clear()
+    if (this._fileChunks) this._fileChunks.clear()
     // 通知离开所有房间
     for (const roomName of this.localRooms()) {
       await this._broadcast({ type: MsgType.LEAVE_ROOM, payload: { room: roomName } })
@@ -563,6 +594,12 @@ export class PeerNetwork extends EventTarget {
         break
       case MsgType.FILE_MESSAGE:
         this._onFileMessage(data)
+        break
+      case MsgType.FILE_META:
+        this._onFileMeta(data)
+        break
+      case MsgType.FILE_REQUEST:
+        this._onFileRequest(peerJsId, data)
         break
     }
   }
@@ -1341,10 +1378,10 @@ export class PeerNetwork extends EventTarget {
     if (!this._localRoomsSet.has(room)) {
       await this.joinRoom(room)
     }
-    // 限制文件大小（单文件 8MB，base64 后通过分片传输，每片远小于 DataChannel 单条上限）
-    const MAX_FILE_SIZE = 8 * 1024 * 1024
+    // 文件大小上限（大文件通过元信息 + 按需拉取传输，不受 DataChannel 限制）
+    const MAX_FILE_SIZE = 100 * 1024 * 1024
     if (file.size > MAX_FILE_SIZE) {
-      this._emit('error', { type: 'file_too_large', message: `文件超过 8MB 限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）` })
+      this._emit('error', { type: 'file_too_large', message: `文件超过 100MB 限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）` })
       return false
     }
     // 读取文件为 base64
@@ -1357,23 +1394,67 @@ export class PeerNetwork extends EventTarget {
 
     // 唯一 fileId（用于分片聚合与去重）
     const fileId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
+    // 小文件阈值：≤1MB 直接广播完整内容（接收方立即可见）；>1MB 只广播元信息，按需拉取
+    const SMALL_FILE_LIMIT = 1024 * 1024
+    const isSmall = file.size <= SMALL_FILE_LIMIT
+
+    // 图片缩略图（大文件广播元信息时附带，供接收方预览）
+    let thumbDataUrl = null
+    if (!isSmall && file.type && file.type.startsWith('image/')) {
+      thumbDataUrl = await makeThumbnail(dataUrl)
+    }
+
     // 本地立即可见
     this._emit('chat', {
       id: fileId,
       room,
-      from: msg.from,
+      from: this.identity.peerId,
       name: this.ownName,
       file: {
         name: file.name,
         type: file.type,
         size: file.size,
-        dataUrl
+        dataUrl,
+        fileId,
+        fromPeerId: this.identity.peerId
       },
-      timestamp: msg.timestamp
+      timestamp: Date.now()
     })
 
-    // 分片发送：WebRTC DataChannel 单条消息安全上限约 256KB，
-    // 每片取 60KB 字符（base64），远低于上限，避免大文件被静默丢弃
+    // 大文件：缓存完整内容供按需拉取，广播元信息
+    if (!isSmall) {
+      // 缓存发送中的大文件（fileId -> dataUrl），供接收方按需请求
+      if (!this._outgoingFiles) this._outgoingFiles = new Map()
+      this._outgoingFiles.set(fileId, { room, dataUrl, name: file.name, type: file.type, size: file.size })
+      // 上限 20 个，超出清理最早的
+      if (this._outgoingFiles.size > 20) {
+        const oldest = this._outgoingFiles.keys().next().value
+        this._outgoingFiles.delete(oldest)
+      }
+      const meta = await buildMessage(
+        {
+          type: MsgType.FILE_META,
+          from: this.identity.peerId,
+          to: room,
+          payload: {
+            room,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            fileId,
+            thumbDataUrl
+          },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      this._markProcessed(meta.id)
+      await this._broadcast(meta)
+      return true
+    }
+
+    // 小文件：分片广播完整内容（WebRTC DataChannel 单条消息安全上限约 256KB，
+    // 每片取 60KB 字符（base64），远低于上限，避免大文件被静默丢弃）
     const CHUNK_SIZE = 60000
     const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE)
     for (let i = 0; i < totalChunks; i++) {
@@ -1391,7 +1472,8 @@ export class PeerNetwork extends EventTarget {
             fileId,
             chunkIndex: i,
             totalChunks,
-            dataUrl: chunk
+            dataUrl: chunk,
+            fromPeerId: this.identity.peerId
           },
           extensions: { name: this.ownName }
         },
@@ -1450,7 +1532,9 @@ export class PeerNetwork extends EventTarget {
             name: agg.meta.fileName,
             type: agg.meta.fileType,
             size: agg.meta.fileSize,
-            dataUrl: full
+            dataUrl: full,
+            fileId,
+            fromPeerId: agg.meta.from
           },
           timestamp: agg.meta.timestamp
         })
@@ -1483,6 +1567,98 @@ export class PeerNetwork extends EventTarget {
     if (msg.from !== this.identity.peerId) {
       this._forward(msg)
     }
+  }
+
+  /** 处理收到的大文件元信息（不传完整内容，仅元数据 + 缩略图） */
+  _onFileMeta(msg) {
+    const room = msg.payload?.room
+    const fileId = msg.payload?.fileId
+    if (!room || !fileId) return
+    if (!this._markProcessed(msg.id)) return
+    // 屏蔽过滤
+    if (this._isMessageBanned(room, msg.from)) return
+
+    this._emit('chat', {
+      id: fileId,
+      room,
+      from: msg.from,
+      name: msg.extensions?.name || msg.from.slice(0, 8),
+      file: {
+        name: msg.payload.fileName,
+        type: msg.payload.fileType,
+        size: msg.payload.fileSize,
+        fileId,
+        fromPeerId: msg.from,
+        // 元信息模式：无完整 dataUrl，仅缩略图；点击下载时按需拉取
+        thumbDataUrl: msg.payload.thumbDataUrl || null,
+        isMeta: true
+      },
+      timestamp: msg.timestamp
+    })
+
+    // 元信息也转发（让间接连接的节点也能看到文件卡片）
+    if (msg.from !== this.identity.peerId) {
+      this._forward(msg)
+    }
+  }
+
+  /** 收到文件下载请求：从本地缓存找到完整内容，分片回传 */
+  async _onFileRequest(peerJsId, msg) {
+    const fileId = msg.payload?.fileId
+    if (!fileId) return
+    if (!this._markProcessed(msg.id)) return
+    const entry = this._outgoingFiles?.get(fileId)
+    if (!entry) return // 缓存已过期或不是我们发送的
+    dbg('file:request served', fileId, 'to', peerJsId)
+
+    // 分片回传给请求者（单播，不广播）
+    const CHUNK_SIZE = 60000
+    const totalChunks = Math.ceil(entry.dataUrl.length / CHUNK_SIZE)
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = entry.dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+      const chunkMsg = await buildMessage(
+        {
+          type: MsgType.FILE_MESSAGE,
+          from: this.identity.peerId,
+          to: entry.room,
+          payload: {
+            room: entry.room,
+            fileName: entry.name,
+            fileType: entry.type,
+            fileSize: entry.size,
+            fileId,
+            chunkIndex: i,
+            totalChunks,
+            dataUrl: chunk
+          },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      this._markProcessed(chunkMsg.id)
+      await this._send(peerJsId, chunkMsg)
+    }
+  }
+
+  /** 请求下载大文件完整内容（向 fileId 的发送者按需拉取） */
+  async requestFile(fileId, fromPeerId) {
+    // 找到持有该文件的连接（发送者）
+    let targetPeerJsId = null
+    for (const [pid, entry] of this.connections) {
+      if (entry.peerId === fromPeerId) {
+        targetPeerJsId = pid
+        break
+      }
+    }
+    if (!targetPeerJsId) {
+      this._emit('error', { type: 'file_unavailable', message: '文件发送者已离线，无法下载' })
+      return false
+    }
+    await this._sendRaw(targetPeerJsId, {
+      type: MsgType.FILE_REQUEST,
+      payload: { fileId }
+    }, fromPeerId)
+    return true
   }
 
   async queryRooms(keyword) {
