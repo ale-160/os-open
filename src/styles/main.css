@@ -289,7 +289,7 @@ input {
 }
 .search-input-wrap {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
 .search-input {
   flex: 1;
@@ -297,14 +297,17 @@ input {
   background: var(--bg-elev2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  font-size: 13px;
+  padding: 10px 12px;
+  font-size: 15px;
 }
 .search-input:focus {
   border-color: var(--accent);
 }
 .search-input-wrap .btn {
-  padding: 6px 10px;
+  padding: 10px 16px;
+  font-size: 14px;
+  min-height: 44px;
+  touch-action: manipulation;
 }
 .hint {
   margin: 8px 0 0;
@@ -335,15 +338,18 @@ input {
   font-size: 10px;
   color: var(--text-dim);
 }
+/* ===== 列表通用 ===== */
 .list-body {
   flex: 1;
   overflow-y: auto;
   padding: 0 6px 8px;
   min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 .list-body.compact {
   flex: 0 1 auto;
   max-height: 40%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .empty {
@@ -379,8 +385,9 @@ input {
 }
 .filter-tab {
   flex: 1;
-  padding: 4px 8px;
-  font-size: 12px;
+  padding: 6px 10px;
+  min-height: 44px;
+  font-size: 13px;
   color: var(--text-muted);
   background: transparent;
   border-radius: var(--radius-sm);
@@ -389,6 +396,7 @@ input {
   align-items: center;
   justify-content: center;
   gap: 4px;
+  touch-action: manipulation;
 }
 .filter-tab:hover {
   background: var(--bg-hover);
@@ -425,10 +433,12 @@ input {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 8px 10px;
+  padding: 12px 12px;
+  min-height: 44px;
   border-radius: var(--radius-sm);
   margin: 2px 0;
   transition: background 0.12s;
+  touch-action: manipulation;
 }
 .room-item:hover {
   background: var(--bg-hover);
@@ -494,6 +504,7 @@ input {
   overflow-y: auto;
   padding: 16px 18px;
   min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 .chat-empty {
   height: 100%;
@@ -915,7 +926,7 @@ select.input {
   .sidebar {
     border-right: none;
     border-bottom: 1px solid var(--border-soft);
-    max-height: 38vh;
+    max-height: 40vh;
   }
   .members-bar {
     display: none;
@@ -926,6 +937,69 @@ select.input {
   .peer-info {
     align-items: flex-start;
     width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 8px 10px;
+    gap: 10px;
+  }
+  .header-actions {
+    gap: 4px;
+  }
+  .btn-mini {
+    padding: 6px 10px;
+    font-size: 12px;
+    min-height: 44px;
+  }
+  .chat-input .input {
+    padding: 10px 12px;
+    font-size: 15px;
+  }
+  .chat-input .btn,
+  .chat-input .file-btn,
+  .chat-input .btn.primary {
+    padding: 10px 14px;
+    font-size: 14px;
+    min-height: 44px;
+  }
+  .file-btn {
+    font-size: 18px;
+  }
+  .filter-tab {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  .modal-card {
+    padding: 0;
+    max-width: 100vw;
+    width: 100%;
+    max-height: 90vh;
+  }
+  .modal-head,
+  .modal-body,
+  .modal-foot {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 6px 8px;
+  }
+  .brand-name {
+    font-size: 16px;
+  }
+  .room-name {
+    font-size: 13px;
+  }
+  .msg-name {
+    font-size: 12px;
+  }
+  .msg-text {
+    font-size: 13px;
   }
 }
 
@@ -1442,15 +1516,17 @@ code {
 .load-more-btn {
   display: block;
   width: 100%;
-  padding: 8px;
+  padding: 12px;
+  min-height: 44px;
   margin: 8px 0 4px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-dim);
   background: var(--bg-elev2);
   border: 1px dashed var(--border);
   border-radius: var(--radius-sm);
   transition: background 0.15s, color 0.15s;
+  touch-action: manipulation;
 }
 .load-more-btn:hover {
   background: var(--bg-hover);
