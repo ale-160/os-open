@@ -1491,9 +1491,9 @@ export class PeerNetwork extends EventTarget {
       return true
     }
 
-    // 小文件：分片广播完整内容（WebRTC DataChannel 单条消息安全上限约 256KB，
-    // 每片取 60KB 字符（base64），远低于上限，避免大文件被静默丢弃）
-    const CHUNK_SIZE = 60000
+    // 小文件：分片广播完整内容。PeerJS JSON 通道单条消息上限 16300 字节
+    // （chunkedMTU，JSON 序列化不自动分片），分片取 12000 字符 base64 保安全
+    const CHUNK_SIZE = 12000
     const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE)
     for (let i = 0; i < totalChunks; i++) {
       const chunk = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
@@ -1672,8 +1672,10 @@ export class PeerNetwork extends EventTarget {
       }
     }
 
-    // 分片回传给请求者（单播，不广播）
-    const CHUNK_SIZE = 60000
+    // 分片回传给请求者（单播，不广播）。
+    // PeerJS JSON 通道单条消息上限 16300 字节（chunkedMTU），
+    // 分片取 12000 字符 base64 确保不超限（此前 60KB 分片被 PeerJS 静默拒绝）
+    const CHUNK_SIZE = 12000
     const totalChunks = Math.ceil(entry.dataUrl.length / CHUNK_SIZE)
     for (let i = 0; i < totalChunks; i++) {
       const chunk = entry.dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
