@@ -221,7 +221,7 @@ const currentServerLabel = computed(() => {
 
 <template>
   <div class="app" :class="{ 'is-booting': state.booting }">
-    <header class="app-header">
+    <header class="app-header" :class="{ compact: !!currentRoom }">
       <div class="brand">
         <span class="brand-mark">⬡</span>
         <span class="brand-name">nchat</span>

@@ -1492,33 +1492,40 @@ export class PeerNetwork extends EventTarget {
     }
 
     // 小文件：分片广播完整内容。PeerJS JSON 通道单条消息上限 16300 字节
-    // （chunkedMTU，JSON 序列化不自动分片），分片取 12000 字符 base64 保安全
-    const CHUNK_SIZE = 12000
+    // （chunkedMTU，JSON 序列化不自动分片），分片取 13000 字符 base64 保安全
+    const CHUNK_SIZE = 13000
     const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE)
-    for (let i = 0; i < totalChunks; i++) {
-      const chunk = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
-      const msg = await buildMessage(
-        {
-          type: MsgType.FILE_MESSAGE,
-          from: this.identity.peerId,
-          to: room,
-          payload: {
-            room,
-            fileName: file.name,
-            fileType: file.type,
-            fileSize: file.size,
-            fileId,
-            chunkIndex: i,
-            totalChunks,
-            dataUrl: chunk,
-            fromPeerId: this.identity.peerId
+    // 并行分片发送（每批 5 片），避免串行等待大幅降低总耗时
+    const CONCURRENCY = 5
+    for (let start = 0; start < totalChunks; start += CONCURRENCY) {
+      const end = Math.min(start + CONCURRENCY, totalChunks)
+      const tasks = []
+      for (let i = start; i < end; i++) {
+        const chunk = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+        const msg = await buildMessage(
+          {
+            type: MsgType.FILE_MESSAGE,
+            from: this.identity.peerId,
+            to: room,
+            payload: {
+              room,
+              fileName: file.name,
+              fileType: file.type,
+              fileSize: file.size,
+              fileId,
+              chunkIndex: i,
+              totalChunks,
+              dataUrl: chunk,
+              fromPeerId: this.identity.peerId
+            },
+            extensions: { name: this.ownName }
           },
-          extensions: { name: this.ownName }
-        },
-        this.identity.privateKey
-      )
-      this._markProcessed(msg.id)
-      await this._broadcast(msg)
+          this.identity.privateKey
+        )
+        this._markProcessed(msg.id)
+        tasks.push(this._broadcast(msg))
+      }
+      await Promise.all(tasks)
     }
     return true
   }
@@ -1672,39 +1679,40 @@ export class PeerNetwork extends EventTarget {
       }
     }
 
-    // 分片回传给请求者（单播，不广播）。
-    // PeerJS JSON 通道单条消息上限 16300 字节（chunkedMTU），
-    // 分片取 12000 字符 base64 确保不超限（此前 60KB 分片被 PeerJS 静默拒绝）
     const CHUNK_SIZE = 12000
     const totalChunks = Math.ceil(entry.dataUrl.length / CHUNK_SIZE)
-    for (let i = 0; i < totalChunks; i++) {
-      const chunk = entry.dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
-      const chunkMsg = await buildMessage(
-        {
-          type: MsgType.FILE_MESSAGE,
-          from: this.identity.peerId,
-          to: entry.room,
-          payload: {
-            room: entry.room,
-            fileName: entry.name,
-            fileType: entry.type,
-            fileSize: entry.size,
-            fileId,
-            chunkIndex: i,
-            totalChunks,
-            dataUrl: chunk
+    const CONCURRENCY = 5
+    for (let start = 0; start < totalChunks; start += CONCURRENCY) {
+      const end = Math.min(start + CONCURRENCY, totalChunks)
+      const tasks = []
+      for (let i = start; i < end; i++) {
+        const chunk = entry.dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+        const chunkMsg = await buildMessage(
+          {
+            type: MsgType.FILE_MESSAGE,
+            from: this.identity.peerId,
+            to: entry.room,
+            payload: {
+              room: entry.room,
+              fileName: entry.name,
+              fileType: entry.type,
+              fileSize: entry.size,
+              fileId,
+              chunkIndex: i,
+              totalChunks,
+              dataUrl: chunk
+            },
+            extensions: { name: this.ownName }
           },
-          extensions: { name: this.ownName }
-        },
-        this.identity.privateKey
-      )
-      this._markProcessed(chunkMsg.id)
-      // 优先单播回传给请求连接；若连接已失效（转发路径/半开连接），
-      // 广播兜底让分片在网络中扩散到请求者（_markProcessed 防重，聚合去重）
-      const sent = await this._send(target, chunkMsg)
-      if (!sent && totalChunks > 1) {
-        await this._broadcast(chunkMsg)
+          this.identity.privateKey
+        )
+        this._markProcessed(chunkMsg.id)
+        tasks.push(this._send(target, chunkMsg).then(sent => {
+          if (!sent && totalChunks > 1) return this._broadcast(chunkMsg)
+          return true
+        }))
       }
+      await Promise.all(tasks)
     }
   }
 

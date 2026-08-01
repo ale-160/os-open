@@ -951,10 +951,46 @@ select.input {
   }
   .app-header {
     flex-wrap: wrap;
+    padding: 6px 10px;
+    gap: 6px;
+  }
+  /* 房间内紧凑头部：省出高度给聊天框 */
+  .app-header.compact {
+    padding: 4px 10px;
+    gap: 4px;
+  }
+  .app-header.compact .brand-mark {
+    font-size: 16px;
+  }
+  .app-header.compact .brand-name {
+    font-size: 14px;
+  }
+  .app-header.compact .brand-tag {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+  .app-header.compact .header-actions .btn-mini {
+    min-height: 32px;
+    padding: 4px 8px;
+    font-size: 11px;
+  }
+  .app-header.compact .peer-info {
+    width: 100%;
+    align-items: flex-start;
+  }
+  .app-header.compact .peer-id {
+    padding: 2px 6px;
+    font-size: 11px;
   }
   .peer-info {
     align-items: flex-start;
     width: 100%;
+  }
+  .chat-head {
+    padding: 8px 10px;
+  }
+  .room-title {
+    font-size: 14px;
   }
 }
 
