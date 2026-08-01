@@ -77,8 +77,17 @@ async function init() {
     state.peerId = identity.peerId
 
     // 读取昵称与本地已缓存房间
-    const savedName = await getMeta('ownName', '')
-    state.ownName = savedName || randomDefaultName()
+    // 未改过名时：首次生成随机名并立即持久化，之后刷新复用同一名字（不再每次随机）
+    let savedName = await getMeta('ownName', '')
+    if (!savedName) {
+      savedName = randomDefaultName()
+      try {
+        await setMeta('ownName', savedName)
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    state.ownName = savedName
     await loadCachedRooms()
     await refreshStorageStats()
 
