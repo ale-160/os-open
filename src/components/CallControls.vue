@@ -29,15 +29,33 @@ const isPreviewing = ref(false)
 const selectedMember = ref('')
 // 错误信息
 const callError = ref('')
+// 通话浮层形态：'minimized' 小窗 | 'fullscreen' 全屏
+const callView = ref('minimized')
+
+function enterFullscreen() {
+  callView.value = 'fullscreen'
+}
+
+function exitFullscreen() {
+  callView.value = 'minimized'
+}
 
 // 房间内其他成员
 const otherMembers = computed(() => {
   return props.members.filter(m => !m.self)
 })
 
-// 监听远程流
+// 监听远程流：对方挂断（remoteStream 变 null）时自动复位本地通话状态
 watch(() => remoteStream.value, (stream) => {
-  // 远程流通过 state 管理
+  if (!stream && isInCall.value) {
+    // 对方已挂断：停止本地流并退出通话 UI
+    stopStream(localStream.value)
+    localStream.value = null
+    isInCall.value = false
+    isPreviewing.value = false
+    currentCallTarget.value = null
+    callView.value = 'minimized'
+  }
 }, { flush: 'post' })
 
 // 监听来电
@@ -142,83 +160,118 @@ function hangup() {
   isPreviewing.value = false
   currentCallTarget.value = null
   callError.value = ''
+  callView.value = 'minimized'
 }
 </script>
 
 <template>
-  <div v-if="isDev" class="call-controls">
-    <div class="call-section">
-      <label class="form-label">测试音视频通话 (开发模式)</label>
+  <div v-if="isDev">
+    <!-- 未通话时的测试面板（嵌入聊天区，不遮挡） -->
+    <div v-if="!isInCall" class="call-controls">
+      <div class="call-section">
+        <label class="form-label">测试音视频通话 (开发模式)</label>
 
-      <div v-if="callError" class="call-error">
-        {{ callError }}
-      </div>
+        <div v-if="callError" class="call-error">
+          {{ callError }}
+        </div>
 
-      <!-- 来电提示 -->
-      <div v-if="state.incomingCall" class="incoming-call">
-        <div class="call-text">📞 {{ shortPeerId(state.incomingCall.from) }} 请求视频通话</div>
-        <button class="btn-mini primary" @click="answerCall(state.incomingCall.from)">
-          接听
-        </button>
-      </div>
+        <!-- 来电提示 -->
+        <div v-if="state.incomingCall" class="incoming-call">
+          <div class="call-text">📞 {{ shortPeerId(state.incomingCall.from) }} 请求视频通话</div>
+          <button class="btn-mini primary" @click="answerCall(state.incomingCall.from)">
+            接听
+          </button>
+        </div>
 
-      <template v-if="!isInCall && !isPreviewing">
-        <select
-          v-model="selectedMember"
-          class="input"
-          :disabled="!otherMembers.length"
-        >
-          <option value="" disabled>选择呼叫对象</option>
-          <option v-for="m in otherMembers" :key="m.peerId" :value="m.peerId">
-            {{ m.name || shortPeerId(m.peerId) }} ({{ m.stars || 1 }}★)
-          </option>
-        </select>
-        <div class="preview-row">
-          <button
-            class="btn primary"
+        <template v-if="!isPreviewing">
+          <select
+            v-model="selectedMember"
+            class="input"
             :disabled="!otherMembers.length"
-            @click="startPreview"
           >
-            视频预览 (冷启动)
-          </button>
-        </div>
-      </template>
+            <option value="" disabled>选择呼叫对象</option>
+            <option v-for="m in otherMembers" :key="m.peerId" :value="m.peerId">
+              {{ m.name || shortPeerId(m.peerId) }} ({{ m.stars || 1 }}★)
+            </option>
+          </select>
+          <div class="preview-row">
+            <button
+              class="btn primary"
+              :disabled="!otherMembers.length"
+              @click="startPreview"
+            >
+              视频预览 (冷启动)
+            </button>
+          </div>
+        </template>
 
-      <!-- 视频冷启动预览 -->
-      <template v-else-if="isPreviewing && !isInCall">
-        <div class="preview-row">
-          <button
-            class="btn primary"
-            :disabled="!selectedMember"
-            @click="startCall"
-          >
-            开始通话
-          </button>
-          <button class="btn" @click="stopPreview">
-            取消
-          </button>
-        </div>
-      </template>
+        <!-- 视频冷启动预览 -->
+        <template v-else>
+          <div class="preview-row">
+            <button
+              class="btn primary"
+              :disabled="!selectedMember"
+              @click="startCall"
+            >
+              开始通话
+            </button>
+            <button class="btn" @click="stopPreview">
+              取消
+            </button>
+          </div>
+        </template>
 
-      <template v-else>
-        <div class="call-active">
-          <div class="call-status">通话中({{ shortPeerId(currentCallTarget) }})</div>
-          <button class="btn danger" @click="hangup">
-            挂断
-          </button>
+        <!-- 冷启动本地预览 -->
+        <div v-if="isPreviewing && localStream" class="preview-box">
+          <video :srcObject="localStream" autoplay muted playsinline class="preview-video" />
         </div>
-      </template>
+      </div>
     </div>
 
-    <!-- 远程视频预览 -->
-    <div v-if="remoteStream" class="media-preview remote">
-      <video :srcObject="remoteStream" autoplay playsinline class="media-video" />
-    </div>
+    <!-- ===== 通话中：小窗 / 全屏浮层（不遮挡聊天） ===== -->
+    <template v-else>
+      <!-- 小窗模式：右下角悬浮，点击放大 -->
+      <div
+        v-if="callView === 'minimized'"
+        class="call-mini"
+        @click="enterFullscreen"
+      >
+        <video
+          v-if="remoteStream"
+          :srcObject="remoteStream"
+          autoplay playsinline class="mini-video"
+        />
+        <div v-else class="mini-placeholder">📹 等待对方视频…</div>
+        <!-- 本地画中画角标 -->
+        <div v-if="localStream" class="mini-local">
+          <video :srcObject="localStream" autoplay muted playsinline class="mini-local-video" />
+        </div>
+        <!-- 挂断（小窗内点击不冒泡到放大） -->
+        <button class="mini-hangup" @click.stop="hangup" title="挂断">✕</button>
+        <span class="mini-status">通话中 {{ shortPeerId(currentCallTarget) }}</span>
+      </div>
 
-    <!-- 本地视频预览 -->
-    <div v-if="localStream" class="media-preview local">
-      <video :srcObject="localStream" autoplay muted playsinline class="media-video" />
-    </div>
+      <!-- 全屏模式 -->
+      <div v-else class="call-fullscreen">
+        <video
+          v-if="remoteStream"
+          :srcObject="remoteStream"
+          autoplay playsinline class="full-video"
+        />
+        <div v-else class="full-placeholder">📹 等待对方视频…</div>
+        <!-- 本地画中画角标 -->
+        <div v-if="localStream" class="full-local">
+          <video :srcObject="localStream" autoplay muted playsinline class="full-local-video" />
+        </div>
+        <div class="full-controls">
+          <button class="btn" @click="exitFullscreen">— 小窗</button>
+          <button class="btn danger" @click="hangup">挂断</button>
+        </div>
+        <div class="full-status">
+          通话中 {{ shortPeerId(currentCallTarget) }}
+        </div>
+      </div>
+    </template>
   </div>
 </template>
 
@@ -266,24 +319,6 @@ function hangup() {
   flex: 1;
 }
 
-.call-active {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.call-status {
-  font-size: 13px;
-  color: var(--green);
-}
-
-.call-active .btn {
-  min-height: 44px;
-  min-width: 44px;
-  touch-action: manipulation;
-}
-
 .preview-row {
   display: flex;
   gap: 8px;
@@ -295,36 +330,186 @@ function hangup() {
   touch-action: manipulation;
 }
 
-.media-preview {
-  position: relative;
+.preview-box {
   margin-top: 8px;
-}
-
-.media-preview.remote {
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
   max-width: 100%;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: #000;
+}
+.preview-video {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  display: block;
 }
 
-.media-preview.local {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 80px;
-  height: 60px;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  border: 1px solid var(--border);
+/* ===== 通话中小窗 ===== */
+.call-mini {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  width: 168px;
+  height: 126px;
   background: #000;
-  z-index: 10;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  z-index: 90;
+  cursor: pointer;
+  box-shadow: var(--shadow);
 }
-
-.media-video {
+.mini-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.mini-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  background: var(--bg-elev2);
+}
+.mini-local {
+  position: absolute;
+  right: 4px;
+  top: 4px;
+  width: 56px;
+  height: 42px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+}
+.mini-local-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1); /* 镜像，接近自拍习惯 */
+}
+.mini-hangup {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(248, 81, 73, 0.9);
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+.mini-status {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  right: 4px;
+  font-size: 10px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 4px;
+  padding: 2px 6px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== 通话中全屏 ===== */
+.call-fullscreen {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  z-index: 95;
+  display: flex;
+  flex-direction: column;
+}
+.full-video {
+  flex: 1;
+  width: 100%;
+  object-fit: contain;
+  display: block;
+  min-height: 0;
+}
+.full-placeholder {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  font-size: 15px;
+}
+.full-local {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  width: 108px;
+  height: 152px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+  box-shadow: var(--shadow);
+}
+.full-local-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1);
+}
+.full-controls {
+  position: absolute;
+  bottom: 28px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px;
+}
+.full-controls .btn {
+  min-height: 48px;
+  min-width: 96px;
+  font-size: 15px;
+  border-radius: 24px;
+  touch-action: manipulation;
+}
+.full-status {
+  position: absolute;
+  top: 16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fff;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px;
+  border-radius: 6px;
+  width: fit-content;
+  margin: 0 auto;
+}
+
+/* 移动端全屏本地窗口缩小，避免遮挡过多 */
+@media (max-width: 600px) {
+  .full-local {
+    width: 72px;
+    height: 100px;
+  }
+  .call-mini {
+    width: 150px;
+    height: 112px;
+  }
 }
 </style>

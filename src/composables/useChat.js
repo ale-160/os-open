@@ -327,7 +327,7 @@ function refreshMembers() {
   // 获取房间 owner
   const known = network.knownRooms.get(room)
   const meta = network._localRoomMeta?.get(room)
-  const ownerPeerId = meta?.owner || known?.owner || state.peerId
+  const ownerPeerId = meta?.owner || known?.owner
   const selfIsOwner = ownerPeerId === state.peerId
   const rules = meta?.rules || known?.rules
   const threshold = rules?.approveThreshold ?? 50
@@ -378,7 +378,7 @@ function isCurrentUserOwner() {
   if (!room || !network) return false
   const known = network.knownRooms.get(room)
   const meta = network._localRoomMeta?.get(room)
-  const ownerPeerId = meta?.owner || known?.owner || state.peerId
+  const ownerPeerId = meta?.owner || known?.owner
   return ownerPeerId === state.peerId
 }
 
@@ -388,7 +388,7 @@ function canUserApprove() {
   if (!room || !network) return false
   const known = network.knownRooms.get(room)
   const meta = network._localRoomMeta?.get(room)
-  const ownerPeerId = meta?.owner || known?.owner || state.peerId
+  const ownerPeerId = meta?.owner || known?.owner
   if (ownerPeerId === state.peerId) return true
   const rules = meta?.rules || known?.rules
   const threshold = rules?.approveThreshold ?? 50

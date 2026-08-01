@@ -25,6 +25,7 @@ import {
   savePeer,
   deletePeer,
   saveRoom,
+  getRoom,
   getMessages,
   getRoomPassword,
   setRoomPassword,
@@ -243,6 +244,10 @@ export class PeerNetwork extends EventTarget {
 
   setOwnName(name) {
     this.ownName = name
+    // 改名后广播 hello，让已连接节点立即学到新名字（无需刷新页面）
+    for (const id of this.connections.keys()) {
+      this._sendHello(id).catch(() => {})
+    }
   }
 
   // ---------------- 连接管理 ----------------
@@ -734,6 +739,8 @@ export class PeerNetwork extends EventTarget {
     for (const r of rooms) {
       entry.rooms.add(r.name)
       this._mergeRoom(r.name, peerJsId, entry.peerId, entry.name, null, null, r.aliases, r.rules, r.owner)
+      // 通知 UI 刷新成员列表（新成员/改名通过 hello 同步后立即显示，无需刷新页面）
+      this._emit('member:update', { room: r.name })
     }
     // 仅在首次 hello 时回复，避免无限 hello 循环
     if (!entry.helloExchanged) {
@@ -1195,13 +1202,15 @@ export class PeerNetwork extends EventTarget {
     }
 
     // 继承已知房间的元数据（别名/规则），没有则用默认
+    // 注意：owner 未知时不能默认自己是房主（否则新加入者会显示 99 星），
+    // 从 knownRooms 或本地缓存房间记录恢复，都没有则置空，等 hello 学习。
     if (!this._localRoomMeta.has(room)) {
       const known = this.knownRooms.get(room)
-      const hasOwner = known?.owner && known.members.has(known.owner)
+      const cached = await getRoom(room)
       this._localRoomMeta.set(room, {
         aliases: known ? [...known.aliases] : [],
         rules: known ? { ...known.rules } : { ...DEFAULT_RULES },
-        owner: hasOwner ? known.owner : this.identity.peerId
+        owner: known?.owner || cached?.owner || null
       })
     }
     this._mergeRoom(room, this.peerJsId, this.identity.peerId, this.ownName)
@@ -1332,7 +1341,7 @@ export class PeerNetwork extends EventTarget {
     if (!this._localRoomsSet.has(room)) {
       await this.joinRoom(room)
     }
-    // 限制文件大小（WebRTC DataChannel 单条消息建议 < 16MB，这里限制 8MB 保险）
+    // 限制文件大小（单文件 8MB，base64 后通过分片传输，每片远小于 DataChannel 单条上限）
     const MAX_FILE_SIZE = 8 * 1024 * 1024
     if (file.size > MAX_FILE_SIZE) {
       this._emit('error', { type: 'file_too_large', message: `文件超过 8MB 限制（当前 ${(file.size / 1024 / 1024).toFixed(1)}MB）` })
@@ -1346,26 +1355,11 @@ export class PeerNetwork extends EventTarget {
       reader.readAsDataURL(file)
     })
 
-    const msg = await buildMessage(
-      {
-        type: MsgType.FILE_MESSAGE,
-        from: this.identity.peerId,
-        to: room,
-        payload: {
-          room,
-          fileName: file.name,
-          fileType: file.type,
-          fileSize: file.size,
-          dataUrl
-        },
-        extensions: { name: this.ownName }
-      },
-      this.identity.privateKey
-    )
-    this._markProcessed(msg.id)
+    // 唯一 fileId（用于分片聚合与去重）
+    const fileId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8)
     // 本地立即可见
     this._emit('chat', {
-      id: msg.id,
+      id: fileId,
       room,
       from: msg.from,
       name: this.ownName,
@@ -1377,7 +1371,35 @@ export class PeerNetwork extends EventTarget {
       },
       timestamp: msg.timestamp
     })
-    await this._broadcast(msg)
+
+    // 分片发送：WebRTC DataChannel 单条消息安全上限约 256KB，
+    // 每片取 60KB 字符（base64），远低于上限，避免大文件被静默丢弃
+    const CHUNK_SIZE = 60000
+    const totalChunks = Math.ceil(dataUrl.length / CHUNK_SIZE)
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = dataUrl.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE)
+      const msg = await buildMessage(
+        {
+          type: MsgType.FILE_MESSAGE,
+          from: this.identity.peerId,
+          to: room,
+          payload: {
+            room,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            fileId,
+            chunkIndex: i,
+            totalChunks,
+            dataUrl: chunk
+          },
+          extensions: { name: this.ownName }
+        },
+        this.identity.privateKey
+      )
+      this._markProcessed(msg.id)
+      await this._broadcast(msg)
+    }
     return true
   }
 
@@ -1392,19 +1414,71 @@ export class PeerNetwork extends EventTarget {
     // 屏蔽过滤
     if (this._isMessageBanned(room, msg.from)) return
 
-    this._emit('chat', {
-      id: msg.id,
-      room,
-      from: msg.from,
-      name: msg.extensions?.name || msg.from.slice(0, 8),
-      file: {
-        name: msg.payload.fileName,
-        type: msg.payload.fileType,
-        size: msg.payload.fileSize,
-        dataUrl
-      },
-      timestamp: msg.timestamp
-    })
+    const { fileId, chunkIndex, totalChunks } = msg.payload
+    // 分片消息：聚合完成后才显示
+    if (typeof chunkIndex === 'number' && typeof totalChunks === 'number' && fileId) {
+      if (!this._fileChunks) this._fileChunks = new Map()
+      let agg = this._fileChunks.get(fileId)
+      if (!agg) {
+        agg = {
+          total: totalChunks,
+          chunks: new Map(),
+          meta: {
+            fileName: msg.payload.fileName,
+            fileType: msg.payload.fileType,
+            fileSize: msg.payload.fileSize,
+            from: msg.from,
+            name: msg.extensions?.name || msg.from.slice(0, 8),
+            timestamp: msg.timestamp
+          },
+          firstSeen: Date.now()
+        }
+        this._fileChunks.set(fileId, agg)
+      }
+      agg.chunks.set(chunkIndex, dataUrl)
+      // 全部到齐：拼接并显示
+      if (agg.chunks.size >= agg.total) {
+        let full = ''
+        for (let i = 0; i < agg.total; i++) full += agg.chunks.get(i) || ''
+        this._fileChunks.delete(fileId)
+        this._emit('chat', {
+          id: fileId,
+          room,
+          from: agg.meta.from,
+          name: agg.meta.name,
+          file: {
+            name: agg.meta.fileName,
+            type: agg.meta.fileType,
+            size: agg.meta.fileSize,
+            dataUrl: full
+          },
+          timestamp: agg.meta.timestamp
+        })
+      } else {
+        // 惰性清理：超过 10 分钟未完成的聚合丢弃，避免内存泄漏
+        if (this._fileChunks.size > 50) {
+          const cutoff = Date.now() - 10 * 60 * 1000
+          for (const [fid, a] of this._fileChunks) {
+            if (a.firstSeen < cutoff) this._fileChunks.delete(fid)
+          }
+        }
+      }
+    } else {
+      // 兼容旧格式：单条完整消息
+      this._emit('chat', {
+        id: msg.id,
+        room,
+        from: msg.from,
+        name: msg.extensions?.name || msg.from.slice(0, 8),
+        file: {
+          name: msg.payload.fileName,
+          type: msg.payload.fileType,
+          size: msg.payload.fileSize,
+          dataUrl
+        },
+        timestamp: msg.timestamp
+      })
+    }
 
     if (msg.from !== this.identity.peerId) {
       this._forward(msg)
