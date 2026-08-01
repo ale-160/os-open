@@ -1012,6 +1012,22 @@ select.input {
     align-items: flex-start;
     width: 100%;
   }
+  /* 移动端房间列表只显示列表本身：隐藏 PeerInfo、搜索提示、别名/时间/加载更多等辅助文本 */
+  .app-header .peer-info {
+    display: none;
+  }
+  .room-search .hint,
+  .room-search .search-status {
+    display: none;
+  }
+  .room-aliases,
+  .room-meta .ago {
+    display: none;
+  }
+  .room-list .empty,
+  .load-more-btn {
+    display: none;
+  }
   .chat-head {
     padding: 8px 10px;
   }

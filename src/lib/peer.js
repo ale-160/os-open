@@ -498,6 +498,18 @@ export class PeerNetwork extends EventTarget {
   async _send(peerJsId, msg) {
     const entry = this.connections.get(peerJsId)
     if (!entry || !entry.conn.open) return false
+    // 防御：PeerJS JSON 通道单条消息上限 16300 字节（chunkedMTU），
+    // 超限消息进入 PeerJS 内部 buffer 后 _tryBuffer() 会无限递归爆栈（CPU 100%）。
+    // 发送前先估算 JSON 大小，超限直接丢弃并告警，绝不让它进 PeerJS 队列。
+    try {
+      const len = JSON.stringify(msg).length
+      if (len >= 16000) {
+        console.warn('[nchat] send blocked: message too big for JSON channel', len, 'bytes, type=', msg?.type)
+        return false
+      }
+    } catch (e) {
+      /* ignore */
+    }
     try {
       entry.conn.send(msg)
       return true
@@ -543,7 +555,9 @@ export class PeerNetwork extends EventTarget {
         name,
         aliases: meta?.aliases || [],
         rules: meta?.rules || { ...DEFAULT_RULES },
-        owner: this.identity.peerId
+        // 只广播"本地已知的房主"，而不是写死自己：
+        // 否则每个节点 hello 都自称房主，会反复覆盖其他节点的 owner（双 99 星根因）
+        owner: meta?.owner || null
       }
     })
     await this._sendRaw(
@@ -1086,7 +1100,11 @@ export class PeerNetwork extends EventTarget {
       r.rules = { ...r.rules, ...safeRules }
     }
     if (owner) {
-      r.owner = owner
+      // 房主声明可信度检查：只有"广播者自己就是房主"（hello 里 owner === 广播者 peerId）
+      // 或本地还不知道房主时，才采纳该声明。否则普通成员广播的过时 owner 会覆盖真实房主。
+      if (peerId === owner || !r.owner) {
+        r.owner = owner
+      }
     }
     r.lastUpdate = Date.now()
   }

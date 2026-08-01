@@ -1,27 +1,95 @@
 /**
- * 本地持久化层（基于 localStorage）
+ * 本地持久化层
  *
- * 原设计使用 IndexedDB（idb 库），但在部分浏览器环境下
- * indexedDB.open() 的回调不触发，导致整个应用初始化卡死。
- * MVP 阶段数据量小，改用 localStorage 更简单可靠。
+ * 消息（含图片 dataUrl，体积大）存 IndexedDB（配额远大于 localStorage 的 ~5MB，
+ * 几张图片就会写满 localStorage 导致历史丢失）；其余轻量元数据
+ * （peers/rooms/meta/aliases/passwords/stars/bans）仍用 localStorage。
+ *
+ * IndexedDB 不可用（部分浏览器 open 回调不触发/卡死）时自动回退 localStorage，
+ * 功能不中断。
  *
  * 四类数据：
  *  - peers:    已发现节点 [{ id, name, lastSeen }]
  *  - rooms:    已知房间 [{ name, memberCount, activity, lastUpdate }]
- *  - messages: 房间消息 [{ id, room, from, name, text, timestamp }]
+ *  - messages: 房间消息 [{ id, room, from, name, text, timestamp }]（IndexedDB）
  *  - meta:     杂项 KV（如 ownName）
  */
+import { openDB } from 'idb'
 import { CONFIG } from '../config.js'
 
 const KEYS = {
   peers: 'nchat:peers',
   rooms: 'nchat:rooms',
-  messages: 'nchat:messages', // { roomName: [msg, ...] }
+  messages: 'nchat:messages', // { roomName: [msg, ...] } 旧格式（localStorage 回退/迁移源）
   meta: 'nchat:meta',
   aliases: 'nchat:aliases', // { alias: roomName } 别名→房间名映射
   passwords: 'nchat:passwords', // { roomName: password } 已验证的房间密码
   stars: 'nchat:stars', // { roomName: { peerId: stars } } 星标覆盖
   bans: 'nchat:bans' // { roomName: { peerId: banBelowStars } } 个人屏蔽规则
+}
+
+const IDB_NAME = 'nchat-db'
+const IDB_VERSION = 1
+const IDB_STORE = 'messages'
+// IndexedDB 打开超时（ms）：部分环境 open 回调不触发，超时后回退 localStorage
+const IDB_TIMEOUT = 4000
+
+let idbPromise = null
+let idbDisabled = false
+let idbMigrated = false
+
+function openMessagesDB() {
+  if (idbDisabled) return null
+  if (!idbPromise) {
+    idbPromise = Promise.race([
+      openDB(IDB_NAME, IDB_VERSION, {
+        upgrade(db) {
+          if (!db.objectStoreNames.contains(IDB_STORE)) {
+            const store = db.createObjectStore(IDB_STORE, { keyPath: 'id' })
+            store.createIndex('room', 'room')
+          }
+        }
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('IndexedDB open timeout')), IDB_TIMEOUT)
+      )
+    ]).catch((e) => {
+      console.warn('[nchat] IndexedDB 不可用，消息回退 localStorage：', e?.message)
+      idbDisabled = true
+      idbPromise = null
+      return null
+    })
+  }
+  return idbPromise
+}
+
+/** 迁移旧 localStorage 消息到 IndexedDB（首次打开时执行一次） */
+async function migrateMessagesToIDB(db) {
+  if (idbMigrated) return
+  idbMigrated = true
+  try {
+    const legacy = readJSON(KEYS.messages, {})
+    if (!legacy || !Object.keys(legacy).length) return
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    const store = tx.objectStore(IDB_STORE)
+    let moved = 0
+    for (const list of Object.values(legacy)) {
+      if (!Array.isArray(list)) continue
+      for (const m of list) {
+        if (m && m.id) {
+          await store.put(m)
+          moved++
+        }
+      }
+    }
+    await tx.done
+    if (moved > 0) {
+      console.log(`[nchat] 已迁移 ${moved} 条历史消息到 IndexedDB`)
+      localStorage.removeItem(KEYS.messages)
+    }
+  } catch (e) {
+    console.warn('[nchat] 迁移旧消息失败（保留 localStorage）：', e?.message)
+  }
 }
 
 // ---- 内部工具 ----
@@ -151,8 +219,21 @@ function syncAliasIndex(roomName, aliases) {
   writeJSON(KEYS.aliases, aliasMap)
 }
 
-// ---- Messages ----
+// ---- Messages（IndexedDB 优先，localStorage 回退）----
 export async function addMessage(msg) {
+  if (!msg || !msg.id || !msg.room) return
+  const db = await openMessagesDB()
+  if (db) {
+    try {
+      await migrateMessagesToIDB(db)
+      await db.put(IDB_STORE, msg)
+      // 裁剪：每房间最多 HISTORY_LIMIT 条（新成员能看到的历史有上限即可，不无限累积）
+      await trimRoomMessages(db, msg.room)
+      return
+    } catch (e) {
+      console.warn('[nchat] IndexedDB 写入失败，回退 localStorage：', e?.message)
+    }
+  }
   const store = readJSON(KEYS.messages, {})
   const list = store[msg.room] || []
   // 去重
@@ -169,7 +250,37 @@ export async function addMessage(msg) {
   writeJSON(KEYS.messages, store)
 }
 
+/** IndexedDB 中裁剪某房间的旧消息（保留最近 HISTORY_LIMIT 条） */
+async function trimRoomMessages(db, room) {
+  try {
+    const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
+    if (all.length <= CONFIG.HISTORY_LIMIT) return
+    all.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    const excess = all.slice(0, all.length - CONFIG.HISTORY_LIMIT)
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    for (const m of excess) {
+      tx.store.delete(m.id)
+    }
+    await tx.done
+  } catch (e) {
+    /* ignore */
+  }
+}
+
 export async function getMessages(room, since = 0, limit = CONFIG.HISTORY_FETCH_BATCH) {
+  const db = await openMessagesDB()
+  if (db) {
+    try {
+      await migrateMessagesToIDB(db)
+      const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
+      return all
+        .filter((m) => m.timestamp > since)
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(0, limit)
+    } catch (e) {
+      /* 回退下方 localStorage */
+    }
+  }
   const store = readJSON(KEYS.messages, {})
   const list = store[room] || []
   return list
@@ -179,6 +290,16 @@ export async function getMessages(room, since = 0, limit = CONFIG.HISTORY_FETCH_
 }
 
 export async function hasMessage(id) {
+  if (!id) return false
+  const db = await openMessagesDB()
+  if (db) {
+    try {
+      const m = await db.get(IDB_STORE, id)
+      if (m) return true
+    } catch (e) {
+      /* 回退下方 localStorage */
+    }
+  }
   const store = readJSON(KEYS.messages, {})
   for (const room of Object.keys(store)) {
     if (store[room].some((m) => m.id === id)) return true
@@ -239,7 +360,18 @@ export function deleteRoomStars(room) {
 export async function clearRoomData(room) {
   // 删除房间记录
   await deleteRoom(room)
-  // 删除消息
+  // 删除消息（IndexedDB + localStorage 双清）
+  try {
+    const db = await openMessagesDB()
+    if (db) {
+      const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
+      const tx = db.transaction(IDB_STORE, 'readwrite')
+      for (const m of all) tx.store.delete(m.id)
+      await tx.done
+    }
+  } catch (e) {
+    /* ignore */
+  }
   const store = readJSON(KEYS.messages, {})
   delete store[room]
   writeJSON(KEYS.messages, store)
@@ -305,6 +437,15 @@ export function deleteRoomBans(room) {
 
 /** 统计某房间的本地存储消息数 */
 export async function getRoomMessageCount(room) {
+  const db = await openMessagesDB()
+  if (db) {
+    try {
+      const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
+      return all.length
+    } catch (e) {
+      /* 回退下方 localStorage */
+    }
+  }
   const store = readJSON(KEYS.messages, {})
   const list = store[room] || []
   return list.length
@@ -318,6 +459,16 @@ export async function getStorageStats() {
   let sizeBytes = 0
   for (const list of Object.values(messages)) {
     if (Array.isArray(list)) msgCount += list.length
+  }
+  // IndexedDB 消息数（叠加）
+  try {
+    const db = await openMessagesDB()
+    if (db) {
+      const all = await db.getAll(IDB_STORE)
+      msgCount += all.length
+    }
+  } catch (e) {
+    /* ignore */
   }
   // 估算 localStorage 总用量
   try {
