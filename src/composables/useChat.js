@@ -312,6 +312,10 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
     if (existing && chatMsg.file.dataUrl) {
       Object.assign(existing, chatMsg)
       pendingDownloads.delete(chatMsg.file.fileId)
+      // 主动清理下载中标记，避免 watch 时序导致 timeout 误判失败
+      const next = new Set(downloadingIds.value)
+      next.delete(chatMsg.file.fileId)
+      downloadingIds.value = next
       return
     }
   }

@@ -122,9 +122,16 @@ const downloadFailed = ref(false)
 // 打开放大查看；若为 meta（未下载）自动触发拉取原图
 function openLightbox(file) {
   if (!file) return
-  lightboxFileId.value = file.fileId || file.id || null
+  const fileId = file.fileId || file.id || null
+  lightboxFileId.value = fileId
   downloadFailed.value = false
-  if (file.isMeta && file.fileId) {
+  // 同一 fileId 可能被多次打开：清掉旧的下载中标记，避免 watch 误判
+  if (fileId) {
+    const next = new Set(downloadingIds.value)
+    next.delete(fileId)
+    downloadingIds.value = next
+  }
+  if (file.isMeta && fileId) {
     requestDownload(file)
   }
 }
