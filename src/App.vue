@@ -69,6 +69,7 @@ const {
 const showCreateDialog = ref(false)
 const showSettings = ref(false)
 const showRoomManager = ref(false)
+const installBannerVisible = ref(false)
 
 // 屏蔽规则计算
 const currentRoomBanBelow = computed(() => {
@@ -266,12 +267,13 @@ const currentServerLabel = computed(() => {
         />
       </aside>
 
-      <section class="chat-area">
+      <section class="chat-area" :class="{ 'install-banner-visible': installBannerVisible }">
         <ChatPanel
           :current-room="currentRoom"
           :messages="messages"
           :online="state.online"
           :stats="stats"
+          :members="members"
           @send="sendRoomMessage"
           @send-file="sendFileMessage"
           @leave="leaveCurrentRoom"
@@ -353,7 +355,7 @@ const currentServerLabel = computed(() => {
     </div>
 
     <!-- PWA 安装提示 -->
-    <PromptInstall />
+    <PromptInstall @visible="installBannerVisible = $event" />
 
     <div v-if="state.booting" class="overlay">
       <div class="overlay-card">

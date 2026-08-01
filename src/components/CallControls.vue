@@ -9,6 +9,7 @@ const props = defineProps({
 
 const {
   state,
+  remoteStream,
   startMediaCall,
   answerMediaCall,
   hangupMediaCall
@@ -35,12 +36,12 @@ const otherMembers = computed(() => {
 })
 
 // 监听远程流
-watch(() => state.value?.remoteStream, (stream) => {
+watch(() => remoteStream.value, (stream) => {
   // 远程流通过 state 管理
 }, { flush: 'post' })
 
 // 监听来电
-watch(() => state.value?.incomingCall, (call) => {
+watch(() => state.incomingCall, (call) => {
   if (call) {
     // 自动接受来电（开发测试用）
     // 实际使用中，应提示用户确认
@@ -210,8 +211,8 @@ function hangup() {
     </div>
 
     <!-- 远程视频预览 -->
-    <div v-if="state.remoteStream" class="media-preview remote">
-      <video :srcObject="state.remoteStream" autoplay playsinline class="media-video" />
+    <div v-if="remoteStream" class="media-preview remote">
+      <video :srcObject="remoteStream" autoplay playsinline class="media-video" />
     </div>
 
     <!-- 本地视频预览 -->

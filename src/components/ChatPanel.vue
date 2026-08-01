@@ -1,11 +1,13 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
+import CallControls from './CallControls.vue'
 
 const props = defineProps({
   currentRoom: { type: String, default: '' },
   messages: { type: Array, default: () => [] },
   online: { type: Boolean, default: false },
-  stats: { type: Object, default: () => ({ sent: 0, received: 0 }) }
+  stats: { type: Object, default: () => ({ sent: 0, received: 0 }) },
+  members: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['send', 'leave', 'send-file'])
@@ -127,6 +129,9 @@ function escapeHtml(s) {
         <span class="room-title muted">选择左侧房间开始聊天</span>
       </template>
     </div>
+
+    <!-- 音视频通话测试 (开发模式) — 放在 ChatPanel 头部，在桌面/移动都可见 -->
+    <CallControls v-if="members.length > 1" :members="members" />
 
     <div class="chat-body" ref="bodyRef">
       <div v-if="!inRoom" class="chat-empty">

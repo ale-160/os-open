@@ -4,6 +4,19 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 const showPrompt = ref(false)
 const dismissed = ref(false)
 
+const emit = defineEmits(['visible'])
+let notified = false
+
+function notifyVisible(visible) {
+  if (visible && !notified) {
+    notified = true
+    emit('visible', true)
+  } else if (!visible && notified) {
+    notified = false
+    emit('visible', false)
+  }
+}
+
 // Check if already installed
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches
 
@@ -17,12 +30,14 @@ function handleBeforeInstallPrompt(e) {
   // Show our custom banner
   if (!isStandalone && !dismissed.value) {
     showPrompt.value = true
+    notifyVisible(true)
   }
 }
 
 function handleAppInstalled() {
   // App was installed, hide banner
   showPrompt.value = false
+  notifyVisible(false)
   deferredPrompt = null
 }
 
@@ -32,12 +47,14 @@ async function installApp() {
   const { outcome } = await deferredPrompt.userChoice
   if (outcome === 'accepted') {
     showPrompt.value = false
+    notifyVisible(false)
   }
   deferredPrompt = null
 }
 
 function dismiss() {
   showPrompt.value = false
+  notifyVisible(false)
   dismissed.value = true
   // Don't show again until page reload
 }

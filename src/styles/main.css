@@ -42,6 +42,8 @@ body {
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  /* 移动端 PWA 安装横幅预留空间，防止遮挡聊天输入框 */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 button {
@@ -128,6 +130,16 @@ input {
   display: flex;
   min-height: 0;
   background: var(--bg);
+}
+
+/* 当 PWA 安装横幅显示时，保留底部空间，防止遮挡聊天输入框（移动） */
+.chat-area.install-banner-visible {
+  padding-bottom: 72px;
+}
+@media (min-width: 861px) {
+  .chat-area.install-banner-visible {
+    padding-bottom: 0;
+  }
 }
 
 /* ===== PeerInfo ===== */

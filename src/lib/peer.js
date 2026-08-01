@@ -1570,9 +1570,7 @@ export class PeerNetwork extends EventTarget {
     try {
       // 初始化媒体调用映射
       if (!this._mediaCalls) this._mediaCalls = new Map()
-      const call = this.peer.call(targetPeerJsId, localStream, {
-        serialization: 'blob'
-      })
+      const call = this.peer.call(targetPeerJsId, localStream)
       this._mediaCalls.set(targetPeerId, call)
       this._wireMediaCallEvents(call, targetPeerId)
       return true

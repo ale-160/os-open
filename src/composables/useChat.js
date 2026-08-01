@@ -12,7 +12,7 @@
  *  - pendingRequests: 当前房间的待处理加入申请
  *  - storageStats: 本地存储用量统计
  */
-import { reactive, ref, readonly, computed } from 'vue'
+import { reactive, ref, shallowRef, readonly, computed } from 'vue'
 import { loadOrCreateIdentity } from '../lib/crypto.js'
 import { PeerNetwork } from '../lib/peer.js'
 import { AccessRule, SpeakRule } from '../lib/protocol.js'
@@ -46,9 +46,12 @@ const state = reactive({
   ownName: '',
   activeServer: null,
   // 开发测试用：媒体通话状态
-  incomingCall: null,
-  remoteStream: null
+  incomingCall: null
 })
+
+// MediaStream 不应放入 reactive（Vue 会 proxy 包装导致 srcObject 问题），
+// 使用 shallowRef 保持原始对象引用
+const remoteStream = shallowRef(null)
 
 const peers = ref([]) // [{ peerJsId, peerId, name, status }]
 const rooms = ref([]) // [{ name, memberCount, activity, lastUpdate }]
@@ -213,11 +216,11 @@ function wireEvents(net) {
 
   net.addEventListener('media:stream', (e) => {
     state.incomingCall = null
-    state.remoteStream = e.detail.stream
+    remoteStream.value = e.detail.stream
   })
 
   net.addEventListener('media:close', (e) => {
-    state.remoteStream = null
+    remoteStream.value = null
   })
 
   net.addEventListener('peer:status', (e) => {
@@ -701,7 +704,7 @@ async function answerMediaCall(peerId, localStream) {
 function hangupMediaCall(peerId) {
   if (!network) return
   network.hangupMediaCall(peerId)
-  state.remoteStream = null
+  remoteStream.value = null
   state.incomingCall = null
 }
 
@@ -713,6 +716,7 @@ function getRoomPeers() {
 export function useChat() {
   return {
     state: readonly(state),
+    remoteStream,
     peers,
     rooms,
     currentRoom,

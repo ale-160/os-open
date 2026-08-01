@@ -1,6 +1,5 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
-import CallControls from './CallControls.vue'
 
 const props = defineProps({
   members: { type: Array, default: () => [] },
@@ -212,10 +211,5 @@ function cancelBan() {
         </div>
       </div>
     </div>
-    <!-- 音视频通话测试 (开发模式) -->
-    <CallControls
-      v-if="members.length > 1"
-      :members="members"
-    />
   </div>
 </template>
