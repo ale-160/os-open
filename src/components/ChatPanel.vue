@@ -81,13 +81,42 @@ function isText(type) {
   return PREVIEWABLE_TEXT.includes(type) || (type && type.startsWith('text/'))
 }
 
+/** data URL → blob URL（同步转换；blob URL 可被新标签页打开/原生下载，不受 Chrome data URL 导航限制） */
+function dataUrlToBlobUrl(dataUrl) {
+  const [meta, b64] = String(dataUrl).split(',')
+  const mime = (meta && meta.match(/data:(.*?)(;|$)/)?.[1]) || ''
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type: mime }))
+}
+
 function downloadFile(file) {
-  const a = document.createElement('a')
-  a.href = file.dataUrl
-  a.download = file.name || 'download'
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  try {
+    const url = dataUrlToBlobUrl(file.dataUrl)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = file.name || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// 在新标签页打开图片（用 blob URL，避免 Chrome 拦截 data URL 顶层导航）
+function openImageInNewTab(file) {
+  const src = file.dataUrl || file.thumbDataUrl
+  if (!src) return
+  try {
+    const url = dataUrlToBlobUrl(src)
+    window.open(url, '_blank', 'noopener')
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 // 打开预览（图片/视频/音频在模态层展示，文本在新标签页打开）
@@ -168,10 +197,9 @@ function escapeHtml(s) {
                 </div>
                 <a
                   v-if="m.file.thumbDataUrl"
-                  :href="m.file.thumbDataUrl"
-                  target="_blank"
-                  rel="noopener"
                   class="file-image-link"
+                  title="新标签页打开查看"
+                  @click.prevent="openImageInNewTab(m.file)"
                 >
                   <img
                     :src="m.file.thumbDataUrl"
@@ -190,11 +218,9 @@ function escapeHtml(s) {
               <!-- 图片预览 -->
               <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
                 <a
-                  :href="m.file.dataUrl"
-                  target="_blank"
-                  rel="noopener"
                   class="file-image-link"
                   title="新标签页打开原图"
+                  @click.prevent="openImageInNewTab(m.file)"
                 >
                   <img
                     :src="m.file.dataUrl"
@@ -206,11 +232,7 @@ function escapeHtml(s) {
                 <div class="file-meta">
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
-                  <a
-                    class="btn-mini"
-                    :href="m.file.dataUrl"
-                    :download="m.file.name"
-                  >下载</a>
+                  <button class="btn-mini" @click="downloadFile(m.file)">下载</button>
                 </div>
               </div>
               <!-- 视频预览 -->
@@ -307,6 +329,17 @@ function escapeHtml(s) {
   border: 1px solid var(--border-soft);
   border-radius: var(--radius-sm);
   max-width: 320px;
+}
+.file-image-link {
+  display: inline-block;
+  cursor: pointer;
+  line-height: 0;
+}
+.file-image-link .file-image {
+  transition: opacity 0.15s;
+}
+.file-image-link:hover .file-image {
+  opacity: 0.85;
 }
 .file-meta-wrap .file-image.thumb {
   max-width: 240px;

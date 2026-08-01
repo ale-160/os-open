@@ -545,18 +545,31 @@ async function downloadFile(fileId, fromPeerId) {
   return ok
 }
 
-/** 触发浏览器原生下载（a[download] 点击） */
+/** 触发浏览器原生下载（a[download] 点击；用 blob URL，data URL 大文件会被 Chrome 静默拦截） */
 function triggerNativeDownload(file) {
   try {
+    const url = dataUrlToBlobUrl(file.dataUrl)
     const a = document.createElement('a')
-    a.href = file.dataUrl
+    a.href = url
     a.download = file.name || 'download'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+    // 延迟释放，确保浏览器开始下载
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
   } catch (e) {
     /* ignore */
   }
+}
+
+/** data URL → blob URL（同步转换；blob URL 可被新标签页打开/原生下载，不受 Chrome data URL 导航限制） */
+function dataUrlToBlobUrl(dataUrl) {
+  const [meta, b64] = String(dataUrl).split(',')
+  const mime = (meta && meta.match(/data:(.*?)(;|$)/)?.[1]) || ''
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return URL.createObjectURL(new Blob([bytes], { type: mime }))
 }
 
 /** 搜索房间：设置关键词过滤 + 查询网络节点和本地缓存 */
