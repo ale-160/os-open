@@ -1640,24 +1640,14 @@ export class PeerNetwork extends EventTarget {
     }
   }
 
-  /** 请求下载大文件完整内容（向 fileId 的发送者按需拉取） */
+  /** 请求下载大文件完整内容（广播请求，持有该文件的节点响应，不依赖直连） */
   async requestFile(fileId, fromPeerId) {
-    // 找到持有该文件的连接（发送者）
-    let targetPeerJsId = null
-    for (const [pid, entry] of this.connections) {
-      if (entry.peerId === fromPeerId) {
-        targetPeerJsId = pid
-        break
-      }
-    }
-    if (!targetPeerJsId) {
-      this._emit('error', { type: 'file_unavailable', message: '文件发送者已离线，无法下载' })
-      return false
-    }
-    await this._sendRaw(targetPeerJsId, {
+    if (!fileId) return false
+    // 广播请求：房间内任何持有该文件缓存的节点（即发送者）都会响应
+    await this._broadcast({
       type: MsgType.FILE_REQUEST,
       payload: { fileId }
-    }, fromPeerId)
+    })
     return true
   }
 

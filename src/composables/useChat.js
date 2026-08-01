@@ -300,6 +300,11 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
     )
     if (existing && chatMsg.file.dataUrl) {
       Object.assign(existing, chatMsg)
+      // 用户在等待此文件下载：完成后自动触发浏览器原生下载
+      if (pendingDownloads.has(chatMsg.file.fileId)) {
+        pendingDownloads.delete(chatMsg.file.fileId)
+        triggerNativeDownload(chatMsg.file)
+      }
       return
     }
   }
@@ -529,9 +534,29 @@ async function sendFileMessage(file) {
 }
 
 /** 按需下载大文件完整内容（向发送者拉取，成功后自动替换 meta 卡片） */
+const pendingDownloads = new Set() // 正在下载的 fileId，下载完成时自动触发浏览器原生下载
 async function downloadFile(fileId, fromPeerId) {
   if (!network || !fileId) return false
-  return await network.requestFile(fileId, fromPeerId)
+  pendingDownloads.add(fileId)
+  const ok = await network.requestFile(fileId, fromPeerId)
+  if (!ok) pendingDownloads.delete(fileId)
+  // 15s 超时未完成则放弃（发送者可能离线）
+  setTimeout(() => pendingDownloads.delete(fileId), 15000)
+  return ok
+}
+
+/** 触发浏览器原生下载（a[download] 点击） */
+function triggerNativeDownload(file) {
+  try {
+    const a = document.createElement('a')
+    a.href = file.dataUrl
+    a.download = file.name || 'download'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  } catch (e) {
+    /* ignore */
+  }
 }
 
 /** 搜索房间：设置关键词过滤 + 查询网络节点和本地缓存 */

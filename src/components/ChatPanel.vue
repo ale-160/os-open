@@ -166,13 +166,20 @@ function escapeHtml(s) {
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
                 </div>
-                <img
+                <a
                   v-if="m.file.thumbDataUrl"
-                  :src="m.file.thumbDataUrl"
-                  :alt="m.file.name"
-                  class="file-image thumb"
-                  loading="lazy"
-                />
+                  :href="m.file.thumbDataUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="file-image-link"
+                >
+                  <img
+                    :src="m.file.thumbDataUrl"
+                    :alt="m.file.name"
+                    class="file-image thumb"
+                    loading="lazy"
+                  />
+                </a>
                 <div class="file-meta-hint">
                   大文件（{{ formatSize(m.file.size) }}），点击下载后查看
                 </div>
@@ -182,17 +189,28 @@ function escapeHtml(s) {
               </div>
               <!-- 图片预览 -->
               <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
-                <img
-                  :src="m.file.dataUrl"
-                  :alt="m.file.name"
-                  class="file-image"
-                  loading="lazy"
-                  @click="() => { const w = window.open(); if (w) w.document.body.innerHTML = `<img src='${m.file.dataUrl}' style='max-width:100%'>` }"
-                />
+                <a
+                  :href="m.file.dataUrl"
+                  target="_blank"
+                  rel="noopener"
+                  class="file-image-link"
+                  title="新标签页打开原图"
+                >
+                  <img
+                    :src="m.file.dataUrl"
+                    :alt="m.file.name"
+                    class="file-image"
+                    loading="lazy"
+                  />
+                </a>
                 <div class="file-meta">
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
-                  <button class="btn-mini" @click="downloadFile(m.file)">下载</button>
+                  <a
+                    class="btn-mini"
+                    :href="m.file.dataUrl"
+                    :download="m.file.name"
+                  >下载</a>
                 </div>
               </div>
               <!-- 视频预览 -->
