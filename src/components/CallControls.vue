@@ -45,6 +45,11 @@ const otherMembers = computed(() => {
   return props.members.filter(m => !m.self)
 })
 
+// 本地流是否有视频轨道（纯语音降级时隐藏本地画中画角标）
+const hasLocalVideo = computed(() => {
+  return !!localStream.value && localStream.value.getVideoTracks().length > 0
+})
+
 // 监听远程流：对方挂断（remoteStream 变 null）时自动复位本地通话状态
 watch(() => remoteStream.value, (stream) => {
   if (!stream && isInCall.value) {
@@ -66,18 +71,50 @@ watch(() => state.incomingCall, (call) => {
   }
 })
 
-// 获取媒体流
+// 将 getUserMedia 错误映射为可读提示
+function describeMediaError(e) {
+  const name = e?.name
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+    return '摄像头/麦克风权限被拒绝，请在浏览器地址栏允许访问后重试'
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return '未检测到摄像头或麦克风设备'
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return '无法启动摄像头：可能被其他应用或标签页占用，请关闭后重试'
+  }
+  if (name === 'OverconstrainedError' || name === 'ConstraintNotSatisfiedError') {
+    return '摄像头不满足请求参数'
+  }
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    return '当前环境不支持摄像头/麦克风采集（需要 HTTPS 或 localhost 访问）'
+  }
+  return e?.message || '未知错误'
+}
+
+// 获取媒体流（带降级：视频失败 → 纯语音；音频失败 → 纯视频）
 async function getLocalStream(video = true, audio = true) {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: video,
-      audio: audio
-    })
-    return stream
-  } catch (e) {
-    callError.value = '无法获取摄像头/麦克风: ' + e.message
+  if (!navigator.mediaDevices || typeof navigator.mediaDevices.getUserMedia !== 'function') {
+    callError.value = '当前环境不支持摄像头/麦克风采集（需要 HTTPS 或 localhost 访问）'
     return null
   }
+  // 按优先级尝试：视频+音频 → 仅音频 → 仅视频
+  const attempts = []
+  if (video && audio) attempts.push({ video: true, audio: true })
+  if (audio) attempts.push({ audio: true })
+  if (video) attempts.push({ video: true })
+  if (!attempts.length) attempts.push({ audio: true })
+
+  let lastErr = null
+  for (const constraints of attempts) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints)
+    } catch (e) {
+      lastErr = e
+    }
+  }
+  callError.value = describeMediaError(lastErr)
+  return null
 }
 
 // 停止媒体流
@@ -243,7 +280,7 @@ function hangup() {
         />
         <div v-else class="mini-placeholder">📹 等待对方视频…</div>
         <!-- 本地画中画角标 -->
-        <div v-if="localStream" class="mini-local">
+        <div v-if="hasLocalVideo" class="mini-local">
           <video :srcObject="localStream" autoplay muted playsinline class="mini-local-video" />
         </div>
         <!-- 挂断（小窗内点击不冒泡到放大） -->
@@ -260,7 +297,7 @@ function hangup() {
         />
         <div v-else class="full-placeholder">📹 等待对方视频…</div>
         <!-- 本地画中画角标 -->
-        <div v-if="localStream" class="full-local">
+        <div v-if="hasLocalVideo" class="full-local">
           <video :srcObject="localStream" autoplay muted playsinline class="full-local-video" />
         </div>
         <div class="full-controls">
