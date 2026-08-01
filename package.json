@@ -1,0 +1,25 @@
+{
+  "name": "nchat",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "去中心化 P2P 聊天室 MVP（nchat）",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "start": "node scripts/start.js"
+  },
+  "dependencies": {
+    "@noble/ed25519": "^3.1.0",
+    "@noble/hashes": "^2.2.0",
+    "idb": "^8.0.0",
+    "peerjs": "^1.5.4",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "peer": "^1.0.2",
+    "vite": "^5.4.11"
+  }
+}
