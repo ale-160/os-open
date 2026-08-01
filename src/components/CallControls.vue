@@ -22,6 +22,8 @@ const localStream = ref(null)
 // 通话状态
 const isInCall = ref(false)
 const currentCallTarget = ref(null)
+// 视频预览状态（冷启动前的预览）
+const isPreviewing = ref(false)
 // 选择的成员
 const selectedMember = ref('')
 // 错误信息
@@ -66,7 +68,23 @@ function stopStream(stream) {
   }
 }
 
-// 开始通话
+// 开始视频预览（冷启动）
+async function startPreview() {
+  callError.value = ''
+  const stream = await getLocalStream(true, true)
+  if (!stream) return
+  localStream.value = stream
+  isPreviewing.value = true
+}
+
+// 停止预览
+function stopPreview() {
+  stopStream(localStream.value)
+  localStream.value = null
+  isPreviewing.value = false
+}
+
+// 开始通话（基于已有的预览流）
 async function startCall() {
   callError.value = ''
   const member = props.members.find(m => m.peerId === selectedMember.value)
@@ -74,18 +92,23 @@ async function startCall() {
     callError.value = '请选择一个成员'
     return
   }
-  const stream = await getLocalStream(true, true)
-  if (!stream) return
-  localStream.value = stream
+  // 如果还没有本地流，获取一个
+  if (!localStream.value) {
+    const stream = await getLocalStream(true, true)
+    if (!stream) return
+    localStream.value = stream
+    isPreviewing.value = true
+  }
   currentCallTarget.value = member.peerId
   isInCall.value = true
 
-  const ok = await startMediaCall(member.peerId, stream)
+  const ok = await startMediaCall(member.peerId, localStream.value)
   if (!ok) {
     callError.value = '呼叫失败，请检查对方是否在线'
-    stopStream(stream)
+    stopStream(localStream.value)
     localStream.value = null
     isInCall.value = false
+    isPreviewing.value = false
     currentCallTarget.value = null
   }
 }
@@ -115,6 +138,7 @@ function hangup() {
   stopStream(localStream.value)
   localStream.value = null
   isInCall.value = false
+  isPreviewing.value = false
   currentCallTarget.value = null
   callError.value = ''
 }
@@ -137,7 +161,7 @@ function hangup() {
         </button>
       </div>
 
-      <template v-if="!isInCall">
+      <template v-if="!isInCall && !isPreviewing">
         <select
           v-model="selectedMember"
           class="input"
@@ -148,13 +172,31 @@ function hangup() {
             {{ m.name || shortPeerId(m.peerId) }} ({{ m.stars || 1 }}★)
           </option>
         </select>
-        <button
-          class="btn primary"
-          :disabled="!selectedMember || !otherMembers.length"
-          @click="startCall"
-        >
-          视频通话
-        </button>
+        <div class="preview-row">
+          <button
+            class="btn primary"
+            :disabled="!otherMembers.length"
+            @click="startPreview"
+          >
+            视频预览 (冷启动)
+          </button>
+        </div>
+      </template>
+
+      <!-- 视频冷启动预览 -->
+      <template v-else-if="isPreviewing && !isInCall">
+        <div class="preview-row">
+          <button
+            class="btn primary"
+            :disabled="!selectedMember"
+            @click="startCall"
+          >
+            开始通话
+          </button>
+          <button class="btn" @click="stopPreview">
+            取消
+          </button>
+        </div>
       </template>
 
       <template v-else>
@@ -238,6 +280,17 @@ function hangup() {
 .call-active .btn {
   min-height: 44px;
   min-width: 44px;
+  touch-action: manipulation;
+}
+
+.preview-row {
+  display: flex;
+  gap: 8px;
+}
+
+.preview-row .btn {
+  flex: 1;
+  min-height: 44px;
   touch-action: manipulation;
 }
 
