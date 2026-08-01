@@ -168,6 +168,20 @@ export class PeerNetwork extends EventTarget {
         this._attachConnection(conn)
       })
 
+      // 处理媒体通话请求
+      peer.on('call', (call) => {
+        dbg('peer:call from', call.peer)
+        // 尝试从连接中查找发送方的 peerId
+        let fromPeerId = null
+        for (const entry of this.connections.values()) {
+          if (entry.peerJsId === call.peer) {
+            fromPeerId = entry.peerId
+            break
+          }
+        }
+        this._onMediaCall(call, fromPeerId || call.peer)
+      })
+
       peer.on('error', (err) => {
         console.warn('[nchat] Peer error:', err?.type, err?.message)
         this._emit('error', { type: err?.type, message: err?.message })
@@ -197,6 +211,17 @@ export class PeerNetwork extends EventTarget {
   async stop() {
     this._started = false
     this._stopTimers()
+    // 关闭所有媒体通话
+    if (this._mediaCalls) {
+      for (const call of this._mediaCalls.values()) {
+        try {
+          call.close()
+        } catch (e) {
+          /* ignore */
+        }
+      }
+      this._mediaCalls.clear()
+    }
     // 通知离开所有房间
     for (const roomName of this.localRooms()) {
       await this._broadcast({ type: MsgType.LEAVE_ROOM, payload: { room: roomName } })
@@ -1104,6 +1129,17 @@ export class PeerNetwork extends EventTarget {
     return [...this._localRoomsSet]
   }
 
+  /** 获取指定房间内所有成员的 peerId 列表（用于 UI 显示如呼叫） */
+  getRoomMembers(roomName) {
+    const known = this.knownRooms.get(roomName)
+    if (!known) return []
+    const result = []
+    for (const [peerId, info] of known.members) {
+      result.push({ peerId, name: info.name || '' })
+    }
+    return result
+  }
+
   /**
    * 创建房间（设置别名和规则后加入）
    * @param {string} room  房间名
@@ -1499,6 +1535,107 @@ export class PeerNetwork extends EventTarget {
       name: entry.name,
       status: entry.status
     })
+  }
+
+  // ---------------- 音视频通话（开发测试用） ----------------
+  /**
+   * 开始音视频通话（开发测试用）。
+   * 查找目标 peerId 对应的 peerJsId，发起 media call。
+   * @param {string} targetPeerId  目标 Ed25519 PeerID
+   * @param {MediaStream} localStream 本地媒体流
+   */
+  async startMediaCall(targetPeerId, localStream) {
+    // 查找目标的 peerJsId
+    let targetPeerJsId = null
+    for (const [pid, entry] of this.connections) {
+      if (entry.peerId === targetPeerId) {
+        targetPeerJsId = pid
+        break
+      }
+    }
+    if (!targetPeerJsId) {
+      this._emit('error', {
+        type: 'call_failed',
+        message: '未找到目标用户的连接，请确保对方在线并已连接'
+      })
+      return false
+    }
+    if (!this.peer) {
+      this._emit('error', {
+        type: 'call_failed',
+        message: 'PeerJS 未就绪'
+      })
+      return false
+    }
+    try {
+      // 初始化媒体调用映射
+      if (!this._mediaCalls) this._mediaCalls = new Map()
+      const call = this.peer.call(targetPeerJsId, localStream, {
+        serialization: 'blob'
+      })
+      this._mediaCalls.set(targetPeerId, call)
+      this._wireMediaCallEvents(call, targetPeerId)
+      return true
+    } catch (e) {
+      this._emit('error', {
+        type: 'call_failed',
+        message: '媒体通话初始化失败：' + e.message
+      })
+      return false
+    }
+  }
+
+  /** 处理收到的媒体通话请求 */
+  _onMediaCall(call, fromPeerId) {
+    if (!this._mediaCalls) this._mediaCalls = new Map()
+    this._mediaCalls.set(fromPeerId, call)
+    this._wireMediaCallEvents(call, fromPeerId)
+    // 自动响应：直接接受（开发测试用）
+    // 真实应用应弹出确认对话框
+    this._emit('media:call', { from: fromPeerId })
+  }
+
+  _wireMediaCallEvents(call, peerId) {
+    call.on('stream', (remoteStream) => {
+      this._emit('media:stream', { peerId, stream: remoteStream })
+    })
+    call.on('close', () => {
+      this._emit('media:close', { peerId })
+      this._mediaCalls.delete(peerId)
+    })
+    call.on('error', (err) => {
+      this._emit('media:error', { peerId, error: err })
+      this._mediaCalls.delete(peerId)
+    })
+  }
+
+  /** 接收媒体通话（开发测试用） */
+  async answerMediaCall(peerId, localStream) {
+    const call = this._mediaCalls?.get(peerId)
+    if (!call) return false
+    try {
+      await call.answer(localStream)
+      return true
+    } catch (e) {
+      this._emit('error', {
+        type: 'call_failed',
+        message: '回答通话失败：' + e.message
+      })
+      return false
+    }
+  }
+
+  /** 挂断媒体通话 */
+  hangupMediaCall(peerId) {
+    const call = this._mediaCalls?.get(peerId)
+    if (call) {
+      try {
+        call.close()
+      } catch (e) {
+        /* ignore */
+      }
+      this._mediaCalls.delete(peerId)
+    }
   }
 
   // ---------------- 事件工具 ----------------

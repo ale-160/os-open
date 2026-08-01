@@ -44,7 +44,10 @@ const state = reactive({
   peerId: '',
   peerJsId: '',
   ownName: '',
-  activeServer: null
+  activeServer: null,
+  // 开发测试用：媒体通话状态
+  incomingCall: null,
+  remoteStream: null
 })
 
 const peers = ref([]) // [{ peerJsId, peerId, name, status }]
@@ -199,6 +202,22 @@ function wireEvents(net) {
     const idx = peers.value.findIndex((p) => p.peerJsId === peerJsId)
     if (idx >= 0) peers.value.splice(idx, 1)
     if (peerId && currentRoom.value) refreshMembers()
+  })
+
+  // 音视频通话事件
+  net.addEventListener('media:call', (e) => {
+    const { from } = e.detail
+    pushNotification('info', `收到音视频通话请求`)
+    state.incomingCall = { from, timestamp: Date.now() }
+  })
+
+  net.addEventListener('media:stream', (e) => {
+    state.incomingCall = null
+    state.remoteStream = e.detail.stream
+  })
+
+  net.addEventListener('media:close', (e) => {
+    state.remoteStream = null
   })
 
   net.addEventListener('peer:status', (e) => {
@@ -668,6 +687,29 @@ function getDiagnosticsInfo() {
   return getDiagnostics()
 }
 
+// ---------------- 音视频通话（开发测试用） ----------------
+async function startMediaCall(targetPeerId, localStream) {
+  if (!network) return false
+  return await network.startMediaCall(targetPeerId, localStream)
+}
+
+async function answerMediaCall(peerId, localStream) {
+  if (!network) return false
+  return await network.answerMediaCall(peerId, localStream)
+}
+
+function hangupMediaCall(peerId) {
+  if (!network) return
+  network.hangupMediaCall(peerId)
+  state.remoteStream = null
+  state.incomingCall = null
+}
+
+function getRoomPeers() {
+  if (!network || !currentRoom.value) return []
+  return network.getRoomMembers(currentRoom.value) || []
+}
+
 export function useChat() {
   return {
     state: readonly(state),
@@ -719,6 +761,11 @@ export function useChat() {
     resetSignalingServers,
     getDiagnosticsInfo,
     // 通知
-    dismissNotification
+    dismissNotification,
+    // 音视频通话（开发测试用）
+    startMediaCall,
+    answerMediaCall,
+    hangupMediaCall,
+    getRoomPeers
   }
 }
