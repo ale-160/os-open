@@ -247,7 +247,10 @@ function escapeHtml(s) {
   display: none;
 }
 .file-btn {
-  font-size: 16px;
-  padding: 4px 10px;
+  font-size: 20px;
+  padding: 8px 14px;
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
 }
 </style>

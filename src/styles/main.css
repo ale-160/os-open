@@ -664,6 +664,12 @@ input {
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
+.member-item .btn-mini,
+.peer-item .btn-mini {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
 .member-item:hover,
 .peer-item:hover {
   background: var(--bg-hover);
@@ -1008,6 +1014,13 @@ select.input {
   display: flex;
   gap: 6px;
   margin-left: auto;
+}
+.header-actions .btn-mini {
+  padding: 6px 10px;
+  font-size: 12px;
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
 }
 .server-mini {
   font-size: 10px;
