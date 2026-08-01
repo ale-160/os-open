@@ -2,15 +2,15 @@
 import { ref, onMounted, computed } from 'vue'
 import { useChat } from './composables/useChat.js'
 import { getRoomPassword } from './lib/db.js'
-import PeerInfo from './components/PeerInfo.vue'
-import RoomSearch from './components/RoomSearch.vue'
-import RoomList from './components/RoomList.vue'
+import SideNav from './components/SideNav.vue'
+import ListBar from './components/ListBar.vue'
 import ChatPanel from './components/ChatPanel.vue'
 import MemberList from './components/MemberList.vue'
 import CreateRoomDialog from './components/CreateRoomDialog.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import RoomManager from './components/RoomManager.vue'
 import PromptInstall from './components/PromptInstall.vue'
+import { IconClose, IconLock } from './components/icons'
 
 const {
   state,
@@ -72,6 +72,9 @@ const showCreateDialog = ref(false)
 const showSettings = ref(false)
 const showRoomManager = ref(false)
 const installBannerVisible = ref(false)
+
+// 三栏布局：SideNav 当前激活的导航项（chat/doc/file/search）
+const activeNav = ref('chat')
 
 // 屏蔽规则计算
 const currentRoomBanBelow = computed(() => {
@@ -222,26 +225,65 @@ const currentServerLabel = computed(() => {
 
 <template>
   <div class="app" :class="{ 'is-booting': state.booting, 'in-room': !!currentRoom }">
-    <header class="app-header" :class="{ compact: !!currentRoom }">
-      <div class="brand">
-        <span class="brand-mark">⬡</span>
-        <span class="brand-name">nchat</span>
-        <span class="brand-tag">P2P</span>
+    <!-- 三栏布局：SideNav(64px) | ListBar(280px) | ContentArea(1fr) -->
+    <SideNav
+      :active-nav="activeNav"
+      :online="state.online"
+      :own-name="state.ownName"
+      @nav="activeNav = $event"
+      @open-settings="showSettings = true"
+    />
+
+    <ListBar
+      :active-nav="activeNav"
+      :state="state"
+      :server-label="currentServerLabel"
+      :online="state.online"
+      :search-keyword="searchKeyword"
+      :rooms="rooms"
+      :filtered-rooms="filteredRooms"
+      :current-room="currentRoom"
+      :searching="!!searchKeyword"
+      :joined-rooms="joinedRooms"
+      @rename="setOwnName"
+      @search="searchRooms"
+      @clear="clearSearch"
+      @create="showCreateDialog = true"
+      @join="onJoinRoom"
+      @manage="showRoomManager = true"
+    />
+
+    <main class="content-area" :class="{ 'install-banner-visible': installBannerVisible, 'has-aside': !!currentRoom }">
+      <div class="content-main">
+        <ChatPanel
+          :current-room="currentRoom"
+          :messages="messages"
+          :online="state.online"
+          :stats="stats"
+          :members="members"
+          @send="sendRoomMessage"
+          @send-file="sendFileMessage"
+          @download="onDownloadFile"
+          @back="backToRoomList"
+          @leave="leaveCurrentRoom"
+        />
       </div>
-      <div class="header-actions">
-        <button class="btn-mini" @click="showRoomManager = true" title="管理房间与存储">
-          管理
-        </button>
-        <button class="btn-mini" @click="showSettings = true" title="设置与诊断">
-          设置
-        </button>
-      </div>
-      <PeerInfo
-        :state="state"
-        :server-label="currentServerLabel"
-        @rename="setOwnName"
-      />
-    </header>
+      <aside class="content-aside" v-if="currentRoom">
+        <MemberList
+          :members="members"
+          :is-owner="isCurrentUserOwner()"
+          :can-approve="canUserApprove()"
+          :pending-requests="pendingRequests"
+          :room-ban-below="currentRoomBanBelow"
+          :my-ban-below="myBanBelow"
+          @set-stars="onSetStars"
+          @approve="onApprove"
+          @reject="onReject"
+          @set-ban="onSetBan"
+          @set-room-ban="onSetRoomBan"
+        />
+      </aside>
+    </main>
 
     <!-- 通知条 -->
     <div class="notifications" v-if="notifications.length">
@@ -258,57 +300,6 @@ const currentServerLabel = computed(() => {
         <span class="notif-text">{{ n.text }}</span>
       </div>
     </div>
-
-    <main class="app-main">
-      <aside class="sidebar">
-        <RoomSearch
-          :online="state.online"
-          :keyword="searchKeyword"
-          @search="searchRooms"
-          @clear="clearSearch"
-          @create="showCreateDialog = true"
-        />
-        <RoomList
-          :rooms="filteredRooms"
-          :current-room="currentRoom"
-          :online="state.online"
-          :searching="!!searchKeyword"
-          :joined-rooms="joinedRooms"
-          @join="onJoinRoom"
-        />
-      </aside>
-
-      <section class="chat-area" :class="{ 'install-banner-visible': installBannerVisible }">
-        <ChatPanel
-          :current-room="currentRoom"
-          :messages="messages"
-          :online="state.online"
-          :stats="stats"
-          :members="members"
-          @send="sendRoomMessage"
-          @send-file="sendFileMessage"
-          @download="onDownloadFile"
-          @back="backToRoomList"
-          @leave="leaveCurrentRoom"
-        />
-      </section>
-
-      <aside class="members-bar">
-        <MemberList
-          :members="members"
-          :is-owner="isCurrentUserOwner()"
-          :can-approve="canUserApprove()"
-          :pending-requests="pendingRequests"
-          :room-ban-below="currentRoomBanBelow"
-          :my-ban-below="myBanBelow"
-          @set-stars="onSetStars"
-          @approve="onApprove"
-          @reject="onReject"
-          @set-ban="onSetBan"
-          @set-room-ban="onSetRoomBan"
-        />
-      </aside>
-    </main>
 
     <!-- 创建房间对话框 -->
     <CreateRoomDialog
@@ -345,10 +336,12 @@ const currentServerLabel = computed(() => {
       <div class="modal-card small">
         <div class="modal-head">
           <span>加入「{{ passwordPrompt.name }}」</span>
-          <button class="btn-mini" @click="passwordPrompt = null">✕</button>
+          <button class="btn-mini icon-only-btn" title="关闭" @click="passwordPrompt = null">
+            <IconClose :size="16" />
+          </button>
         </div>
         <div class="modal-body">
-          <p class="form-hint">🔒 该房间需要密码</p>
+          <p class="form-hint"><IconLock :size="14" /> 该房间需要密码</p>
           <input
             class="input"
             v-model="passwordInput"

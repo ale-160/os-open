@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useChat } from '../composables/useChat.js'
 import { shortPeerId } from '../lib/crypto.js'
+import { IconClose, IconVideo, IconVoice } from './icons'
 
 const props = defineProps({
   members: { type: Array, default: () => [] }
@@ -224,7 +225,7 @@ function hangup() {
 
         <!-- 来电提示 -->
         <div v-if="state.incomingCall" class="incoming-call">
-          <div class="call-text">📞 {{ shortPeerId(state.incomingCall.from) }} 请求视频通话</div>
+          <div class="call-text"><IconVideo :size="14" /> {{ shortPeerId(state.incomingCall.from) }} 请求视频通话</div>
           <button class="btn-mini primary" @click="answerCall(state.incomingCall.from)">
             接听
           </button>
@@ -288,13 +289,15 @@ function hangup() {
           :srcObject="remoteStream"
           autoplay playsinline class="mini-video"
         />
-        <div v-else class="mini-placeholder">📹 等待对方视频…</div>
+        <div v-else class="mini-placeholder"><IconVideo :size="16" /> 等待对方视频…</div>
         <!-- 本地画中画角标 -->
         <div v-if="hasLocalVideo" class="mini-local">
           <video :srcObject="localStream" autoplay muted playsinline class="mini-local-video" />
         </div>
         <!-- 挂断（小窗内点击不冒泡到放大） -->
-        <button class="mini-hangup" @click.stop="hangup" title="挂断">✕</button>
+        <button class="mini-hangup icon-only-btn" @click.stop="hangup" title="挂断">
+          <IconClose :size="14" />
+        </button>
         <span class="mini-status">通话中 {{ shortPeerId(currentCallTarget) }}</span>
       </div>
 
@@ -305,7 +308,7 @@ function hangup() {
           :srcObject="remoteStream"
           autoplay playsinline class="full-video"
         />
-        <div v-else class="full-placeholder">📹 等待对方视频…</div>
+        <div v-else class="full-placeholder"><IconVideo :size="24" /> 等待对方视频…</div>
         <!-- 本地画中画角标 -->
         <div v-if="hasLocalVideo" class="full-local">
           <video :srcObject="localStream" autoplay muted playsinline class="full-local-video" />

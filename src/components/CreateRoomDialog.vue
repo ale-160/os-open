@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { AccessRule, SpeakRule } from '../lib/protocol.js'
 import { CONFIG } from '../config.js'
+import { IconClose, IconLock, IconUser, IconChat, IconDown, IconUp } from './icons'
 
 const emit = defineEmits(['create', 'close'])
 
@@ -58,7 +59,9 @@ function onCreate() {
     <div class="modal-card">
       <div class="modal-head">
         <span>创建房间</span>
-        <button class="btn-mini" @click="emit('close')">✕</button>
+        <button class="btn-mini icon-only-btn" title="关闭" @click="emit('close')">
+          <IconClose :size="16" />
+        </button>
       </div>
       <div class="modal-body">
         <div class="form-row">
@@ -96,13 +99,17 @@ function onCreate() {
           <div class="alias-tags" v-if="aliases.length">
             <span v-for="(a, i) in aliases" :key="i" class="alias-tag">
               {{ a }}
-              <button class="alias-remove" @click="removeAlias(i)">✕</button>
+              <button class="alias-remove icon-only-btn" title="移除" @click="removeAlias(i)">
+                <IconClose :size="12" />
+              </button>
             </span>
           </div>
         </div>
 
         <button class="toggle-advanced" @click="showAdvanced = !showAdvanced">
-          {{ showAdvanced ? '▼' : '▶' }} 高级设置
+          <IconUp v-if="showAdvanced" :size="14" />
+          <IconDown v-else :size="14" />
+          高级设置
         </button>
 
         <div v-if="showAdvanced" class="advanced">
@@ -157,10 +164,10 @@ function onCreate() {
           </div>
 
           <p class="form-hint" v-if="access === AccessRule.APPROVE">
-            🛡 审核制：新成员需提交申请，由星标达标的在线成员批准后才能加入
+            <IconUser :size="14" /> 审核制：新成员需提交申请，由星标达标的在线成员批准后才能加入
           </p>
           <p class="form-hint" v-if="access === AccessRule.INVITE">
-            ✉ 邀请制：仅星标达标的成员可邀请他人加入
+            <IconChat :size="14" /> 邀请制：仅星标达标的成员可邀请他人加入
           </p>
         </div>
       </div>

@@ -1,6 +1,18 @@
 <script setup>
 import { ref, watch, nextTick, computed } from 'vue'
 import CallControls from './CallControls.vue'
+import {
+  IconBack,
+  IconLeave,
+  IconChat,
+  IconFile,
+  IconImage,
+  IconVoice,
+  IconDoc,
+  IconDownload,
+  IconSend,
+  IconClose
+} from './icons'
 
 const props = defineProps({
   currentRoom: { type: String, default: '' },
@@ -223,13 +235,17 @@ function escapeHtml(s) {
     <div class="chat-head">
       <template v-if="inRoom">
         <!-- 移动端：返回房间列表（收起的侧边栏） -->
-        <button class="btn-mini back-btn" title="返回房间列表" @click="emit('back')">‹</button>
+        <button class="btn-mini back-btn icon-only-btn" title="返回房间列表" @click="emit('back')">
+          <IconBack :size="20" />
+        </button>
         <span class="hash">#</span>
         <span class="room-title">{{ currentRoom }}</span>
         <span class="room-stats">
           {{ messages.length }} 条消息
         </span>
-        <button class="btn-mini danger" @click="emit('leave')">离开</button>
+        <button class="btn-mini danger icon-only-btn" title="离开房间" @click="emit('leave')">
+          <IconLeave :size="16" />
+        </button>
       </template>
       <template v-else>
         <span class="room-title muted">选择左侧房间开始聊天</span>
@@ -241,7 +257,7 @@ function escapeHtml(s) {
 
     <div class="chat-body" ref="bodyRef">
       <div v-if="!inRoom" class="chat-empty">
-        <div class="empty-icon">⬡</div>
+        <div class="empty-icon"><IconChat :size="48" /></div>
         <p>欢迎来到 nchat</p>
         <p class="sub">
           这是一个去中心化 P2P 聊天室，没有中心服务器存储你的消息。<br />
@@ -268,7 +284,11 @@ function escapeHtml(s) {
               <!-- 大文件元信息卡片：仅缩略图/大小，点击下载按需拉取完整内容 -->
               <div v-if="m.file.isMeta" class="file-meta-wrap">
                 <div class="file-meta">
-                  <span class="file-icon">{{ m.file.thumbDataUrl ? '🖼' : (isAudio(m.file.type) ? '🎵' : '📦') }}</span>
+                  <span class="file-icon">
+                    <IconImage v-if="m.file.thumbDataUrl" :size="16" />
+                    <IconVoice v-else-if="isAudio(m.file.type)" :size="16" />
+                    <IconFile v-else :size="16" />
+                  </span>
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
                 </div>
@@ -286,7 +306,9 @@ function escapeHtml(s) {
                   />
                 </a>
                 <!-- 非图片大文件（压缩包/文档等）：保留下载按钮（图片走浏览器原生长按/右键保存） -->
-                <button v-else class="btn-mini" @click="downloadFile(m.file)">下载</button>
+                <button v-else class="btn-mini icon-only-btn" title="下载" @click="downloadFile(m.file)">
+                  <IconDownload :size="16" />
+                </button>
               </div>
               <!-- 图片预览 -->
               <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
@@ -313,13 +335,15 @@ function escapeHtml(s) {
                 <div class="file-meta">
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
-                  <button class="btn-mini" @click="downloadFile(m.file)">下载</button>
+                  <button class="btn-mini icon-only-btn" title="下载" @click="downloadFile(m.file)">
+                    <IconDownload :size="16" />
+                  </button>
                 </div>
               </div>
               <!-- 音频预览 -->
               <div v-else-if="isAudio(m.file.type)" class="file-audio-wrap">
                 <div class="file-meta">
-                  <span class="file-icon">🎵</span>
+                  <span class="file-icon"><IconVoice :size="16" /></span>
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
                 </div>
@@ -328,21 +352,27 @@ function escapeHtml(s) {
               <!-- 文本预览 -->
               <div v-else-if="isText(m.file.type)" class="file-text-wrap">
                 <div class="file-meta">
-                  <span class="file-icon">📄</span>
+                  <span class="file-icon"><IconDoc :size="16" /></span>
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
                 </div>
-                <button class="btn-mini" @click="openPreview(m.file)">预览</button>
-                <button class="btn-mini" @click="downloadFile(m.file)">下载</button>
+                <button class="btn-mini icon-only-btn" title="预览" @click="openPreview(m.file)">
+                  <IconDoc :size="16" />
+                </button>
+                <button class="btn-mini icon-only-btn" title="下载" @click="downloadFile(m.file)">
+                  <IconDownload :size="16" />
+                </button>
               </div>
               <!-- 其他类型 -->
               <div v-else class="file-other-wrap">
                 <div class="file-meta">
-                  <span class="file-icon">📎</span>
+                  <span class="file-icon"><IconFile :size="16" /></span>
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
                 </div>
-                <button class="btn-mini" @click="downloadFile(m.file)">下载</button>
+                <button class="btn-mini icon-only-btn" title="下载" @click="downloadFile(m.file)">
+                  <IconDownload :size="16" />
+                </button>
               </div>
             </div>
           </div>
@@ -360,12 +390,12 @@ function escapeHtml(s) {
         @keyup.enter="onSend"
       />
       <button
-        class="btn-mini file-btn"
+        class="btn-mini file-btn icon-only-btn"
         :disabled="!inRoom"
         @click="onPickFile"
         title="发送文件（≤8MB，支持图片/视频/音频预览）"
       >
-        📎
+        <IconFile :size="20" />
       </button>
       <input
         ref="fileInputRef"
@@ -373,8 +403,8 @@ function escapeHtml(s) {
         class="file-input-hidden"
         @change="onFileChange"
       />
-      <button class="btn primary" :disabled="!inRoom || !draft.trim()" @click="onSend">
-        发送
+      <button class="btn primary icon-only-btn" :disabled="!inRoom || !draft.trim()" title="发送" @click="onSend">
+        <IconSend :size="18" />
       </button>
     </div>
 
@@ -384,7 +414,9 @@ function escapeHtml(s) {
         <div class="lightbox-head">
           <span class="file-name" :title="lightboxFile.name">{{ lightboxFile.name }}</span>
           <span class="file-size">{{ formatSize(lightboxFile.size) }}</span>
-          <button class="btn-mini" @click="closeLightbox">✕</button>
+          <button class="btn-mini icon-only-btn" title="关闭" @click="closeLightbox">
+            <IconClose :size="16" />
+          </button>
         </div>
         <div class="lightbox-body">
           <!-- 完整原图 -->
@@ -420,12 +452,24 @@ function escapeHtml(s) {
 .file-input-hidden {
   display: none;
 }
+/* 纯图标按钮：统一尺寸与对齐 */
+.icon-only-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
 .file-btn {
-  font-size: 20px;
-  padding: 8px 14px;
+  padding: 8px 12px;
   min-height: 44px;
   min-width: 44px;
   touch-action: manipulation;
+}
+.empty-icon {
+  color: var(--accent);
+  opacity: 0.5;
+  margin-bottom: var(--sp-3);
+  line-height: 1;
 }
 /* 大文件元信息卡片 */
 .file-meta-wrap {

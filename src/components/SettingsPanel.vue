@@ -5,6 +5,7 @@ import {
   getDiagnostics
 } from '../config.js'
 import { formatBytes } from '../lib/db.js'
+import { IconClose } from './icons'
 
 const emit = defineEmits(['close', 'add-server', 'remove-server', 'switch-server', 'reset-servers'])
 
@@ -87,7 +88,9 @@ function copyToClipboard(text) {
     <div class="modal-card wide">
       <div class="modal-head">
         <span>设置与诊断</span>
-        <button class="btn-mini" @click="emit('close')">✕</button>
+        <button class="btn-mini icon-only-btn" title="关闭" @click="emit('close')">
+          <IconClose :size="16" />
+        </button>
       </div>
 
       <div class="settings-tabs">

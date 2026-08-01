@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
+import { IconCheck, IconClose, IconUp, IconDown, IconEdit } from './icons'
 
 const props = defineProps({
   members: { type: Array, default: () => [] },
@@ -108,8 +109,12 @@ function cancelBan() {
             <span class="pending-time">{{ new Date(req.timestamp).toLocaleTimeString() }}</span>
           </div>
           <div class="pending-actions">
-            <button class="btn-mini primary" @click="emit('approve', req.peerId)">✓</button>
-            <button class="btn-mini danger" @click="emit('reject', req.peerId)">✕</button>
+            <button class="btn-mini primary icon-only-btn" title="批准" @click="emit('approve', req.peerId)">
+              <IconCheck :size="14" />
+            </button>
+            <button class="btn-mini danger icon-only-btn" title="拒绝" @click="emit('reject', req.peerId)">
+              <IconClose :size="14" />
+            </button>
           </div>
         </div>
       </div>
@@ -133,13 +138,17 @@ function cancelBan() {
           {{ m.stars || 1 }}★
         </span>
         <div v-if="isOwner && !m.self && orderedMembers.length > 1" class="reorder-btns">
-          <button class="btn-mini" :disabled="i === 0" @click="moveUp(m.peerId)">↑</button>
-          <button class="btn-mini" :disabled="i === orderedMembers.length - 1" @click="moveDown(m.peerId)">↓</button>
+          <button class="btn-mini icon-only-btn" :disabled="i === 0" title="上移" @click="moveUp(m.peerId)">
+            <IconUp :size="14" />
+          </button>
+          <button class="btn-mini icon-only-btn" :disabled="i === orderedMembers.length - 1" title="下移" @click="moveDown(m.peerId)">
+            <IconDown :size="14" />
+          </button>
         </div>
         <!-- owner 可调整星标 -->
         <div v-if="isOwner && !m.self" class="stars-control">
-          <button v-if="starsEditing !== m.peerId" class="btn-mini" @click="startEditStars(m)" title="调整星标">
-            ★
+          <button v-if="starsEditing !== m.peerId" class="btn-mini icon-only-btn" @click="startEditStars(m)" title="调整星标">
+            <IconEdit :size="14" />
           </button>
           <div v-else class="stars-edit">
             <input
@@ -151,8 +160,12 @@ function cancelBan() {
               @keyup.enter="commitStars"
               @keyup.esc="cancelEditStars"
             />
-            <button class="btn-mini primary" @click="commitStars">✓</button>
-            <button class="btn-mini" @click="cancelEditStars">✕</button>
+            <button class="btn-mini primary icon-only-btn" title="确定" @click="commitStars">
+              <IconCheck :size="14" />
+            </button>
+            <button class="btn-mini icon-only-btn" title="取消" @click="cancelEditStars">
+              <IconClose :size="14" />
+            </button>
           </div>
         </div>
         <!-- 有审核权限的成员可邀请（向未加入的节点） -->

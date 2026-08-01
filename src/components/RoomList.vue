@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CONFIG } from '../config.js'
+import { IconLock, IconUser, IconChat, IconEdit } from './icons'
 
 const props = defineProps({
   rooms: { type: Array, default: () => [] },
@@ -73,18 +74,18 @@ function timeAgo(ts) {
   return Math.floor(diff / 86400000) + '天前'
 }
 
-function accessIcon(rules) {
+function accessIconName(rules) {
   if (!rules) return ''
-  if (rules.access === 'password') return '🔒'
-  if (rules.access === 'approve') return '🛡'
-  if (rules.access === 'invite') return '✉'
+  if (rules.access === 'password') return 'lock'
+  if (rules.access === 'approve') return 'user'
+  if (rules.access === 'invite') return 'chat'
   return ''
 }
 
-function speakIcon(rules) {
+function speakIconName(rules) {
   if (!rules) return ''
-  if (rules.speak === 'whitelist') return '🗨'
-  if (rules.speak === 'approve') return '✍'
+  if (rules.speak === 'whitelist') return 'chat'
+  if (rules.speak === 'approve') return 'edit'
   return ''
 }
 </script>
@@ -133,8 +134,11 @@ function speakIcon(rules) {
       >
         <div class="room-name">
           <span class="room-icons">
-            <span v-if="accessIcon(r.rules)" :title="'准入: ' + r.rules?.access">{{ accessIcon(r.rules) }}</span>
-            <span v-if="speakIcon(r.rules)" :title="'发言: ' + r.rules?.speak">{{ speakIcon(r.rules) }}</span>
+            <IconLock v-if="accessIconName(r.rules) === 'lock'" :size="12" :title="'准入: ' + r.rules?.access" />
+            <IconUser v-else-if="accessIconName(r.rules) === 'user'" :size="12" :title="'准入: ' + r.rules?.access" />
+            <IconChat v-else-if="accessIconName(r.rules) === 'chat'" :size="12" :title="'准入: ' + r.rules?.access" />
+            <IconChat v-if="speakIconName(r.rules) === 'chat'" :size="12" :title="'发言: ' + r.rules?.speak" />
+            <IconEdit v-else-if="speakIconName(r.rules) === 'edit'" :size="12" :title="'发言: ' + r.rules?.speak" />
           </span>
           {{ r.name }}
           <span v-if="joinedNames.has(r.name)" class="room-badge joined">已加入</span>

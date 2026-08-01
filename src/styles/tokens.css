@@ -1,0 +1,100 @@
+/**
+ * nchat 设计 Token
+ *
+ * 统一色板 / 字号 / 间距 / 圆角 / 阴影，所有组件应仅引用 var(--*)，
+ * 禁止在组件 CSS 中再出现硬编码的 #hex。
+ *
+ * 色板（与计划 §4.2 对齐）：
+ *   primary #2F81F7  / success #2ECC71 / warning #F5B041 / danger #F85149
+ *   灰阶 12 级（g00 最深 → g11 最浅）
+ */
+:root {
+  /* ===== 品牌色 ===== */
+  --c-primary: #2f81f7;
+  --c-primary-hover: #4493f8;
+  --c-primary-soft: rgba(47, 129, 247, 0.12);
+  --c-success: #2ecc71;
+  --c-success-soft: rgba(46, 204, 113, 0.14);
+  --c-warning: #f5b041;
+  --c-warning-soft: rgba(245, 176, 65, 0.14);
+  --c-danger: #f85149;
+  --c-danger-soft: rgba(248, 81, 73, 0.12);
+  --c-owner: #f5a623; /* 房主星标色（沿用既有视觉，区别于 warning） */
+  --c-owner-soft: rgba(245, 166, 35, 0.18);
+  --c-white: #ffffff;
+  --c-black: #000000;
+  /* 半透明遮罩（用于 overlay/modal 背景）*/
+  --c-scrim: rgba(13, 17, 23, 0.7);
+
+  /* ===== 灰阶 12 级（g00 最深 → g11 最浅）===== */
+  --c-g00: #0d1117; /* 应用底色 */
+  --c-g01: #11161d;
+  --c-g02: #161b22; /* 侧栏 / 头部 */
+  --c-g03: #1c232c; /* 输入框 / 浮层 */
+  --c-g04: #21262d; /* hover */
+  --c-g05: #2a3038;
+  --c-g06: #30363d; /* 主边框 */
+  --c-g07: #3a434d;
+  --c-g08: #6e7681; /* 弱化文本 */
+  --c-g09: #8b949e; /* 次级文本 */
+  --c-g10: #c2c8d0;
+  --c-g11: #e6edf3; /* 主文本 */
+
+  /* ===== 语义别名（兼容既有命名，指向灰阶）===== */
+  --bg: var(--c-g00);
+  --bg-elev: var(--c-g02);
+  --bg-elev2: var(--c-g03);
+  --bg-hover: var(--c-g04);
+  --border: var(--c-g06);
+  --border-soft: var(--c-g04);
+  --text: var(--c-g11);
+  --text-dim: var(--c-g09);
+  --text-muted: var(--c-g08);
+  --accent: var(--c-primary);
+  --accent-hover: var(--c-primary-hover);
+  --accent-soft: var(--c-primary-soft);
+  --green: var(--c-success);
+  --yellow: var(--c-warning);
+  --red: var(--c-danger);
+  --danger-soft: var(--c-danger-soft);
+
+  /* ===== 字号（11-22）===== */
+  --fs-11: 11px;
+  --fs-12: 12px;
+  --fs-13: 13px;
+  --fs-14: 14px;
+  --fs-15: 15px;
+  --fs-16: 16px;
+  --fs-18: 18px;
+  --fs-20: 20px;
+  --fs-22: 22px;
+
+  /* ===== 间距（4-32，4 的倍数）===== */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  /* ===== 圆角（4-16）===== */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+
+  /* ===== 阴影 3 档 ===== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  /* 兼容旧用法 */
+  --radius: var(--r-md);
+  --shadow: var(--shadow-lg);
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}

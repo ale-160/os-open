@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { formatBytes, getRoomMessageCount } from '../lib/db.js'
+import { IconClose, IconLock, IconUser, IconChat } from './icons'
 
 const props = defineProps({
   rooms: { type: Array, default: () => [] },
@@ -37,9 +38,9 @@ function accessLabel(rules) {
   return map[rules.access] || '开放'
 }
 
-function accessIcon(rules) {
+function accessIconName(rules) {
   if (!rules) return ''
-  const map = { password: '🔒', approve: '🛡', invite: '✉' }
+  const map = { password: 'lock', approve: 'user', invite: 'chat' }
   return map[rules.access] || ''
 }
 </script>
@@ -49,7 +50,9 @@ function accessIcon(rules) {
     <div class="modal-card wide">
       <div class="modal-head">
         <span>房间与存储管理</span>
-        <button class="btn-mini" @click="emit('close')">✕</button>
+        <button class="btn-mini icon-only-btn" title="关闭" @click="emit('close')">
+          <IconClose :size="16" />
+        </button>
       </div>
 
       <div class="settings-tabs">
@@ -79,7 +82,9 @@ function accessIcon(rules) {
             <div class="room-mgr-info">
               <div class="room-mgr-name">
                 <span class="room-icons">
-                  <span v-if="accessIcon(r.rules)">{{ accessIcon(r.rules) }}</span>
+                  <IconLock v-if="accessIconName(r.rules) === 'lock'" :size="13" />
+                  <IconUser v-else-if="accessIconName(r.rules) === 'user'" :size="13" />
+                  <IconChat v-else-if="accessIconName(r.rules) === 'chat'" :size="13" />
                 </span>
                 <span :class="{ active: r.name === currentRoom }">{{ r.name }}</span>
                 <span class="room-mgr-tag">{{ accessLabel(r.rules) }}</span>

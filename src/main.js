@@ -1,5 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
+import './styles/tokens.css'
 import './styles/main.css'
 
 // 注册 Service Worker（生产环境）
