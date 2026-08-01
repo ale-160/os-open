@@ -251,6 +251,31 @@ export async function clearRoomData(room) {
   deleteRoomBans(room)
 }
 
+// ---- 大文件发送缓存（刷新页面后仍可提供下载） ----
+// 结构：{ fileId: { room, name, type, size, dataUrl } }
+const OUTGOING_KEY = 'nchat:outgoing-files'
+
+export function saveOutgoingFile(fileId, info) {
+  const all = readJSON(OUTGOING_KEY, {})
+  all[fileId] = info
+  // 限制条数，防 localStorage 溢出（每条可能几百 KB ~ 几 MB）
+  const keys = Object.keys(all)
+  while (keys.length > 5) {
+    delete all[keys.shift()]
+  }
+  writeJSON(OUTGOING_KEY, all)
+}
+
+export function getOutgoingFiles() {
+  return readJSON(OUTGOING_KEY, {})
+}
+
+export function deleteOutgoingFile(fileId) {
+  const all = readJSON(OUTGOING_KEY, {})
+  delete all[fileId]
+  writeJSON(OUTGOING_KEY, all)
+}
+
 // ---- 个人屏蔽规则 ----
 // 结构：{ roomName: { peerId: banBelowStars } }
 // 含义：peerId 设置的屏蔽阈值，屏蔽星标 < banBelowStars 的用户发言

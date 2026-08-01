@@ -35,7 +35,9 @@ export const MsgType = {
   FILE_MESSAGE: 'file_message',
   // 大文件：元信息广播（缩略图/大小），完整内容按需拉取
   FILE_META: 'file_meta',
-  FILE_REQUEST: 'file_request'
+  FILE_REQUEST: 'file_request',
+  // 大文件：发送者缓存已失效（如刷新页面），通知请求者
+  FILE_UNAVAILABLE: 'file_unavailable'
 }
 
 // ---- 房间规则 ----

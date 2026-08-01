@@ -116,11 +116,14 @@ const lightboxFile = computed(() => {
 })
 // 正在下载中的 fileId（用于按钮显示"下载中…"）
 const downloadingIds = ref(new Set())
+// 下载失败标记（lightbox 提示）
+const downloadFailed = ref(false)
 
 // 打开放大查看；若为 meta（未下载）自动触发拉取原图
 function openLightbox(file) {
   if (!file) return
   lightboxFileId.value = file.fileId || file.id || null
+  downloadFailed.value = false
   if (file.isMeta && file.fileId) {
     requestDownload(file)
   }
@@ -130,11 +133,31 @@ function closeLightbox() {
   lightboxFileId.value = null
 }
 
+// 重试下载
+function retryDownload() {
+  if (!lightboxFile.value) return
+  downloadFailed.value = false
+  requestDownload(lightboxFile.value)
+}
+
 // 触发下载（记录状态；数据到达后卡片自动替换为完整内容）
 function requestDownload(file) {
   if (!file?.fileId) return
   downloadingIds.value = new Set(downloadingIds.value).add(file.fileId)
   emit('download', file)
+  // 12s 超时：未收到数据则提示失败并复位（发送者可能离线/已刷新页面）
+  setTimeout(() => {
+    if (!downloadingIds.value.has(file.fileId)) return
+    const m = props.messages.find((x) => x.file?.fileId === file.fileId)
+    if (m && !m.file?.dataUrl) {
+      const next = new Set(downloadingIds.value)
+      next.delete(file.fileId)
+      downloadingIds.value = next
+      if (lightboxFileId.value === file.fileId) {
+        downloadFailed.value = true
+      }
+    }
+  }, 12000)
 }
 
 // 监听消息变化：下载完成后清理下载中标记
@@ -261,7 +284,7 @@ function escapeHtml(s) {
               <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
                 <a
                   class="file-image-link"
-                  title="点击放大查看"
+                  title="点击放大查看（长按/右键可保存图片）"
                   @click.prevent="openLightbox(m.file)"
                 >
                   <img
@@ -274,7 +297,6 @@ function escapeHtml(s) {
                 <div class="file-meta">
                   <span class="file-name" :title="m.file.name">{{ m.file.name }}</span>
                   <span class="file-size">{{ formatSize(m.file.size) }}</span>
-                  <button class="btn-mini" @click="downloadFile(m.file)">下载</button>
                 </div>
               </div>
               <!-- 视频预览 -->
@@ -367,23 +389,23 @@ function escapeHtml(s) {
           <!-- 元信息模式：缩略图 + 正在加载原图 -->
           <div v-else-if="lightboxFile.thumbDataUrl" class="lightbox-loading">
             <img :src="lightboxFile.thumbDataUrl" :alt="lightboxFile.name" class="lightbox-thumb" />
-            <p>正在加载原图…</p>
+            <p v-if="!downloadFailed">正在加载原图…</p>
+            <p v-else class="download-fail">⚠ 加载失败：发送者可能已离线或刷新页面</p>
+            <button v-if="downloadFailed" class="btn-mini primary" @click="retryDownload">
+              重试
+            </button>
           </div>
           <div v-else class="lightbox-loading">
-            <p>正在加载…</p>
+            <p v-if="!downloadFailed">正在加载…</p>
+            <p v-else class="download-fail">⚠ 加载失败：发送者可能已离线或刷新页面</p>
+            <button v-if="downloadFailed" class="btn-mini primary" @click="retryDownload">
+              重试
+            </button>
           </div>
         </div>
         <div class="lightbox-foot">
-          <span class="file-hint" v-if="lightboxFile.isMeta && !lightboxFile.dataUrl">
-            下载完成后自动显示原图
-          </span>
-          <button
-            v-if="lightboxFile.dataUrl"
-            class="btn primary"
-            @click="downloadFile(lightboxFile)"
-          >
-            ⬇ 保存
-          </button>
+          <span class="file-hint">长按/右键图片可保存</span>
+          <button class="btn-mini" @click="closeLightbox">关闭</button>
         </div>
       </div>
     </div>

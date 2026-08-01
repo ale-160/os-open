@@ -34,7 +34,10 @@ import {
   deleteRoomStars,
   getRoomBans,
   setBan,
-  deleteRoomBans
+  deleteRoomBans,
+  saveOutgoingFile,
+  getOutgoingFiles,
+  deleteOutgoingFile
 } from './db.js'
 
 const DEBUG = false
@@ -127,6 +130,19 @@ export class PeerNetwork extends EventTarget {
   async start(explicitServer) {
     if (this._started) return
     this._started = true
+
+    // 恢复持久化的大文件发送缓存（刷新页面后仍可提供下载）
+    try {
+      if (!this._outgoingFiles) this._outgoingFiles = new Map()
+      const stored = getOutgoingFiles()
+      for (const [fileId, info] of Object.entries(stored)) {
+        if (info && info.dataUrl) {
+          this._outgoingFiles.set(fileId, info)
+        }
+      }
+    } catch (e) {
+      /* ignore */
+    }
 
     // 候选信令服务器列表：优先 explicitServer，否则当前激活项，最后全部
     const allServers = getAllSignalingServers()
@@ -600,6 +616,13 @@ export class PeerNetwork extends EventTarget {
         break
       case MsgType.FILE_REQUEST:
         this._onFileRequest(peerJsId, data)
+        // 请求也转发（meta 是转发来的，请求也要能到达发送者，否则间接节点无法下载）
+        if (data.from !== this.identity.peerId) {
+          this._forward(data)
+        }
+        break
+      case MsgType.FILE_UNAVAILABLE:
+        this._onFileUnavailable(data)
         break
     }
   }
@@ -1426,10 +1449,17 @@ export class PeerNetwork extends EventTarget {
       // 缓存发送中的大文件（fileId -> dataUrl），供接收方按需请求
       if (!this._outgoingFiles) this._outgoingFiles = new Map()
       this._outgoingFiles.set(fileId, { room, dataUrl, name: file.name, type: file.type, size: file.size })
+      // 持久化到 localStorage（刷新页面后仍可提供下载；超大文件可能超限则跳过）
+      try {
+        saveOutgoingFile(fileId, { room, dataUrl, name: file.name, type: file.type, size: file.size })
+      } catch (e) {
+        /* localStorage 超限时仅内存缓存，可接受 */
+      }
       // 上限 20 个，超出清理最早的
       if (this._outgoingFiles.size > 20) {
         const oldest = this._outgoingFiles.keys().next().value
         this._outgoingFiles.delete(oldest)
+        deleteOutgoingFile(oldest)
       }
       const meta = await buildMessage(
         {
@@ -1608,7 +1638,12 @@ export class PeerNetwork extends EventTarget {
     if (!fileId) return
     if (!this._markProcessed(msg.id)) return
     const entry = this._outgoingFiles?.get(fileId)
-    if (!entry) return // 缓存已过期或不是我们发送的
+    if (!entry) {
+      // 无缓存：可能不是我们发送的文件，或发送后已刷新页面。
+      // 不在这里回发（中间节点转发也会经过这里，会误报），
+      // 由请求端超时提示失败。
+      return
+    }
     dbg('file:request served', fileId, 'to', peerJsId)
 
     // 分片回传给请求者（单播，不广播）
@@ -1638,6 +1673,13 @@ export class PeerNetwork extends EventTarget {
       this._markProcessed(chunkMsg.id)
       await this._send(peerJsId, chunkMsg)
     }
+  }
+
+  /** 收到文件不可用通知（发送者缓存已失效，如刷新页面） */
+  _onFileUnavailable(msg) {
+    const fileId = msg.payload?.fileId
+    if (!fileId) return
+    this._emit('file:unavailable', { fileId, from: msg.from })
   }
 
   /** 请求下载大文件完整内容（广播请求，持有该文件的节点响应，不依赖直连） */
