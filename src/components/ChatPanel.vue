@@ -160,7 +160,7 @@ function requestDownload(file) {
   }, 12000)
 }
 
-// 监听消息变化：下载完成后清理下载中标记
+// 监听消息变化：下载完成后清理下载中标记；下载失败立即提示
 watch(
   () => props.messages,
   (list) => {
@@ -168,7 +168,14 @@ watch(
     const done = new Set()
     for (const id of downloadingIds.value) {
       const m = list.find((x) => x.file?.fileId === id)
-      if (m && m.file?.dataUrl) done.add(id)
+      if (m && m.file?.dataUrl) {
+        done.add(id)
+      } else if (m?.file?.downloadFailed) {
+        done.add(id)
+        if (lightboxFileId.value === id) {
+          downloadFailed.value = true
+        }
+      }
     }
     if (done.size) {
       const next = new Set(downloadingIds.value)
@@ -269,16 +276,8 @@ function escapeHtml(s) {
                     loading="lazy"
                   />
                 </a>
-                <div class="file-meta-hint">
-                  大文件（{{ formatSize(m.file.size) }}），点击查看/下载
-                </div>
-                <button
-                  class="btn-mini primary"
-                  :disabled="downloadingIds.has(m.file.fileId)"
-                  @click="requestDownload(m.file)"
-                >
-                  {{ downloadingIds.has(m.file.fileId) ? '下载中…' : '⬇ 下载' }}
-                </button>
+                <!-- 非图片大文件（压缩包/文档等）：保留下载按钮（图片走浏览器原生长按/右键保存） -->
+                <button v-else class="btn-mini" @click="downloadFile(m.file)">下载</button>
               </div>
               <!-- 图片预览 -->
               <div v-else-if="isImage(m.file.type)" class="file-image-wrap">
@@ -371,7 +370,7 @@ function escapeHtml(s) {
     </div>
 
     <!-- 图片放大查看 lightbox（页面内模态，不跳新标签页） -->
-    <div v-if="lightboxFile" class="lightbox-overlay" @click.self="closeLightbox">
+    <div v-if="lightboxFile" class="lightbox-overlay">
       <div class="lightbox-card">
         <div class="lightbox-head">
           <span class="file-name" :title="lightboxFile.name">{{ lightboxFile.name }}</span>
@@ -402,10 +401,6 @@ function escapeHtml(s) {
               重试
             </button>
           </div>
-        </div>
-        <div class="lightbox-foot">
-          <span class="file-hint">长按/右键图片可保存</span>
-          <button class="btn-mini" @click="closeLightbox">关闭</button>
         </div>
       </div>
     </div>

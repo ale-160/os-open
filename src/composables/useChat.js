@@ -250,6 +250,17 @@ function wireEvents(net) {
   net.addEventListener('chat', async (chatMsg) => {
     await handleChatMessage(chatMsg.detail)
   })
+  net.addEventListener('file:unavailable', (e) => {
+    const fileId = e.detail?.fileId
+    if (!fileId) return
+    pendingDownloads.delete(fileId)
+    // 标记对应消息的 file 为下载失败（ChatPanel 检测后立即显示失败提示，无需等 12s 超时）
+    const m = messages.value.find((x) => x.file?.fileId === fileId)
+    if (m && m.file && !m.file.dataUrl) {
+      m.file.downloadFailed = true
+    }
+    pushNotification('error', '文件不可用：发送者刷新页面后原文件缓存已丢失，请对方重新发送')
+  })
 
   // 历史消息
   net.addEventListener('history', async (e) => {

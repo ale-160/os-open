@@ -106,6 +106,8 @@ export class PeerNetwork extends EventTarget {
     this._pendingJoinRequests = new Map()
     /** 已处理消息去重：msgId -> timestamp，避免 gossip 转发导致的重复 emit/转发 */
     this._processedMsgs = new Map()
+    /** 本节点发送过的大文件 fileId 集合（用于请求时判断"缓存是否已失效"） */
+    this._sentFileIds = new Set()
   }
 
   /** 检查并标记消息是否已处理过（返回 true 表示首次处理） */
@@ -623,6 +625,10 @@ export class PeerNetwork extends EventTarget {
         break
       case MsgType.FILE_UNAVAILABLE:
         this._onFileUnavailable(data)
+        // 沿转发路径回传给请求者（meta 转发链的反向）
+        if (data.from !== this.identity.peerId) {
+          this._forward(data)
+        }
         break
     }
   }
@@ -1446,6 +1452,8 @@ export class PeerNetwork extends EventTarget {
 
     // 大文件：缓存完整内容供按需拉取，广播元信息
     if (!isSmall) {
+      // 记录"本节点发送过该文件"（即使缓存被淘汰也能区分"发过但缓存失效"与"从未发过"）
+      this._sentFileIds.add(fileId)
       // 缓存发送中的大文件（fileId -> dataUrl），供接收方按需请求
       if (!this._outgoingFiles) this._outgoingFiles = new Map()
       this._outgoingFiles.set(fileId, { room, dataUrl, name: file.name, type: file.type, size: file.size })
@@ -1639,12 +1647,30 @@ export class PeerNetwork extends EventTarget {
     if (!this._markProcessed(msg.id)) return
     const entry = this._outgoingFiles?.get(fileId)
     if (!entry) {
-      // 无缓存：可能不是我们发送的文件，或发送后已刷新页面。
-      // 不在这里回发（中间节点转发也会经过这里，会误报），
-      // 由请求端超时提示失败。
+      // 本节点曾发送过该文件但缓存已失效（如刷新页面后内存缓存丢失）：
+      // 回发 FILE_UNAVAILABLE，让请求者立即知道原因（而不是静默超时）
+      if (this._sentFileIds.has(fileId) && msg.from !== this.identity.peerId) {
+        await this._sendRaw(peerJsId, {
+          type: MsgType.FILE_UNAVAILABLE,
+          payload: { fileId }
+        }, msg.from)
+      }
+      // 从未发过该文件（可能是转发请求）：静默
       return
     }
     dbg('file:request served', fileId, 'to', peerJsId)
+
+    // 回传目标：优先找请求者（msg.from）的直连连接；
+    // 找不到（请求经转发到达）则用收到请求的连接，让转发节点继续扩散分片
+    let target = peerJsId
+    if (msg.from && msg.from !== this.identity.peerId) {
+      for (const [id, e] of this.connections) {
+        if (e.peerId === msg.from) {
+          target = id
+          break
+        }
+      }
+    }
 
     // 分片回传给请求者（单播，不广播）
     const CHUNK_SIZE = 60000
@@ -1671,7 +1697,12 @@ export class PeerNetwork extends EventTarget {
         this.identity.privateKey
       )
       this._markProcessed(chunkMsg.id)
-      await this._send(peerJsId, chunkMsg)
+      // 优先单播回传给请求连接；若连接已失效（转发路径/半开连接），
+      // 广播兜底让分片在网络中扩散到请求者（_markProcessed 防重，聚合去重）
+      const sent = await this._send(target, chunkMsg)
+      if (!sent && totalChunks > 1) {
+        await this._broadcast(chunkMsg)
+      }
     }
   }
 
