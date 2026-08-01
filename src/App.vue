@@ -55,6 +55,10 @@ const {
   sendRoomMessage,
   sendFileMessage,
   downloadFile,
+  // Phase 3.1: 消息编辑 / 撤回 / 回应
+  editMessage,
+  recallMessage,
+  reactToMessage,
   searchRooms,
   clearSearch,
   filteredRooms,
@@ -274,6 +278,20 @@ async function onTogglePin(msgId) {
   await togglePin(msgId)
 }
 
+// Phase 3.1: 消息编辑 / 撤回 / 回应
+async function onEditMessage({ msg, text }) {
+  if (!currentRoom.value) return
+  await editMessage(msg, text)
+}
+async function onRecallMessage(msg) {
+  if (!currentRoom.value) return
+  await recallMessage(msg)
+}
+async function onReactMessage({ msgId, emoji, action }) {
+  if (!currentRoom.value) return
+  await reactToMessage(msgId, emoji, action)
+}
+
 // Phase 2.4: 云文档事件
 async function onCreateDoc(title) {
   if (!currentRoom.value) return
@@ -384,6 +402,7 @@ function onLocated(msgId) {
           :docs="currentRoomDocsList"
           :doc-conflicts="docConflicts"
           :locate-msg-id="pendingLocateMsgId"
+          :my-peer-id="state.peerId"
           @send="sendRoomMessage"
           @send-file="sendFileMessage"
           @download="onDownloadFile"
@@ -398,6 +417,9 @@ function onLocated(msgId) {
           @resolve-conflict-remote="onResolveConflictRemote"
           @resolve-conflict-local="onResolveConflictLocal"
           @located="onLocated"
+          @edit-message="onEditMessage"
+          @recall-message="onRecallMessage"
+          @react-message="onReactMessage"
         />
       </div>
       <aside class="content-aside" v-if="currentRoom">

@@ -15,7 +15,9 @@ import {
   IconClose,
   IconAnnounce,
   IconEdit,
-  IconPin
+  IconPin,
+  IconTrash,
+  IconReact
 } from './icons'
 
 const props = defineProps({
@@ -32,7 +34,9 @@ const props = defineProps({
   docs: { type: Array, default: () => [] },
   docConflicts: { type: Map, default: () => new Map() },
   // Phase 2.5: 从搜索结果跳转定位的消息 ID
-  locateMsgId: { type: String, default: '' }
+  locateMsgId: { type: String, default: '' },
+  // Phase 3.1: 当前用户 peerId（用于判断"我的消息"以显示编辑/撤回）
+  myPeerId: { type: String, default: '' }
 })
 
 const emit = defineEmits([
@@ -42,8 +46,74 @@ const emit = defineEmits([
   'create-doc', 'update-doc', 'rename-doc', 'delete-doc',
   'resolve-conflict-remote', 'resolve-conflict-local',
   // Phase 2.5: 定位完成通知（父组件清除 locateMsgId）
-  'located'
+  'located',
+  // Phase 3.1: 消息编辑 / 撤回 / 回应
+  'edit-message', 'recall-message', 'react-message'
 ])
+
+// ---- Phase 3.1: 消息编辑 / 撤回 / 回应 ----
+const RECALL_WINDOW = 5 * 60 * 1000 // 5 分钟撤回时限
+const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
+const editingMsgId = ref(null)
+const editDraft = ref('')
+const reactPickerMsgId = ref(null)
+
+function isOwn(m) {
+  return !!m && m.from === props.myPeerId
+}
+function canRecall(m) {
+  // 仅自己发送 + 未撤回 + 5 分钟内
+  return isOwn(m) && !m.deleted && (Date.now() - (m.timestamp || 0)) <= RECALL_WINDOW
+}
+function startEdit(m) {
+  if (!m.text) return
+  editingMsgId.value = m.id
+  editDraft.value = m.text
+  // 关闭表情选择器，避免叠加
+  reactPickerMsgId.value = null
+}
+function cancelEdit() {
+  editingMsgId.value = null
+  editDraft.value = ''
+}
+function saveEdit(m) {
+  const text = editDraft.value.trim()
+  if (!text) return
+  emit('edit-message', { msg: m, text })
+  editingMsgId.value = null
+  editDraft.value = ''
+}
+function onRecall(m) {
+  emit('recall-message', m)
+}
+function toggleReactPicker(m) {
+  reactPickerMsgId.value = reactPickerMsgId.value === m.id ? null : m.id
+  // 关闭编辑态
+  if (editingMsgId.value === m.id) editingMsgId.value = null
+}
+function myReacted(m, emoji) {
+  const ids = (m.reactions && m.reactions[emoji]) || []
+  return ids.includes(props.myPeerId)
+}
+function reactionList(m) {
+  const r = m.reactions || {}
+  return Object.keys(r).map((emoji) => {
+    const ids = r[emoji] || []
+    return {
+      emoji,
+      count: ids.length,
+      mine: ids.includes(props.myPeerId),
+      title: ids.length + ' 人回应'
+    }
+  })
+}
+function onEmojiClick(m, emoji) {
+  const action = myReacted(m, emoji) ? 'remove' : 'add'
+  emit('react-message', { msgId: m.id, emoji, action })
+  // 选择后关闭选择器
+  if (reactPickerMsgId.value === m.id) reactPickerMsgId.value = null
+}
+
 
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
 const activeTab = ref('chat')
@@ -541,19 +611,70 @@ function escapeHtml(s) {
               <span v-if="isPinnedMsg(m.id)" class="msg-pin-badge" title="已置顶">
                 <IconPin :size="12" />
               </span>
-              <!-- Phase 2.3: hover 显示 Pin 按钮 -->
-              <button
-                class="btn-mini icon-only-btn msg-pin-btn"
-                :title="isPinnedMsg(m.id) ? '取消置顶' : '置顶'"
-                @click="onTogglePin(m.id)"
-              >
-                <IconPin :size="14" />
+              <!-- Phase 3.1: 操作工具条（hover 显示）：置顶 + 编辑 + 撤回 + 回应 -->
+              <span class="msg-actions">
+                <button
+                  class="btn-mini icon-only-btn msg-pin-btn"
+                  :title="isPinnedMsg(m.id) ? '取消置顶' : '置顶'"
+                  @click="onTogglePin(m.id)"
+                >
+                  <IconPin :size="14" />
+                </button>
+                <template v-if="isOwn(m)">
+                  <button
+                    v-if="!m.deleted && m.text"
+                    class="btn-mini icon-only-btn msg-act-btn"
+                    title="编辑"
+                    @click="startEdit(m)"
+                  >
+                    <IconEdit :size="14" />
+                  </button>
+                  <button
+                    v-if="!m.deleted && canRecall(m)"
+                    class="btn-mini icon-only-btn msg-act-btn"
+                    title="撤回（5 分钟内）"
+                    @click="onRecall(m)"
+                  >
+                    <IconTrash :size="14" />
+                  </button>
+                </template>
+                <button
+                  v-if="!m.deleted"
+                  class="btn-mini icon-only-btn msg-act-btn"
+                  title="表情回应"
+                  @click="toggleReactPicker(m)"
+                >
+                  <IconReact :size="14" />
+                </button>
+              </span>
+            </div>
+
+            <!-- 已撤回显示 -->
+            <div v-if="m.deleted" class="msg-recalled">
+              <IconTrash :size="12" />
+              <span>消息已撤回</span>
+            </div>
+            <!-- 编辑态 -->
+            <div v-else-if="editingMsgId === m.id" class="msg-edit-box">
+              <input
+                class="input msg-edit-input"
+                v-model="editDraft"
+                type="text"
+                @keyup.enter="saveEdit(m)"
+                @keyup.esc="cancelEdit"
+                autofocus
+              />
+              <button class="btn-mini primary" title="保存" @click="saveEdit(m)">保存</button>
+              <button class="btn-mini icon-only-btn" title="取消" @click="cancelEdit">
+                <IconClose :size="14" />
               </button>
             </div>
-            <!-- 文本消息 -->
-            <span v-if="m.text" class="msg-text">{{ m.text }}</span>
-            <!-- 文件消息 -->
-            <div v-else-if="m.file" class="msg-file">
+            <!-- 文本内容 -->
+            <template v-else>
+              <span v-if="m.text" class="msg-text">{{ m.text }}</span>
+              <span v-if="m.edited" class="msg-edited-tag" title="已编辑">已编辑</span>
+              <!-- 文件消息 -->
+              <div v-else-if="m.file" class="msg-file">
               <!-- 大文件元信息卡片：仅缩略图/大小，点击下载按需拉取完整内容 -->
               <div v-if="m.file.isMeta" class="file-meta-wrap">
                 <div class="file-meta">
@@ -658,6 +779,31 @@ function escapeHtml(s) {
                   <IconDownload :size="16" />
                 </button>
               </div>
+            </div>
+            </template>
+            <!-- Phase 3.1: 表情回应聚合条 -->
+            <div v-if="!m.deleted && reactionList(m).length" class="msg-reactions">
+              <button
+                v-for="r in reactionList(m)"
+                :key="r.emoji"
+                class="reaction-chip"
+                :class="{ mine: r.mine }"
+                :title="r.title"
+                @click="onEmojiClick(m, r.emoji)"
+              >
+                <span class="reaction-emoji">{{ r.emoji }}</span>
+                <span class="reaction-count">{{ r.count }}</span>
+              </button>
+            </div>
+            <!-- Phase 3.1: 表情选择器 -->
+            <div v-if="reactPickerMsgId === m.id" class="react-picker">
+              <button
+                v-for="e in presetEmojis"
+                :key="e"
+                class="react-picker-emoji"
+                :class="{ active: myReacted(m, e) }"
+                @click="onEmojiClick(m, e)"
+              >{{ e }}</button>
             </div>
           </div>
         </div>
@@ -941,6 +1087,116 @@ function escapeHtml(s) {
 @keyframes pin-highlight {
   0% { background: var(--c-warning-soft); }
   100% { background: transparent; }
+}
+
+/* ===== Phase 3.1: 消息编辑 / 撤回 / 回应 ===== */
+.msg-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.msg:hover .msg-actions {
+  opacity: 1;
+}
+.msg-act-btn {
+  opacity: 0.55;
+  min-height: 26px;
+  min-width: 26px;
+  padding: 2px 4px;
+}
+.msg-act-btn:hover {
+  opacity: 1;
+}
+.msg-edited-tag {
+  margin-left: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  cursor: default;
+  user-select: none;
+}
+.msg-recalled {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+.msg-edit-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.msg-edit-input {
+  flex: 1;
+  min-width: 0;
+}
+.msg-reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.reaction-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev2);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1.4;
+  transition: background 0.12s, border-color 0.12s;
+}
+.reaction-chip:hover {
+  border-color: var(--accent);
+}
+.reaction-chip.mine {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.reaction-emoji {
+  font-size: 14px;
+}
+.reaction-count {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 8px;
+  text-align: center;
+}
+.react-picker {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 4px;
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  width: fit-content;
+}
+.react-picker-emoji {
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.react-picker-emoji:hover {
+  background: var(--bg-elev);
+}
+.react-picker-emoji.active {
+  background: var(--accent-soft);
 }
 
 /* 大文件元信息卡片 */

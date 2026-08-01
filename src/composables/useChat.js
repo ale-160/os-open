@@ -20,6 +20,7 @@ import {
   addMessage,
   hasMessage,
   getMessages,
+  updateMessage,
   getMeta,
   setMeta,
   getAllRooms,
@@ -119,9 +120,18 @@ async function init() {
     domains.value = network.getDomains().map((d) => ({ ...d }))
     wireEvents(network)
 
-    // dev 调试钩子
+    // dev 调试钩子（仅 DEV，生产构建不含）
     if (import.meta.env.DEV) {
-      window.__nchat = { network, state, peers, rooms, messages }
+      window.__nchat = {
+        network, state, peers, rooms, messages,
+        currentRoom, docs, docConflicts,
+        createRoom, joinRoom, searchRooms, switchToRoom, setOwnName,
+    createDoc, updateDoc, renameDoc, deleteDocRemote,
+    resolveDocConflictAcceptRemote, resolveDocConflictKeepLocal,
+    currentRoomDocs,
+    editMessage, recallMessage, reactToMessage,
+    getMessageById: (id) => messages.value.find((m) => m.id === id) || null
+  }
     }
 
     await network.start()
@@ -376,6 +386,20 @@ function wireEvents(net) {
     pushNotification('warning', `文档「${local?.title || '未命名'}」存在版本冲突，对方有更新版本`)
   })
 
+  // Phase 3.1: 消息编辑 / 撤回 / 回应
+  net.addEventListener('message:edit', (e) => {
+    const { room, msgId, newText } = e.detail || {}
+    applyEdit(room, msgId, newText)
+  })
+  net.addEventListener('message:delete', (e) => {
+    const { room, msgId } = e.detail || {}
+    applyDelete(room, msgId)
+  })
+  net.addEventListener('message:react', (e) => {
+    const { room, msgId, emoji, action, from } = e.detail || {}
+    applyReact(room, msgId, emoji, action, from || (network && network.identity.peerId))
+  })
+
   // Phase 2.5: 网络搜索结果聚合
   net.addEventListener('search_result', (e) => {
     const { searchId, results } = e.detail || {}
@@ -460,6 +484,9 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
   if (set.has(chatMsg.id)) return
   set.add(chatMsg.id)
   roomMessageIndex.set(chatMsg.room, set)
+
+  // Phase 3.1: 回填早到的 EDIT/DELETE/REACT 补丁（必须在持久化前，否则库里存的是旧副本）
+  drainPendingPatch(chatMsg)
 
   // 持久化
   try {
@@ -738,6 +765,10 @@ async function joinRoom(name, password) {
 async function loadLocalMessages(name) {
   try {
     const local = await getMessages(name, 0)
+    // Phase 3.1: 从库加载时回填仍在缓冲中的编辑/撤回/回应补丁
+    for (const m of local) {
+      if (drainPendingPatch(m)) updateMessage(m.id, plain(m)).catch(() => {})
+    }
     messages.value = local
     for (const m of local) {
       const set = roomMessageIndex.get(name) || new Set()
@@ -770,6 +801,120 @@ async function sendRoomMessage(text) {
   if (!network || !currentRoom.value || !text.trim()) return
   const ok = await network.sendRoomMessage(currentRoom.value, text.trim())
   if (ok) stats.value.sent++
+}
+
+// ---- Phase 3.1: 消息编辑 / 撤回 / 回应 ----
+
+/**
+ * 未落地补丁缓冲：msgId -> patch。
+ * P2P 下 EDIT/DELETE/REACT 可能先于消息本体到达（历史同步、乱序转发），
+ * 此时目标消息还不在 messages/IndexedDB 中，补丁必须暂存，
+ * 等消息到达（handleChatMessage / 切换房间加载）后再补上，否则会被静默丢弃。
+ */
+const pendingMsgPatches = new Map()
+
+/** 剥离 Vue 响应式 Proxy，得到可写入 IndexedDB 的纯数据。 */
+function plain(v) {
+  try {
+    return JSON.parse(JSON.stringify(v))
+  } catch (e) {
+    return v
+  }
+}
+
+/** 记录补丁（与已有补丁合并），供消息稍后到达时回填。 */
+function stashPatch(msgId, patch) {
+  const prev = pendingMsgPatches.get(msgId) || {}
+  pendingMsgPatches.set(msgId, { ...prev, ...patch })
+}
+
+/** 消息到达后回填暂存补丁。返回是否有补丁被应用。 */
+function drainPendingPatch(msg) {
+  if (!msg || !pendingMsgPatches.has(msg.id)) return false
+  Object.assign(msg, pendingMsgPatches.get(msg.id))
+  pendingMsgPatches.delete(msg.id)
+  return true
+}
+
+/** 统一应用补丁：内存 + IndexedDB；消息不在本地时暂存。 */
+function applyMsgPatch(msgId, patch) {
+  const p = plain(patch)
+  const m = messages.value.find((x) => x.id === msgId)
+  if (m) {
+    Object.assign(m, p)
+    messages.value = [...messages.value]
+  } else {
+    stashPatch(msgId, p)
+  }
+  // 即使当前不在该房间（m 为空），也尝试写库：消息可能已持久化但未加载到内存
+  updateMessage(msgId, p).then((written) => {
+    if (!written) stashPatch(msgId, p)
+  }).catch(() => stashPatch(msgId, p))
+}
+
+/** 本地应用编辑：替换文本 + 标记 edited，并持久化。 */
+function applyEdit(room, msgId, newText) {
+  applyMsgPatch(msgId, {
+    text: newText,
+    edited: true,
+    editedAt: Date.now(),
+    deleted: false // 编辑可恢复被撤回消息
+  })
+}
+
+/** 本地应用撤回：标记 deleted。 */
+function applyDelete(room, msgId) {
+  applyMsgPatch(msgId, { deleted: true, deletedAt: Date.now() })
+}
+
+/** 本地应用表情回应：在消息底部聚合（add/remove），按 peerId 去重。 */
+function applyReact(room, msgId, emoji, action, from) {
+  if (!emoji || !from) return
+  const m = messages.value.find((x) => x.id === msgId)
+  // 基准取内存值，其次取暂存补丁，保证乱序到达时聚合不丢
+  const base = m?.reactions || pendingMsgPatches.get(msgId)?.reactions || {}
+  const reactions = plain(base) || {}
+  const list = new Set(reactions[emoji] || [])
+  if (action === 'remove') list.delete(from)
+  else list.add(from)
+  if (list.size) reactions[emoji] = [...list]
+  else delete reactions[emoji]
+  applyMsgPatch(msgId, { reactions })
+}
+
+/** 编辑自己发送的消息（UI 传入消息对象以取得原发送者/时间戳）。 */
+async function editMessage(msg, newText) {
+  if (!network || !currentRoom.value || !msg) return false
+  const ok = await network.editMessage(
+    currentRoom.value,
+    msg.id,
+    newText,
+    msg.from,
+    msg.timestamp
+  )
+  if (!ok) pushNotification('error', '编辑失败：只能编辑自己发送的消息')
+  return ok
+}
+
+/** 撤回自己发送的消息（限 5 分钟内）。 */
+async function recallMessage(msg) {
+  if (!network || !currentRoom.value || !msg) return false
+  const ok = await network.recallMessage(
+    currentRoom.value,
+    msg.id,
+    msg.from,
+    msg.timestamp
+  )
+  if (!ok) pushNotification('error', '撤回失败：只能撤回自己 5 分钟内发送的消息')
+  return ok
+}
+
+/** 对消息添加/移除表情回应。 */
+async function reactToMessage(msgId, emoji, action = 'add') {
+  if (!network || !currentRoom.value || !msgId) return false
+  const ok = await network.reactToMessage(currentRoom.value, msgId, emoji, action)
+  if (!ok) pushNotification('error', '回应失败')
+  return ok
 }
 
 async function sendFileMessage(file) {
@@ -1113,6 +1258,10 @@ export function useChat() {
     sendRoomMessage,
     sendFileMessage,
     downloadFile,
+    // Phase 3.1: 消息编辑 / 撤回 / 回应
+    editMessage,
+    recallMessage,
+    reactToMessage,
     searchRooms,
     clearSearch,
     // Phase 2.5: 消息搜索

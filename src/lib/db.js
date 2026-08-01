@@ -318,6 +318,56 @@ export async function hasMessage(id) {
   return false
 }
 
+/**
+ * Phase 3.1: 更新已存在消息的字段（编辑/撤回/回应）。
+ * 按 id 读取 → 合并 patch → 写回（IndexedDB 优先，失败回退 localStorage）。
+ * @param {string} id  消息 id
+ * @param {Object} patch  需要更新的字段（如 { edited, text, editedAt } / { deleted } / { reactions }）
+ * @returns {Promise<boolean>}
+ */
+export async function updateMessage(id, patch) {
+  if (!id || !patch) return false
+  // 关键：调用方传来的 patch 可能含 Vue 响应式 Proxy（如 reactions 数组）。
+  // structuredClone 无法克隆 Proxy，IndexedDB put 会抛
+  // "[object Array] could not be cloned"，导致编辑/撤回/回应状态静默丢失。
+  const plainPatch = toPlain(patch)
+  if (!plainPatch) return false
+  const db = await openMessagesDB()
+  if (db) {
+    try {
+      const m = await db.get(IDB_STORE, id)
+      if (m) {
+        const updated = { ...m, ...plainPatch }
+        await db.put(IDB_STORE, updated)
+        return true
+      }
+    } catch (e) {
+      console.warn('[nchat] updateMessage IndexedDB 失败：', e?.message)
+    }
+  }
+  // 回退 localStorage
+  const store = readJSON(KEYS.messages, {})
+  for (const room of Object.keys(store)) {
+    const list = store[room]
+    const idx = list.findIndex((m) => m.id === id)
+    if (idx >= 0) {
+      list[idx] = { ...list[idx], ...plainPatch }
+      writeJSON(KEYS.messages, store)
+      return true
+    }
+  }
+  return false
+}
+
+/** 剥离 Vue 响应式 Proxy / 不可克隆结构，返回可安全写入 IndexedDB 的纯数据。 */
+function toPlain(v) {
+  try {
+    return JSON.parse(JSON.stringify(v))
+  } catch (e) {
+    return null
+  }
+}
+
 // ---- Phase 2.5: 消息全文搜索（本地） ----
 
 /**

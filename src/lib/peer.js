@@ -818,6 +818,7 @@ export class PeerNetwork extends EventTarget {
       peerId: null,
       name: '',
       lastSeen: Date.now(),
+      createdAt: Date.now(),
       status: 'connecting',
       rooms: new Set(),
       helloExchanged: false,
@@ -1475,28 +1476,36 @@ export class PeerNetwork extends EventTarget {
    * @param {string} connKey  连接 key（domainKey/peerJsId）
    * @param {object} msg
    */
-  async _send(connKey, msg) {
+  async _send(connKey, msg, retries = 3) {
     const entry = this.connections.get(connKey)
-    if (!entry || !entry.conn || !entry.conn.open) return false
-    // 防御：PeerJS JSON 通道单条消息上限 16300 字节（chunkedMTU），
-    // 超限消息进入 PeerJS 内部 buffer 后 _tryBuffer() 会无限递归爆栈（CPU 100%）。
-    // 发送前先估算 JSON 大小，超限直接丢弃并告警，绝不让它进 PeerJS 队列。
-    try {
-      const len = JSON.stringify(msg).length
-      if (len >= 16000) {
-        console.warn('[nchat] send blocked: message too big for JSON channel', len, 'bytes, type=', msg?.type)
-        return false
+    if (!entry || !entry.conn) return false
+    // PeerJS 数据通道有"假开"现象：conn.open===true 但底层 WebRTC SCTP transport
+    // 尚未完全就绪，此时 conn.send() 不抛异常但消息被静默丢弃。
+    // 策略：等待 open → 发送 → 若非最后一次重试则短暂等待后重试（给 transport 就绪时间）。
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      // 等待 open（首次或通道重建）
+      while (!entry.conn.open && attempt < retries) {
+        await new Promise((r) => setTimeout(r, 250))
+        // 连接可能在等待期间被关闭/删除
+        if (!this.connections.has(connKey)) return false
       }
-    } catch (e) {
-      /* ignore */
+      if (!entry.conn.open) return false
+      try {
+        const len = JSON.stringify(msg).length
+        if (len >= 16000) {
+          console.warn('[nchat] send blocked: message too big', len, 'bytes')
+          return false
+        }
+        entry.conn.send(msg)
+        // 非末次重试：等待一小段时间，若 transport 未就绪则下次重试会重新尝试
+        if (attempt < retries) await new Promise((r) => setTimeout(r, 350))
+        // 注意：不检查返回值（PeerJS send 返回 void）。若静默丢弃，
+        // 下一次重试时 transport 可能已就绪。
+      } catch (e) {
+        if (attempt < retries) await new Promise((r) => setTimeout(r, 350))
+      }
     }
-    try {
-      entry.conn.send(msg)
-      return true
-    } catch (e) {
-      console.warn('[nchat] send failed:', e?.message)
-      return false
-    }
+    return true
   }
 
   async _sendRaw(connKey, partial, to = '') {
@@ -1519,16 +1528,25 @@ export class PeerNetwork extends EventTarget {
    * @param {string} [to]     to 字段
    */
   async _broadcast(partial, to = '') {
-    const msg = await buildMessage(
-      {
-        type: partial.type,
-        from: this.identity.peerId,
-        to,
-        payload: partial.payload || {},
-        extensions: { ...(partial.extensions || {}), name: this.ownName }
-      },
-      this.identity.privateKey
-    )
+    // 已签名的完整消息：原样广播，绝不重建。
+    // 重建会生成新的 id/timestamp，导致：
+    //   1) 本地存的 msgId 与全网其他节点不一致 —— 所有按 msgId 引用的协议
+    //      （EDIT / DELETE / REACT / PIN / 文件元信息）在对端都定位不到目标消息；
+    //   2) 调用方在广播前做的 _markProcessed(msg.id) 失效（标记的 id 没上过线），
+    //      对端转发回来时会被当作新消息重复处理。
+    const msg =
+      partial && partial.id && partial.signature
+        ? partial
+        : await buildMessage(
+            {
+              type: partial.type,
+              from: this.identity.peerId,
+              to,
+              payload: partial.payload || {},
+              extensions: { ...(partial.extensions || {}), name: this.ownName }
+            },
+            this.identity.privateKey
+          )
     // 跨域去重：按 peerId 选一条在线连接（peerId 未知时按 connKey 全发，hello 后才有 peerId）
     const sent = new Set() // peerId 集合，已发送的 peer 不重复
     const tasks = []
@@ -1737,6 +1755,16 @@ export class PeerNetwork extends EventTarget {
         break
       case MsgType.MSG_SEARCH_RESULT:
         this._onMsgSearchResult(data)
+        break
+      // ---- Phase 3.1: 消息编辑 / 撤回 / 回应 ----
+      case MsgType.EDIT:
+        this._onEdit(data)
+        break
+      case MsgType.DELETE:
+        this._onDelete(data)
+        break
+      case MsgType.REACT:
+        this._onReact(data)
         break
     }
   }
@@ -2976,6 +3004,136 @@ export class PeerNetwork extends EventTarget {
     return true
   }
 
+  // ---------------- Phase 3.1: 消息编辑 / 撤回 / 回应 ----------------
+
+  /**
+   * 编辑自己发送的消息（仅发送者本人可操作；签名校验 from）。
+   * @param {string} room
+   * @param {string} msgId   目标消息 ID
+   * @param {string} newText 新文本
+   * @param {string} originalFrom  原消息发送者 peerId（必须等于本节点，否则本地拒绝）
+   * @param {number} originalTimestamp  原消息时间戳（用于撤回时限校验，编辑不强制）
+   * @returns {Promise<boolean>}
+   */
+  async editMessage(room, msgId, newText, originalFrom, originalTimestamp) {
+    if (!this._localRoomsSet.has(room)) return false
+    // 仅发送者本人可编辑：本地先校验身份
+    if (originalFrom !== this.identity.peerId) {
+      this._emit('error', { type: 'edit_denied', message: '只能编辑自己发送的消息' })
+      return false
+    }
+    const editMsg = await buildMessage(
+      {
+        type: MsgType.EDIT,
+        from: this.identity.peerId,
+        to: room,
+        payload: { room, msgId, newText: String(newText || ''), originalFrom, originalTimestamp },
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(editMsg.id)
+    // 本地立即生效
+    this._emit('message:edit', { room, msgId, newText: editMsg.payload.newText })
+    await this._broadcast(editMsg)
+    return true
+  }
+
+  /**
+   * 撤回自己发送的消息（仅发送者本人 + 5 分钟内）。
+   */
+  async recallMessage(room, msgId, originalFrom, originalTimestamp) {
+    if (!this._localRoomsSet.has(room)) return false
+    if (originalFrom !== this.identity.peerId) {
+      this._emit('error', { type: 'recall_denied', message: '只能撤回自己发送的消息' })
+      return false
+    }
+    // 5 分钟时限
+    if (originalTimestamp && Date.now() - originalTimestamp > 5 * 60 * 1000) {
+      this._emit('error', { type: 'recall_expired', message: '已超过 5 分钟，无法撤回' })
+      return false
+    }
+    const delMsg = await buildMessage(
+      {
+        type: MsgType.DELETE,
+        from: this.identity.peerId,
+        to: room,
+        payload: { room, msgId, originalFrom, originalTimestamp },
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(delMsg.id)
+    this._emit('message:delete', { room, msgId })
+    await this._broadcast(delMsg)
+    return true
+  }
+
+  /**
+   * 表情回应（任意成员可操作，可重复切换）。
+   * @param {string} room
+   * @param {string} msgId
+   * @param {string} emoji
+   * @param {'add'|'remove'} action
+   */
+  async reactToMessage(room, msgId, emoji, action) {
+    if (!this._localRoomsSet.has(room)) return false
+    const reactMsg = await buildMessage(
+      {
+        type: MsgType.REACT,
+        from: this.identity.peerId,
+        to: room,
+        payload: { room, msgId, emoji, action: action || 'add' },
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(reactMsg.id)
+    this._emit('message:react', { room, msgId, emoji, action: reactMsg.payload.action, from: this.identity.peerId })
+    await this._broadcast(reactMsg)
+    return true
+  }
+
+  /** 收到编辑广播：仅原发送者可编辑（签名校验 from === originalFrom） */
+  _onEdit(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { room, msgId, newText, originalFrom } = msg.payload || {}
+    if (!room || !msgId) return
+    // 权限校验：编辑者必须是原消息发送者（from 由签名保证不可伪造）
+    if (msg.from !== originalFrom) {
+      dbg('edit: 非发送者操作被拒', msg.from, originalFrom)
+      return
+    }
+    this._emit('message:edit', { room, msgId, newText })
+    if (msg.from !== this.identity.peerId) this._forward(msg)
+  }
+
+  /** 收到撤回广播：仅原发送者 + 5 分钟内 */
+  _onDelete(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { room, msgId, originalFrom, originalTimestamp } = msg.payload || {}
+    if (!room || !msgId) return
+    if (msg.from !== originalFrom) {
+      dbg('delete: 非发送者操作被拒', msg.from, originalFrom)
+      return
+    }
+    if (originalTimestamp && Date.now() - originalTimestamp > 5 * 60 * 1000) {
+      dbg('delete: 超过 5 分钟时限被拒')
+      return
+    }
+    this._emit('message:delete', { room, msgId })
+    if (msg.from !== this.identity.peerId) this._forward(msg)
+  }
+
+  /** 收到表情回应广播：更新聚合（add/remove） */
+  _onReact(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { room, msgId, emoji, action } = msg.payload || {}
+    if (!room || !msgId || !emoji) return
+    this._emit('message:react', { room, msgId, emoji, action: action || 'add', from: msg.from })
+    if (msg.from !== this.identity.peerId) this._forward(msg)
+  }
+
   /**
    * 发送文件消息
    * @param {string} room 房间名
@@ -3456,6 +3614,7 @@ export class PeerNetwork extends EventTarget {
     this._checkTimer = setInterval(() => {
       try {
         this._checkLiveness()
+        this._pruneZombieConnections()
       } catch (e) {
         /* ignore */
       }
@@ -3556,6 +3715,30 @@ export class PeerNetwork extends EventTarget {
       name: entry.name,
       status: entry.status
     })
+  }
+
+  /**
+   * 清理僵尸连接：无 peerId 且数据通道未 open 的连接（通常是 PeerJS 握手残留）。
+   * 这些连接浪费 _broadcast 迭代带宽，且 conn.send() 会静默失败。
+   * 每 2 秒由 _checkTimer 调用一次。
+   */
+  _pruneZombieConnections() {
+    if (this.connections.size <= 1) return // 单节点无需清理
+    let pruned = 0
+    for (const [connKey, entry] of this.connections) {
+      // 有 peerId 的连接保留（即使暂时 offline，由 _checkLiveness 处理）
+      if (entry.peerId) continue
+      // 数据通道已 open → 可能是正在握手的合法连接，再给一点时间
+      if (entry.conn && entry.conn.open) continue
+      // 无 peerId + 未 open + 存在超过 10s → 僵尸，清理
+      if ((entry.createdAt || 0) < Date.now() - 10000) {
+        try { if (entry.conn) entry.conn.close() } catch (e) { /* ignore */ }
+        this.connections.delete(connKey)
+        this._connKeyByPeerJsId.delete(connKey)
+        pruned++
+      }
+    }
+    if (pruned > 0) dbg('pruned', pruned, 'zombie connections')
   }
 
   // ---------------- 音视频通话（开发测试用） ----------------
