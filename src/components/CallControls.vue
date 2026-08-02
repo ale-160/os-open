@@ -16,10 +16,8 @@ const {
   hangupMediaCall
 } = useChat()
 
-// 移动端（≤860px）默认折叠测试面板，点击标题展开，避免占据聊天区高度
-const panelCollapsed = ref(false)
-const isMobileLayout = typeof window !== 'undefined' && window.innerWidth <= 860
-if (isMobileLayout) panelCollapsed.value = true
+// 开发测试面板：默认折叠（桌面+移动都收），点击标题展开，避免占据聊天区高度
+const panelCollapsed = ref(true)
 function togglePanel() {
   panelCollapsed.value = !panelCollapsed.value
 }
@@ -359,10 +357,10 @@ function hangup() {
 
 .call-error {
   font-size: 12px;
-  color: var(--red);
+  color: var(--c-danger);
   padding: 4px 8px;
   background: rgba(248, 81, 73, 0.12);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
 }
 
 .incoming-call {
@@ -371,7 +369,7 @@ function hangup() {
   gap: 8px;
   padding: 8px;
   background: rgba(47, 129, 247, 0.12);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
 }
 
 .call-text {
@@ -393,7 +391,7 @@ function hangup() {
 
 .preview-box {
   margin-top: 8px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   overflow: hidden;
   border: 1px solid var(--border);
   background: #000;
@@ -415,11 +413,11 @@ function hangup() {
   height: 126px;
   background: #000;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   overflow: hidden;
   z-index: 90;
   cursor: pointer;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-3);
 }
 .mini-video {
   width: 100%;
@@ -517,11 +515,11 @@ function hangup() {
   top: 12px;
   width: 108px;
   height: 152px;
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   overflow: hidden;
   border: 1px solid var(--border);
   background: #000;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-3);
 }
 .full-local-video {
   width: 100%;

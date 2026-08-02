@@ -162,7 +162,7 @@ input {
   opacity: 0.5;
 }
 .meta-error {
-  color: var(--red);
+  color: var(--c-danger);
 }
 .meta-item.signal {
   color: var(--text-dim);
@@ -183,7 +183,7 @@ input {
   box-shadow: 0 0 0 2px var(--c-success-soft);
 }
 .dot.off {
-  background: var(--red);
+  background: var(--c-danger);
 }
 .dot.unstable {
   background: var(--yellow);
@@ -247,7 +247,7 @@ input {
   color: var(--c-white);
 }
 .btn-mini.danger {
-  color: var(--red);
+  color: var(--c-danger);
   border-color: var(--danger-soft);
 }
 .btn-mini.danger:hover {
@@ -723,7 +723,7 @@ input {
   align-items: center;
   gap: 14px;
   color: var(--text-dim);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2);
 }
 .spinner {
   width: 28px;
@@ -813,7 +813,7 @@ input {
   max-width: 420px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2);
   display: flex;
   flex-direction: column;
 }
@@ -1089,7 +1089,7 @@ select.input {
   border-radius: var(--r-sm);
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2);
   cursor: pointer;
   pointer-events: auto;
   font-size: var(--fs-13);
@@ -1109,7 +1109,7 @@ select.input {
   border-color: var(--green);
 }
 .notification.error {
-  border-color: var(--red);
+  border-color: var(--c-danger);
 }
 .notification.info {
   border-color: var(--accent);
@@ -1122,7 +1122,7 @@ select.input {
   color: var(--green);
 }
 .notification.error .notif-icon {
-  color: var(--red);
+  color: var(--c-danger);
 }
 .notification.info .notif-icon {
   color: var(--accent);
@@ -1197,7 +1197,7 @@ select.input {
   color: var(--yellow);
 }
 .diag-value.err {
-  color: var(--red);
+  color: var(--c-danger);
 }
 .diag-value.hint {
   color: var(--text-muted);
@@ -1272,10 +1272,10 @@ select.input {
   flex: 1;
 }
 .form-hint.err {
-  color: var(--red);
+  color: var(--c-danger);
 }
 .btn-link.danger {
-  color: var(--red);
+  color: var(--c-danger);
   align-self: flex-start;
   margin-top: var(--sp-2);
 }
@@ -1605,7 +1605,7 @@ code {
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
   border-left: 3px solid var(--text-dim);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   background: var(--bg-elev);
   transition: border-color 0.2s;
 }
@@ -1705,7 +1705,7 @@ code {
   gap: var(--sp-2);
   padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--r-md);
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }

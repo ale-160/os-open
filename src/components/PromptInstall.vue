@@ -95,10 +95,10 @@ onBeforeUnmount(() => {
   right: 16px;
   background: var(--bg-elev);
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--r-sm);
   padding: 8px 12px;
   z-index: 80;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-2);
   backdrop-filter: blur(8px);
 }
 

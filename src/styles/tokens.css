@@ -44,6 +44,19 @@
   --accent-hover:  var(--c-primary-hover);
   --c-white:       #FFFFFF;
 
+  /* --- 兼容旧 token（历史组件仍引用） --- */
+  --accent-soft: var(--c-primary-soft);
+  --border-strong: rgba(255,255,255,0.14);
+  --c-black: #000000;
+  --c-owner: #FBBF24;
+  --c-owner-soft: rgba(251, 191, 36, 0.12);
+  --c-scrim: rgba(0,0,0,0.5);
+  --danger-soft: var(--c-danger-soft);
+  --green: var(--c-success);
+  --yellow: var(--c-warning);
+  --fs-10: 10px;
+  --fs-22: 22px;
+
   /* --- 毛玻璃 / 半透明 --- */
   --glass-bg:        rgba(26, 26, 32, 0.75);
   --glass-border:    rgba(255, 255, 255, 0.06);

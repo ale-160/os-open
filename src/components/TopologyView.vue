@@ -109,8 +109,8 @@ function statusText(p) {
   color: #b37400;
 }
 .peer-chip.offline {
-  border-color: var(--red);
-  color: var(--red);
+  border-color: var(--c-danger);
+  color: var(--c-danger);
 }
 .peer-name {
   font-weight: 600;
