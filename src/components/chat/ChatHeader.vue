@@ -9,7 +9,8 @@ import {
   IconEdit,
   IconCheck,
   IconClose,
-  IconUser
+  IconUser,
+  IconVoice
 } from '../icons'
 
 const props = defineProps({
@@ -21,9 +22,10 @@ const props = defineProps({
   memberCount: { type: Number, default: 0 },
   inRoom: { type: Boolean, default: false },
   memberOpen: { type: Boolean, default: true },
+  callOpen: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member'])
+const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member', 'toggle-call'])
 
 const showAnnouncement = computed(() => !!props.announcement?.text)
 const editingAnnouncement = ref(false)
@@ -80,11 +82,14 @@ function clearAnn() {
       <button v-if="pinnedMsgIds.length" class="icon-btn" @click="emit('toggle-pin', pinnedMsgIds[0])" title="置顶消息">
         <IconPin :size="18" class="filled" />
       </button>
-      <button v-if="inRoom" class="icon-btn danger" @click="emit('leave')" title="离开房间">
+      <button v-if="inRoom" class="icon-btn danger" @click="emit('leave')" title="退出房间（清除所有聊天记录）">
         <IconLeave :size="18" />
       </button>
       <button class="icon-btn" @click="emit('more')" title="更多">
         <IconMenu :size="20" />
+      </button>
+      <button v-if="inRoom" class="icon-btn" :class="{ active: callOpen }" @click="emit('toggle-call')" :title="callOpen ? '收起音视频通话' : '音视频通话'">
+        <IconVoice :size="18" />
       </button>
       <button v-if="inRoom" class="icon-btn" :class="{ active: memberOpen }" @click="emit('toggle-member')" :title="memberOpen ? '收起成员列表' : '展开成员列表'">
         <IconUser :size="18" />

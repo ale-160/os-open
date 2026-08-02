@@ -106,6 +106,9 @@ function cancelReply() {
   replyingTo.value = null
 }
 
+// 音视频通话面板（标题栏通话按钮控制）
+const callOpen = ref(false)
+
 // ---- 多选模式：批量撤回/删除 ----
 const multiSelect = ref({ active: false, ids: new Set() })
 const selectedIds = computed(() => [...multiSelect.value.ids])
@@ -308,16 +311,18 @@ function onLocated(msgId) {
       :member-count="members.length"
       :in-room="inRoom"
       :member-open="memberOpen"
+      :call-open="callOpen"
       @back="emit('back')"
       @leave="emit('leave')"
       @toggle-member="emit('toggle-member')"
+      @toggle-call="callOpen = !callOpen"
       @set-announcement="emit('set-announcement', $event)"
       @toggle-pin="emit('toggle-pin', $event)"
       @more="() => {}"
     />
 
-    <!-- 音视频通话测试 (开发模式) — 放在 ChatPanel 头部，在桌面/移动都可见 -->
-    <CallControls v-if="members.length > 1" :members="members" />
+    <!-- 音视频通话测试 (开发模式) — 由标题栏通话按钮控制显隐 -->
+    <CallControls v-if="callOpen && members.length > 1" :members="members" />
 
     <!-- Phase 2.4: 云文档视图（群内 tab） -->
     <DocPanel
@@ -405,7 +410,7 @@ function onLocated(msgId) {
       <!-- 输入区 -->
       <MessageInput
         :disabled="!inRoom"
-        placeholder="输入消息，回车发送，Shift+Enter 换行"
+        :placeholder="inRoom ? `发送到 ${currentRoom}` : '输入消息，回车发送，Shift+Enter 换行'"
         :replying-to="replyingTo"
         @send="onSend"
         @file="onSendFile"

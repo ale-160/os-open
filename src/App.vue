@@ -54,6 +54,7 @@ const {
   createRoom,
   joinRoom,
   leaveCurrentRoom,
+  clearRoomData,
   backToRoomList,
   sendRoomMessage,
   sendFileMessage,
@@ -311,6 +312,20 @@ function onNotify({ type = 'error', message } = {}) {
 // Phase 2.4: 当前房间文档列表
 const currentRoomDocsList = computed(() => currentRoomDocs())
 
+// 退出房间：确认后清除该房间所有本地数据（消息/星标/置顶/房间记录等，不可恢复）
+async function onExitRoom() {
+  const room = currentRoom.value
+  if (!room) return
+  if (!confirm(`确定退出「${room}」吗？\n退出将清除该房间的所有聊天记录与保存信息，且不可恢复。`)) return
+  await clearRoomStorage(room)
+  await leaveCurrentRoom()
+}
+
+// 离开房间（仅退出视图，保留数据——移动端返回列表用）
+async function onLeaveRoom() {
+  await leaveCurrentRoom()
+}
+
 async function onSendChat({ text, replyTo } = {}) {
   if (!text) return
   await sendRoomMessage(text, replyTo)
@@ -508,7 +523,7 @@ function onCloseTopology() {
           :locate-msg-id="pendingLocateMsgId"
           :my-peer-id="state.peerId"
           @send="onSendChat"
-          @leave="leaveCurrentRoom"
+          @leave="onExitRoom"
           @back="backToRoomList"
           @send-file="sendFileMessage"
           @download="onDownloadFile"

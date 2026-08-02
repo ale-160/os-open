@@ -1259,6 +1259,21 @@ async function kickMember(room, peerId) {
 /** 清空某房间的本地数据（消息/密码/星标/房间记录） */
 async function clearRoomStorage(room) {
   await clearRoomData(room)
+  // 星标（localStorage）
+  const stars = { ...starredByRoom.value }
+  delete stars[room]
+  starredByRoom.value = stars
+  saveStarred()
+  // 置顶/公告/文档
+  const nextPins = new Map(pins.value)
+  nextPins.delete(room)
+  pins.value = nextPins
+  const nextAnn = new Map(announcements.value)
+  nextAnn.delete(room)
+  announcements.value = nextAnn
+  const nextDocs = new Map(docs.value)
+  nextDocs.delete(room)
+  docs.value = nextDocs
   // 从内存索引移除
   roomMessageIndex.delete(room)
   // 从房间列表移除
@@ -1418,6 +1433,7 @@ export function useChat() {
     createRoom,
     joinRoom,
     leaveCurrentRoom,
+    clearRoomData,
     backToRoomList,
     sendRoomMessage,
     sendFileMessage,

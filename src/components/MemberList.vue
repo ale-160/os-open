@@ -40,6 +40,10 @@ const emit = defineEmits([
 
 const { isDesktop, memberOpen, toggleMember } = useLayout()
 
+// 权限：自己是否为创建者（星标/禁言/踢出仅创建者）；邀请需创建者或星级达标
+const selfIsOwner = computed(() => props.members.find((m) => m.self)?.isOwner ?? false)
+const canInvite = computed(() => props.members.find((m) => m.self)?.canApprove ?? false)
+
 // 本地排序覆盖：peerId -> 手动顺序（仅 owner 操作，本地生效）
 const orderOverride = ref(new Map())
 const orderedMembers = ref([])
@@ -214,11 +218,12 @@ function cancelBan() {
             <span class="member-name">{{ m.name || initial(m.peerId) }}{{ m.self ? ' (你)' : '' }}</span>
             <span class="member-meta">{{ roleLabel(m.isOwner ? 'owner' : 'member') }} · {{ starsLabel(m.stars) }}</span>
           </div>
+          <!-- 操作按钮：默认隐藏，悬停成员项时显示；按权限过滤 -->
           <div class="member-actions" v-if="!m.self">
-            <button class="icon-btn-mini" @click="inviteMember(m)" title="邀请"><IconUserPlus :size="16" /></button>
-            <button class="icon-btn-mini" @click="setStars(m)" title="星标"><IconStar :size="16" :class="{ filled: m.stars > 1 }" /></button>
-            <button class="icon-btn-mini" @click="banMember(m)" title="禁言"><IconMicOff :size="16" /></button>
-            <button class="icon-btn-mini danger" @click="kickMember(m)" title="踢出"><IconUserX :size="16" /></button>
+            <button v-if="canInvite" class="icon-btn-mini" @click="inviteMember(m)" title="邀请"><IconUserPlus :size="16" /></button>
+            <button v-if="selfIsOwner" class="icon-btn-mini" @click="setStars(m)" title="星标"><IconStar :size="16" :class="{ filled: m.stars > 1 }" /></button>
+            <button v-if="selfIsOwner" class="icon-btn-mini" @click="banMember(m)" title="禁言"><IconMicOff :size="16" /></button>
+            <button v-if="selfIsOwner" class="icon-btn-mini danger" @click="kickMember(m)" title="踢出"><IconUserX :size="16" /></button>
           </div>
           <!-- 星标编辑（owner 操作） -->
           <div v-if="starsEditing === m.peerId" class="stars-editor" @click.stop>
@@ -351,7 +356,18 @@ import {
 .member-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .member-name { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-meta { font-size: var(--fs-11); color: var(--text-muted); }
-.member-actions { display: flex; gap: var(--sp-1); }
+.member-actions {
+  display: flex;
+  gap: var(--sp-1);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--t-fast);
+}
+/* 悬停成员项时显示操作按钮 */
+.member-item:hover .member-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
 /* 星标编辑器（成员列表内联，独占一行） */
 .stars-editor {
   width: 100%;
