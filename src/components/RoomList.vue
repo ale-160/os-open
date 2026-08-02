@@ -14,8 +14,8 @@ const props = defineProps({
 
 const emit = defineEmits(['join', 'toggle-fav'])
 
-// 筛选标签：discover=发现, joined=已加入, faved=收藏
-const filterTab = ref('discover')
+// 筛选标签：faved=收藏, joined=已加入, discover=发现
+const filterTab = ref('faved')
 
 // 分页：当前显示的房间数
 const visibleCount = ref(CONFIG.ROOM_PAGE_SIZE)
@@ -102,10 +102,10 @@ function speakIconName(rules) {
     <div class="room-filter-tabs">
       <button
         class="filter-tab"
-        :class="{ active: filterTab === 'discover' }"
-        @click="filterTab = 'discover'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
+        :class="{ active: filterTab === 'faved' }"
+        @click="filterTab = 'faved'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        发现 <span class="tab-count">{{ allCount }}</span>
+        收藏 <span class="tab-count">{{ favedCount }}</span>
       </button>
       <button
         class="filter-tab"
@@ -116,10 +116,10 @@ function speakIconName(rules) {
       </button>
       <button
         class="filter-tab"
-        :class="{ active: filterTab === 'faved' }"
-        @click="filterTab = 'faved'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
+        :class="{ active: filterTab === 'discover' }"
+        @click="filterTab = 'discover'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        收藏 <span class="tab-count">{{ favedCount }}</span>
+        发现 <span class="tab-count">{{ allCount }}</span>
       </button>
     </div>
 
@@ -127,9 +127,9 @@ function speakIconName(rules) {
       <div v-if="!visibleRooms.length" class="empty">
         <p v-if="searching">未找到匹配的房间</p>
         <p v-else-if="filterTab === 'joined'">未加入任何房间</p>
-        <p v-else-if="filterTab === 'saved'">未保存任何房间</p>
+        <p v-else-if="filterTab === 'faved'">未收藏任何房间</p>
         <p v-else>暂未发现房间</p>
-        <p class="sub" v-if="!searching && filterTab === 'all'">点击「创建」发起第一个房间</p>
+        <p class="sub" v-if="!searching && filterTab === 'discover'">点击「创建」发起第一个房间</p>
         <p class="sub" v-else-if="searching">尝试其他关键词或清除搜索</p>
       </div>
       <button
