@@ -40,9 +40,6 @@ import {
   getRoomBans,
   setBan,
   deleteRoomBans,
-  saveOutgoingFile,
-  getOutgoingFiles,
-  deleteOutgoingFile,
   lcanPut,
   lcanGet,
   lcanDelete,
@@ -71,6 +68,13 @@ import {
 } from './lcan.js'
 import { sha256 } from '@noble/hashes/sha2.js'
 import { sign as edSign, verify as edVerify } from './crypto.js'
+import {
+  sendFileMessage,
+  _pushFileChunks,
+  _pushFileChunksToPeer,
+  _onFileChunkBin,
+  _assembleFile
+} from './fileTransfer.js'
 
 const DEBUG = false
 function dbg(...args) {
@@ -94,127 +98,6 @@ const FILE_CHUNK_HEADER_MARGIN = 64
 const PULL_CHUNK_SIZE = 65536
 /** 探测能力缓存 localStorage key */
 const CAP_CACHE_KEY = 'nchat:capability'
-
-/** ArrayBuffer → hex 字符串（用于 sha256 总哈希展示/比对） */
-function bufToHex(buf) {
-  const bytes = buf instanceof Uint8Array ? buf : new Uint8Array(buf)
-  let s = ''
-  for (let i = 0; i < bytes.length; i++) s += bytes[i].toString(16).padStart(2, '0')
-  return s
-}
-
-/** 计算 ArrayBuffer 的 sha256 总哈希（hex 字符串）。安全/非安全上下文通用（noble 纯 JS） */
-function sha256Hex(arrayBuffer) {
-  const bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)
-  return bufToHex(sha256(bytes))
-}
-
-/** 生成图片缩略图（canvas 压缩 JPEG）。为保证 FILE_META 消息不超 PeerJS JSON 通道上限
- *  （16300 字节），缩略图 base64 需控制在 ~12KB 内：优先 240px/q0.6，超限则逐级降尺寸/质量 */
-function makeThumbnail(dataUrl, maxSize = 240) {
-  return new Promise((resolve) => {
-    try {
-      const img = new Image()
-      img.onload = () => {
-        try {
-          // 尺寸/质量降级阶梯：240px/0.6 → 200px/0.5 → 160px/0.45 → 120px/0.4
-          const tiers = [
-            { size: 240, quality: 0.6 },
-            { size: 200, quality: 0.5 },
-            { size: 160, quality: 0.45 },
-            { size: 120, quality: 0.4 }
-          ]
-          for (const tier of tiers) {
-            const scale = Math.min(1, tier.size / Math.max(img.width, img.height))
-            const w = Math.max(1, Math.round(img.width * scale))
-            const h = Math.max(1, Math.round(img.height * scale))
-            const canvas = document.createElement('canvas')
-            canvas.width = w
-            canvas.height = h
-            const ctx = canvas.getContext('2d')
-            ctx.drawImage(img, 0, 0, w, h)
-            const data = canvas.toDataURL('image/jpeg', tier.quality)
-            // base64 字符数 ≈ 字节数 × 1.37，留出消息头开销，阈值取 11000
-            if (data.length <= 11000) {
-              resolve(data)
-              return
-            }
-          }
-          // 全部超限：用最低档再试一次（此时应已足够小，若仍超则返回 null 走非缩略图分支）
-          const scale = Math.min(1, 80 / Math.max(img.width, img.height))
-          const w = Math.max(1, Math.round(img.width * scale))
-          const h = Math.max(1, Math.round(img.height * scale))
-          const canvas = document.createElement('canvas')
-          canvas.width = w
-          canvas.height = h
-          const ctx = canvas.getContext('2d')
-          ctx.drawImage(img, 0, 0, w, h)
-          resolve(canvas.toDataURL('image/jpeg', 0.35))
-        } catch (e) {
-          resolve(null)
-        }
-      }
-      img.onerror = () => resolve(null)
-      img.src = dataUrl
-    } catch (e) {
-      resolve(null)
-    }
-  })
-}
-
-/** 从 Blob/File 生成缩略图（避免 ArrayBuffer→dataUrl 中间转换，直接用 object URL 加载） */
-function makeThumbnailFromBlob(blob, maxSize = 240) {
-  return new Promise((resolve) => {
-    try {
-      const url = URL.createObjectURL(blob)
-      const img = new Image()
-      img.onload = () => {
-        URL.revokeObjectURL(url)
-        try {
-          const tiers = [
-            { size: 240, quality: 0.6 },
-            { size: 200, quality: 0.5 },
-            { size: 160, quality: 0.45 },
-            { size: 120, quality: 0.4 }
-          ]
-          for (const tier of tiers) {
-            const scale = Math.min(1, tier.size / Math.max(img.width, img.height))
-            const w = Math.max(1, Math.round(img.width * scale))
-            const h = Math.max(1, Math.round(img.height * scale))
-            const canvas = document.createElement('canvas')
-            canvas.width = w
-            canvas.height = h
-            const ctx = canvas.getContext('2d')
-            ctx.drawImage(img, 0, 0, w, h)
-            const data = canvas.toDataURL('image/jpeg', tier.quality)
-            if (data.length <= 11000) {
-              resolve(data)
-              return
-            }
-          }
-          const scale = Math.min(1, 80 / Math.max(img.width, img.height))
-          const w = Math.max(1, Math.round(img.width * scale))
-          const h = Math.max(1, Math.round(img.height * scale))
-          const canvas = document.createElement('canvas')
-          canvas.width = w
-          canvas.height = h
-          const ctx = canvas.getContext('2d')
-          ctx.drawImage(img, 0, 0, w, h)
-          resolve(canvas.toDataURL('image/jpeg', 0.35))
-        } catch (e) {
-          resolve(null)
-        }
-      }
-      img.onerror = () => {
-        URL.revokeObjectURL(url)
-        resolve(null)
-      }
-      img.src = url
-    } catch (e) {
-      resolve(null)
-    }
-  })
-}
 
 export class PeerNetwork extends EventTarget {
   /**
@@ -1116,7 +999,7 @@ export class PeerNetwork extends EventTarget {
     // 全部到齐：组装
     if (agg.chunks.size >= agg.total) {
       this._fileChunks.delete(fileId)
-      this._assembleFile(fileId, agg).catch((e) => {
+      _assembleFile(this, fileId, agg).catch((e) => {
         console.warn('[nchat] assemble file failed:', e?.message)
       })
     }
@@ -1130,92 +1013,7 @@ export class PeerNetwork extends EventTarget {
     }
   }
 
-  /**
-   * 组装完整文件：拼接 ArrayBuffer → 验总哈希 → 验签名 → Blob URL → 发射 chat 事件。
-   * 同时缓存到 _outgoingFiles 成为 holder，供其他节点拉取。
-   * @param {string} fileId
-   * @param {{total, chunkSize, totalHashHex, fileSig, from, chunks:Map, meta:object}} agg
-   */
-  async _assembleFile(fileId, agg) {
-    // 拼接 ArrayBuffer
-    const parts = []
-    let totalLen = 0
-    for (let i = 0; i < agg.total; i++) {
-      const p = agg.chunks.get(i)
-      if (!p) {
-        console.warn('[nchat] file assemble: missing chunk', fileId, i)
-        this._emit('file:unavailable', { fileId, from: agg.from })
-        return
-      }
-      parts.push(p)
-      totalLen += p.byteLength
-    }
-    const combined = new Uint8Array(totalLen)
-    let offset = 0
-    for (const p of parts) {
-      combined.set(new Uint8Array(p), offset)
-      offset += p.byteLength
-    }
-
-    // 验总哈希
-    const hashHex = sha256Hex(combined.buffer)
-    if (hashHex !== agg.totalHashHex) {
-      console.warn('[nchat] file hash mismatch, discard', fileId)
-      this._emit('file:unavailable', { fileId, from: agg.from })
-      return
-    }
-    // 验签名（fileId + ':' + totalHashHex，由原始发送者私钥签署）
-    const sigOk = await edVerify(agg.from, agg.fileSig, fileId + ':' + agg.totalHashHex)
-    if (!sigOk) {
-      console.warn('[nchat] file signature invalid, discard', fileId)
-      this._emit('file:unavailable', { fileId, from: agg.from })
-      return
-    }
-
-    // 创建 Blob URL（全程无 base64，零膨胀）
-    const mime = agg.meta.fileType || 'application/octet-stream'
-    const blob = new Blob([combined.buffer], { type: mime })
-    const blobUrl = URL.createObjectURL(blob)
-
-    // 缓存为 holder（发送者离线后，本节点可向其他节点提供该文件）
-    if (!this._outgoingFiles) this._outgoingFiles = new Map()
-    this._outgoingFiles.set(fileId, {
-      room: agg.meta.room,
-      arrayBuffer: combined.buffer,
-      name: agg.meta.fileName,
-      type: agg.meta.fileType,
-      size: agg.meta.fileSize,
-      totalHashHex: agg.totalHashHex,
-      fileSig: agg.fileSig,
-      chunkSize: agg.chunkSize,
-      totalChunks: agg.total,
-      originalFrom: agg.from, // 原始发送者 peerId（fileSig 验签用）
-      isHolder: true
-    })
-    addHolder('file:' + fileId, this.identity.peerId)
-
-    // 发射 chat 事件（替换 meta 卡片为完整内容）
-    this._emit('chat', {
-      id: fileId,
-      room: agg.meta.room,
-      from: agg.meta.from,
-      name: agg.meta.name,
-      file: {
-        name: agg.meta.fileName,
-        type: agg.meta.fileType,
-        size: agg.meta.fileSize,
-        blobUrl,
-        fileId,
-        fromPeerId: agg.from,
-        totalHashHex: agg.totalHashHex,
-        isMeta: false
-      },
-      timestamp: agg.meta.timestamp
-    })
-    dbg('file:assembled', fileId, totalLen, 'bytes')
-  }
-
-  // ---------------- Phase 2.1 能力探测（蛛网高性能文件通道） ----------------
+// ---------------- Phase 2.1 能力探测（蛛网高性能文件通道） ----------------
   /**
    * 探测对端 bin 通道最大可接受分片大小。
    * 优先读 localStorage 缓存（24h 内不重复探测）；否则逐档探测 256KB→128KB→64KB→32KB。
@@ -1702,7 +1500,7 @@ export class PeerNetwork extends EventTarget {
         this._onFileMeta(data)
         break
       case MsgType.FILE_REQUEST:
-        await this._onFileRequest(connKey, data)
+        await _onFileRequest(this, connKey, data)
         // 请求也转发（meta 是转发来的，请求也要能到达发送者，否则间接节点无法下载）
         if (data.from !== this.identity.peerId) {
           this._forward(data)
@@ -3536,80 +3334,6 @@ export class PeerNetwork extends EventTarget {
     // 元信息也转发（让间接连接的节点也能看到文件卡片）
     if (msg.from !== this.identity.peerId) {
       this._forward(msg)
-    }
-  }
-
-  /**
-   * 收到文件下载请求：从本地 ArrayBuffer 缓存按请求者指定的 chunkSize + 分配索引，
-   * 通过 bin 通道回传分片（多源取模分配：每个 holder 只发自己负责的分片）。
-   */
-  async _onFileRequest(peerJsId, msg) {
-    const fileId = msg.payload?.fileId
-    if (!fileId) return
-    if (!this._markProcessed(msg.id)) return
-    const entry = this._outgoingFiles?.get(fileId)
-    if (!entry || !entry.arrayBuffer) {
-      // 本节点曾发送过该文件但缓存已失效（如刷新页面后内存缓存丢失）：
-      // 回发 FILE_UNAVAILABLE，让请求者立即知道原因（而不是静默超时）
-      if (this._sentFileIds.has(fileId) && msg.from !== this.identity.peerId) {
-        await this._sendRaw(peerJsId, {
-          type: MsgType.FILE_UNAVAILABLE,
-          payload: { fileId }
-        }, msg.from)
-      }
-      return
-    }
-
-    // 请求者指定的分片大小（多源统一尺寸，默认 64KB）
-    const chunkSize = msg.payload?.chunkSize || PULL_CHUNK_SIZE
-    const total = Math.ceil(entry.arrayBuffer.byteLength / chunkSize)
-    // 多源取模分配：holder 只发 position, position+modulo, position+2*modulo... 的分片
-    const modulo = msg.payload?.modulo || 1
-    const position = msg.payload?.position || 0
-    const indices = []
-    for (let i = position; i < total; i += modulo) indices.push(i)
-
-    // 回传目标：优先找请求者（msg.from）的直连连接
-    let target = peerJsId
-    if (msg.from && msg.from !== this.identity.peerId) {
-      const ck = this._connKeyForPeerId(msg.from)
-      if (ck) target = ck
-    }
-
-    dbg('file:request served', fileId, 'to', msg.from, 'indices', indices.length, '/', total)
-
-    const { arrayBuffer, totalHashHex, fileSig, name, type, size, room } = entry
-    // from = 原始发送者 peerId（fileSig 验签用；holder 转发时不变）
-    const fromPeerId = entry.originalFrom || this.identity.peerId
-    for (let start = 0; start < indices.length; start += FILE_BIN_CONCURRENCY) {
-      const end = Math.min(start + FILE_BIN_CONCURRENCY, indices.length)
-      const tasks = []
-      for (let k = start; k < end; k++) {
-        const i = indices[k]
-        const offset = i * chunkSize
-        if (offset >= arrayBuffer.byteLength) continue
-        const len = Math.min(chunkSize, arrayBuffer.byteLength - offset)
-        const buf = arrayBuffer.slice(offset, offset + len)
-        tasks.push(
-          this._sendBinary(target, {
-            kind: BinKind.FILE_CHUNK,
-            fileId,
-            index: i,
-            total,
-            chunkSize,
-            totalHashHex,
-            fileSig,
-            from: fromPeerId,
-            fileName: name,
-            fileType: type,
-            fileSize: size,
-            room,
-            name: this.ownName,
-            buf
-          })
-        )
-      }
-      await Promise.all(tasks)
     }
   }
 

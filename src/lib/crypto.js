@@ -16,6 +16,12 @@ import { sha512, sha256 } from '@noble/hashes/sha2.js'
 noble.hashes.sha512 = sha512
 noble.hashes.sha512Async = async (message) => sha512(message)
 
+/** 计算 ArrayBuffer 的 sha256 总哈希（hex 字符串）。安全/非安全上下文通用（noble 纯 JS） */
+export function sha256Hex(arrayBuffer) {
+  const bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)
+  return Array.from(sha256(bytes)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 // ---- Base58 (Bitcoin 字母表) ----
 const BASE58_ALPHABET =
   '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
