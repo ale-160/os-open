@@ -258,6 +258,71 @@ function writeJWK(jwk) {
 
 /** 取 PeerID 的短显示形式（前 6 + … + 后 4） */
 export function shortPeerId(peerId) {
-  if (!peerId || peerId.length <= 12) return peerId || ''
+  if (!peerId) return ''
+  if (peerId.length <= 10) return peerId
   return peerId.slice(0, 6) + '…' + peerId.slice(-4)
+}
+
+// ---- AES-GCM（Phase 3.4 私聊 E2E 用） ----
+/**
+ * 生成 AES-GCM 密钥（AES-GCM 256）。
+ */
+export async function generateAesKey() {
+  return crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  )
+}
+
+/**
+ * 导出 AES 密钥为 raw bytes（用于公钥交换后存储会话密钥）。
+ */
+export async function exportAesKey(key) {
+  const raw = await crypto.subtle.exportKey('raw', key)
+  return base58Encode(new Uint8Array(raw))
+}
+
+/**
+ * 从 raw/base58 导入 AES-GCM 密钥。
+ */
+export async function importAesKey(base58) {
+  const raw = base58Decode(base58)
+  return crypto.subtle.importKey(
+    'raw',
+    raw,
+    { name: 'AES-GCM' },
+    true,
+    ['encrypt', 'decrypt']
+  )
+}
+
+/**
+ * AES-GCM 加密文本（返回 iv + ciphertext base58）。
+ */
+export async function aesGcmEncrypt(key, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    new TextEncoder().encode(text)
+  )
+  return {
+    iv: base58Encode(iv),
+    ciphertext: base58Encode(new Uint8Array(ciphertext))
+  }
+}
+
+/**
+ * AES-GCM 解密文本。
+ */
+export async function aesGcmDecrypt(key, ivB58, ciphertextB58) {
+  const iv = base58Decode(ivB58)
+  const ciphertext = base58Decode(ciphertextB58)
+  const plain = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    ciphertext
+  )
+  return new TextDecoder().decode(plain)
 }

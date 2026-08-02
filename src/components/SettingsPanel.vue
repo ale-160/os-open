@@ -18,7 +18,10 @@ const {
   getCapabilities,
   setCapabilities,
   getRoleStatsInfo,
-  getDomainsInfo
+  getDomainsInfo,
+  // Phase 3.5: 通知
+  setNotificationsEnabled,
+  notificationsEnabled
 } = useChat()
 
 const tab = ref('diagnostics') // diagnostics | signaling | network | role | lan
@@ -65,6 +68,10 @@ async function onSaveRole() {
   } finally {
     roleSaving.value = false
   }
+}
+
+function onNotificationsEnabledChange() {
+  setNotificationsEnabled(notificationsEnabled.value)
 }
 
 /** 根据角色返回存储上限文本 */
@@ -214,6 +221,17 @@ function copyToClipboard(text) {
 
       <!-- 诊断面板 -->
       <div v-if="tab === 'diagnostics'" class="modal-body">
+        <div class="diag-section">
+          <h4>通知</h4>
+          <label class="role-toggle">
+            <input type="checkbox" v-model="notificationsEnabled" @change="onNotificationsEnabledChange" />
+            <span>允许浏览器通知（需授权）</span>
+          </label>
+          <p class="form-hint" v-if="typeof Notification !== 'undefined' && Notification.permission === 'denied'">
+            当前浏览器已禁止通知，请在浏览器地址栏权限中手动允许。
+          </p>
+        </div>
+
         <div class="diag-section">
           <h4>浏览器环境</h4>
           <div class="diag-row">

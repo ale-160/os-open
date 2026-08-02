@@ -16,9 +16,6 @@ const {
   hangupMediaCall
 } = useChat()
 
-// 仅开发环境显示测试通话按钮
-const isDev = import.meta.env.DEV
-
 // 移动端（≤860px）默认折叠测试面板，点击标题展开，避免占据聊天区高度
 const panelCollapsed = ref(false)
 const isMobileLayout = typeof window !== 'undefined' && window.innerWidth <= 860
@@ -211,11 +208,11 @@ function hangup() {
 </script>
 
 <template>
-  <div v-if="isDev">
-    <!-- 未通话时的测试面板（嵌入聊天区，不遮挡；移动端默认折叠） -->
+  <div v-if="otherMembers.length">
+    <!-- 未通话时的通话面板（嵌入聊天区，不遮挡；移动端默认折叠） -->
     <div v-if="!isInCall" class="call-controls">
       <div class="call-toggle" @click="togglePanel">
-        <span class="form-label">测试音视频通话 (开发模式)</span>
+        <span class="form-label">音视频通话</span>
         <span class="call-toggle-arrow">{{ panelCollapsed ? '▸' : '▾' }}</span>
       </div>
       <div v-if="!panelCollapsed" class="call-section">

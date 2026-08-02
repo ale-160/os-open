@@ -11,6 +11,7 @@ import SettingsPanel from './components/SettingsPanel.vue'
 import RoomManager from './components/RoomManager.vue'
 import PromptInstall from './components/PromptInstall.vue'
 import { IconClose, IconLock } from './components/icons'
+import TopologyView from './components/TopologyView.vue'
 
 const {
   state,
@@ -90,7 +91,9 @@ const {
   resetSignalingServers,
   getDiagnosticsInfo,
   // 通知
-  dismissNotification
+  dismissNotification,
+  // Phase 4.2: 拓扑
+  getDomainsInfo
 } = useChat()
 
 // 对话框状态
@@ -98,6 +101,13 @@ const showCreateDialog = ref(false)
 const showSettings = ref(false)
 const showRoomManager = ref(false)
 const installBannerVisible = ref(false)
+const showTopology = ref(false)
+
+// Phase 4.2: 拓扑数据快照
+const topologyDomains = computed(() => getDomainsInfo())
+function onOpenTopology() {
+  showTopology.value = true
+}
 
 // 三栏布局：SideNav 当前激活的导航项（chat/doc/file/search）
 const activeNav = ref('chat')
@@ -361,6 +371,7 @@ function onLocated(msgId) {
       :own-name="state.ownName"
       @nav="activeNav = $event"
       @open-settings="showSettings = true"
+      @open-topology="onOpenTopology"
     />
 
     <ListBar
@@ -516,6 +527,36 @@ function onLocated(msgId) {
 
     <!-- PWA 安装提示 -->
     <PromptInstall @visible="installBannerVisible = $event" />
+
+    <!-- Phase 4.2: 网络拓扑面板 -->
+    <div v-if="showTopology" class="modal-overlay" @click.self="showTopology = false">
+      <div class="modal-card large">
+        <div class="modal-head">
+          <span>网络拓扑</span>
+          <button class="btn-mini icon-only-btn" title="关闭" @click="showTopology = false">
+            <IconClose :size="16" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <TopologyView :domains="topologyDomains" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4.2: 网络拓扑面板 -->
+    <div v-if="showTopology" class="modal-overlay" @click.self="showTopology = false">
+      <div class="modal-card large">
+        <div class="modal-head">
+          <span>网络拓扑</span>
+          <button class="btn-mini icon-only-btn" title="关闭" @click="showTopology = false">
+            <IconClose :size="16" />
+          </button>
+        </div>
+        <div class="modal-body">
+          <TopologyView :domains="topologyDomains" />
+        </div>
+      </div>
+    </div>
 
     <div v-if="state.booting" class="overlay">
       <div class="overlay-card">

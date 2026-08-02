@@ -1766,6 +1766,30 @@ export class PeerNetwork extends EventTarget {
       case MsgType.REACT:
         this._onReact(data)
         break
+      // ---- Phase 3.2: @提及 + 已读回执 ----
+      case MsgType.MENTION:
+        this._onMention(data)
+        break
+      case MsgType.READ_RECEIPT:
+        this._onReadReceipt(data)
+        break
+      // ---- Phase 3.3: 话题 ----
+      case MsgType.THREAD_CREATE:
+        this._onThreadCreate(data)
+        break
+      case MsgType.THREAD_REPLY:
+        this._onThreadReply(data)
+        break
+      // ---- Phase 3.4: 私聊 E2E ----
+      case MsgType.DM_CREATE:
+        this._onDmCreate(data)
+        break
+      case MsgType.DM_MESSAGE:
+        this._onDmMessage(data)
+        break
+      case MsgType.DM_KEY:
+        this._onDmKey(data)
+        break
     }
   }
 
@@ -3132,6 +3156,75 @@ export class PeerNetwork extends EventTarget {
     if (!room || !msgId || !emoji) return
     this._emit('message:react', { room, msgId, emoji, action: action || 'add', from: msg.from })
     if (msg.from !== this.identity.peerId) this._forward(msg)
+  }
+
+  // ---- Phase 3.2: @提及 + 已读回执 ----
+  _onMention(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { room, msgId, mentioned } = msg.payload || {}
+    if (!room || !msgId || !Array.isArray(mentioned)) return
+    this._emit('mention', { room, msgId, mentioned, from: msg.from, name: msg.extensions?.name || msg.from.slice(0, 8) })
+  }
+
+  _onReadReceipt(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { room, msgIds } = msg.payload || {}
+    if (!room || !Array.isArray(msgIds)) return
+    this._emit('read_receipt', { room, msgIds, from: msg.from })
+  }
+
+  // ---- Phase 3.3: 话题 ----
+  _onThreadCreate(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { rootMsgId, room } = msg.payload || {}
+    if (!rootMsgId || !room) return
+    this._emit('thread:create', { rootMsgId, room, from: msg.from })
+  }
+
+  _onThreadReply(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { rootMsgId, msgId, room } = msg.payload || {}
+    if (!rootMsgId || !msgId || !room) return
+    this._emit('thread:reply', {
+      rootMsgId,
+      msgId,
+      room,
+      from: msg.from,
+      text: msg.payload?.text || ''
+    })
+  }
+
+  // ---- Phase 3.4: 私聊 E2E ----
+  _onDmCreate(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { to, pubKey } = msg.payload || {}
+    if (!to || !pubKey) return
+    this._emit('dm:create', { from: msg.from, pubKey })
+  }
+
+  async _onDmMessage(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { to, iv, ciphertext } = msg.payload || {}
+    if (!to || !iv || !ciphertext) return
+    // 尝试用已有会话密钥解密
+    const session = this._dmSessions?.get(msg.from)
+    if (session?.key) {
+      try {
+        const plain = await aesGcmDecrypt(session.key, iv, ciphertext)
+        this._emit('dm:message', { from: msg.from, text: plain, timestamp: Date.now() })
+        return
+      } catch (e) {
+        // 密钥失效，忽略
+      }
+    }
+    // 无会话密钥：无法解密，静默丢弃
+  }
+
+  _onDmKey(msg) {
+    if (!this._markProcessed(msg.id)) return
+    const { to, pubKey } = msg.payload || {}
+    if (!to || !pubKey) return
+    this._emit('dm:key', { from: msg.from, pubKey })
   }
 
   /**

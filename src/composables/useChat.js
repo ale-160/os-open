@@ -173,11 +173,62 @@ function pushNotification(type, text) {
     const idx = notifications.value.findIndex((n) => n.id === id)
     if (idx >= 0) notifications.value.splice(idx, 1)
   }, 5000)
+
+  // Phase 3.5: 浏览器通知（需授权且用户开启）
+  try {
+    if (notificationsEnabled.value && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification('nchat', { body: text, tag: id })
+    }
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// Phase 3.5: 浏览器通知开关（默认开启，持久化到 localStorage）
+function setNotificationsEnabled(next) {
+  notificationsEnabled.value = !!next
+  try {
+    localStorage.setItem('nchat:notifications:enabled', String(!!next))
+  } catch (e) {
+    /* ignore */
+  }
+  // 关闭时不再需要权限；开启时尝试请求权限
+  if (next && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {})
+  }
 }
 
 function dismissNotification(id) {
   const idx = notifications.value.findIndex((n) => n.id === id)
   if (idx >= 0) notifications.value.splice(idx, 1)
+}
+
+// Phase 3.2-3.4: 最小内存状态（后续再持久化）
+const mentions = ref(new Map()) // room -> Set<msgId>
+const readReceipts = ref(new Map()) // room -> Map<msgId, Set<peerId>>
+const threads = ref(new Map()) // rootMsgId -> { room, replies: [] }
+const dmSessions = ref(new Map()) // peerId -> { pubKey, messages: [] }
+function addMention(room, msgId) {
+  const set = mentions.value.get(room) || new Set()
+  set.add(msgId)
+  mentions.value.set(room, set)
+}
+function addReadReceipt(room, msgId, from) {
+  const map = readReceipts.value.get(room) || new Map()
+  const set = map.get(msgId) || new Set()
+  set.add(from)
+  map.set(msgId, set)
+  readReceipts.value.set(room, map)
+}
+function addThreadReply(rootMsgId, reply) {
+  const thread = threads.value.get(rootMsgId) || { room: reply.room, replies: [] }
+  thread.replies.push(reply)
+  threads.value.set(rootMsgId, thread)
+}
+function addDmMessage(peerId, msg) {
+  const session = dmSessions.value.get(peerId) || { pubKey: null, messages: [] }
+  session.messages.push(msg)
+  dmSessions.value.set(peerId, session)
 }
 
 function wireEvents(net) {
@@ -398,6 +449,64 @@ function wireEvents(net) {
   net.addEventListener('message:react', (e) => {
     const { room, msgId, emoji, action, from } = e.detail || {}
     applyReact(room, msgId, emoji, action, from || (network && network.identity.peerId))
+  })
+
+  // Phase 3.2: @提及 + 已读回执
+  net.addEventListener('mention', (e) => {
+    const { room, msgId } = e.detail || {}
+    if (!room || !msgId) return
+    addMention(room, msgId)
+    pushNotification('info', `有人在「${room}」提到了你`)
+  })
+  net.addEventListener('read_receipt', (e) => {
+    const { room, msgIds, from } = e.detail || {}
+    if (!room || !Array.isArray(msgIds)) return
+    for (const msgId of msgIds) {
+      addReadReceipt(room, msgId, from)
+    }
+  })
+
+  // Phase 3.3: 话题
+  net.addEventListener('thread:create', (e) => {
+    const { rootMsgId } = e.detail || {}
+    if (!rootMsgId) return
+  })
+  net.addEventListener('thread:reply', (e) => {
+    const { rootMsgId, text, from } = e.detail || {}
+    if (!rootMsgId || !text) return
+    addThreadReply(rootMsgId, {
+      rootMsgId,
+      text,
+      from,
+      timestamp: Date.now()
+    })
+  })
+
+  // Phase 3.4: 私聊 E2E
+  net.addEventListener('dm:create', (e) => {
+    const { from, pubKey } = e.detail || {}
+    if (!from || !pubKey) return
+    const session = dmSessions.value.get(from) || { pubKey, messages: [] }
+    session.pubKey = pubKey
+    dmSessions.value.set(from, session)
+  })
+  net.addEventListener('dm:message', (e) => {
+    const { from, text, timestamp } = e.detail || {}
+    if (!from || !text) return
+    addDmMessage(from, {
+      from,
+      text,
+      timestamp: timestamp || Date.now(),
+      direction: 'in'
+    })
+    pushNotification('info', `私聊消息：${text.slice(0, 50)}`)
+  })
+  net.addEventListener('dm:key', (e) => {
+    const { from, pubKey } = e.detail || {}
+    if (!from || !pubKey) return
+    const session = dmSessions.value.get(from) || { pubKey, messages: [] }
+    session.pubKey = pubKey
+    dmSessions.value.set(from, session)
   })
 
   // Phase 2.5: 网络搜索结果聚合

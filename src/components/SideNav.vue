@@ -18,8 +18,7 @@ import {
 const props = defineProps({
   activeNav: { type: String, default: 'chat' },
   online: { type: Boolean, default: false },
-  ownName: { type: String, default: '' },
-  showTopology: { type: Boolean, default: false }
+  ownName: { type: String, default: '' }
 })
 
 const emit = defineEmits(['nav', 'open-settings', 'open-topology'])
@@ -75,9 +74,8 @@ function initial(name) {
       </button>
     </div>
 
-    <!-- 拓扑（调试入口，可选） -->
+    <!-- 拓扑（Phase 4.2：默认显示） -->
     <button
-      v-if="showTopology"
       class="nav-icon-btn"
       title="网络拓扑"
       @click="emit('open-topology')"
