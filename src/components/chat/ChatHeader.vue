@@ -10,7 +10,8 @@ import {
   IconCheck,
   IconClose,
   IconUser,
-  IconVoice
+  IconVoice,
+  IconSettings
 } from '../icons'
 
 const props = defineProps({
@@ -25,7 +26,7 @@ const props = defineProps({
   callOpen: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member', 'toggle-call'])
+const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member', 'toggle-call', 'open-settings'])
 
 const showAnnouncement = computed(() => !!props.announcement?.text)
 const editingAnnouncement = ref(false)
@@ -63,7 +64,7 @@ function clearAnn() {
       </div>
     </div>
 
-    <div class="header-center" v-if="showAnnouncement">
+    <div class="header-center" v-if="showAnnouncement || editingAnnouncement">
       <div class="announcement" v-if="!editingAnnouncement">
         <IconAnnounce :size="14" class="announce-icon" />
         <span class="announce-text">{{ announcement.text }}</span>
@@ -85,14 +86,21 @@ function clearAnn() {
       <button v-if="inRoom" class="icon-btn danger" @click="emit('leave')" title="退出房间（清除所有聊天记录）">
         <IconLeave :size="18" />
       </button>
-      <button class="icon-btn" @click="emit('more')" title="更多">
-        <IconMenu :size="20" />
+      <!-- 发布公告（创建者/高星成员）：点开公告编辑器 -->
+      <button v-if="canSetAnnouncement" class="icon-btn" :class="{ active: editingAnnouncement || showAnnouncement }" @click="editingAnnouncement = !editingAnnouncement" :title="editingAnnouncement ? '收起公告编辑' : '发布公告'">
+        <IconAnnounce :size="18" />
       </button>
       <button v-if="inRoom" class="icon-btn" :class="{ active: callOpen }" @click="emit('toggle-call')" :title="callOpen ? '收起音视频通话' : '音视频通话'">
         <IconVoice :size="18" />
       </button>
+      <button class="icon-btn" @click="emit('more')" title="更多">
+        <IconMenu :size="20" />
+      </button>
       <button v-if="inRoom" class="icon-btn" :class="{ active: memberOpen }" @click="emit('toggle-member')" :title="memberOpen ? '收起成员列表' : '展开成员列表'">
         <IconUser :size="18" />
+      </button>
+      <button class="icon-btn" @click="emit('open-settings')" title="设置">
+        <IconSettings :size="18" />
       </button>
     </div>
   </header>

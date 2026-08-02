@@ -60,7 +60,7 @@ const emit = defineEmits([
   // Phase 3.1: 消息编辑 / 撤回 / 回应
   'edit-message', 'recall-message', 'react-message',
   // 通知（多选批量删除无可用项时提示）
-  'notify', 'toggle-star', 'toggle-member'
+  'notify', 'toggle-star', 'toggle-member', 'open-settings'
 ])
 
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
@@ -316,6 +316,7 @@ function onLocated(msgId) {
       @leave="emit('leave')"
       @toggle-member="emit('toggle-member')"
       @toggle-call="callOpen = !callOpen"
+      @open-settings="emit('open-settings')"
       @set-announcement="emit('set-announcement', $event)"
       @toggle-pin="emit('toggle-pin', $event)"
       @more="() => {}"

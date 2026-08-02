@@ -58,6 +58,7 @@ const {
   createRoom,
   joinRoom,
   leaveCurrentRoom,
+  leaveRoomByName,
   clearRoomData,
   backToRoomList,
   sendRoomMessage,
@@ -251,8 +252,10 @@ async function onSwitchRoom(room) {
 }
 
 async function onClearStorage(room) {
-  if (!confirm(`确定清空「${room}」的本地数据？消息历史将被删除。`)) return
+  if (!confirm(`确定清空「${room}」的本地数据并退出房间？消息历史将被删除，房间可再次加入。`)) return
+  // 与退出房间一致：清数据 + 广播离开 + 移除已加入标记
   await clearRoomStorage(room)
+  await leaveRoomByName(room)
 }
 
 async function onDeleteRoom(room) {
@@ -542,6 +545,7 @@ function onCloseTopology() {
           @toggle-pin="onTogglePin"
           @toggle-star="onToggleStar"
           @toggle-member="toggleMember"
+          @open-settings="showSettings = true"
           @notify="onNotify"
           @create-doc="onCreateDoc"
           @update-doc="onUpdateDoc"
@@ -625,6 +629,7 @@ function onCloseTopology() {
       >
         <MemberList
           :members="members"
+          :peers="peers"
           :current-room="currentRoom"
           :can-set-announcement="canSetAnnouncement()"
           :announcement="currentAnnouncement"
@@ -634,6 +639,7 @@ function onCloseTopology() {
           @invite="onInvite"
           @set-stars="onSetStars"
           @set-rules="onSetRoomRules"
+          @set-ban="onSetBan"
           @ban="onSetRoomBan"
           @kick="onKickMember"
         />

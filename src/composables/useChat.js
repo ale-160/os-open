@@ -1018,6 +1018,19 @@ async function leaveCurrentRoom() {
   pendingRequests.value = []
 }
 
+/** 退出指定房间（广播 leave + 移除已加入标记 + 若为当前房间清空视图）——清空数据复用退出逻辑 */
+async function leaveRoomByName(room) {
+  if (!network || !room) return
+  await network.leaveRoom(room)
+  markLeft(room)
+  if (currentRoom.value === room) {
+    currentRoom.value = ''
+    messages.value = []
+    members.value = []
+    pendingRequests.value = []
+  }
+}
+
 /** 仅退出当前房间视图（不清除成员身份/不广播 leave）——移动端返回房间列表用 */
 function backToRoomList() {
   currentRoom.value = ''
@@ -1558,6 +1571,7 @@ export function useChat() {
     createRoom,
     joinRoom,
     leaveCurrentRoom,
+    leaveRoomByName,
     clearRoomData,
     backToRoomList,
     sendRoomMessage,

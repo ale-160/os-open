@@ -22,6 +22,7 @@ import {
 
 const props = defineProps({
   members: { type: Array, default: () => [] },
+  peers: { type: Array, default: () => [] },
   currentRoom: { type: String, default: '' },
   canSetAnnouncement: { type: Boolean, default: false },
   announcement: { type: Object, default: null },
@@ -34,14 +35,16 @@ const emit = defineEmits([
   'invite',
   'set-stars',
   'set-rules',
+  'set-ban',
   'ban',
   'kick'
 ])
 
 const { isDesktop, memberOpen, toggleMember } = useLayout()
 
-// 权限：自己是否为创建者（星标/禁言/踢出仅创建者可操作）
+// 权限：邀请需创建者或星级达标；星标/禁言/踢出仅创建者可操作
 const selfIsOwner = computed(() => props.members.find((m) => m.self)?.isOwner ?? false)
+const canInvite = computed(() => props.members.find((m) => m.self)?.canApprove ?? false)
 
 // 本地排序覆盖：peerId -> 手动顺序（仅 owner 操作，本地生效）
 const orderOverride = ref(new Map())
@@ -133,8 +136,21 @@ function starsLabel(stars) {
   return `${stars || 1}★`
 }
 
+// 邀请弹窗：列出在线且不在本房间的节点
+const inviteOpen = ref(false)
 function inviteMember(member) {
-  emit('invite', member.peerId)
+  inviteOpen.value = true
+}
+const inviteCandidates = computed(() => {
+  const inRoom = new Set(props.members.map((m) => m.peerId))
+  const selfId = props.members.find((m) => m.self)?.peerId
+  return (props.peers || [])
+    .filter((p) => p.peerId && p.peerId !== selfId && !inRoom.has(p.peerId))
+    .map((p) => ({ peerId: p.peerId, name: p.name || p.peerId.slice(0, 8) }))
+})
+function doInvite(peerId) {
+  emit('invite', peerId)
+  inviteOpen.value = false
 }
 
 function setStars(member) {
@@ -142,8 +158,13 @@ function setStars(member) {
   starsInput.value = member.stars || 1
 }
 
+// 禁言编辑：目标成员 + 阈值（星级低于阈值禁言）
+const banTarget = ref(null)
 function banMember(member) {
-  emit('ban', member.peerId)
+  banTarget.value = member.peerId
+  banMode.value = 'personal'
+  banEditing.value = true
+  banInput.value = 0
 }
 
 function kickMember(member) {
@@ -217,11 +238,28 @@ function cancelBan() {
             <span class="member-name">{{ m.name || initial(m.peerId) }}</span>
             <span class="member-meta">{{ roleLabel(m.isOwner ? 'owner' : 'member') }} · {{ starsLabel(m.stars) }}</span>
           </div>
-          <!-- 操作按钮：默认隐藏，悬停成员项时显示；仅创建者可管理（邀请面向待加入者，不在成员列表提供） -->
+          <!-- 操作按钮：默认隐藏，悬停成员项时显示；邀请需创建者或星级达标，管理操作仅创建者 -->
           <div class="member-actions" v-if="!m.self">
+            <button v-if="canInvite" class="icon-btn-mini" @click="inviteMember(m)" title="邀请"><IconUserPlus :size="16" /></button>
             <button v-if="selfIsOwner" class="icon-btn-mini" @click="setStars(m)" title="星标"><IconStar :size="16" :class="{ filled: m.stars > 1 }" /></button>
             <button v-if="selfIsOwner" class="icon-btn-mini" @click="banMember(m)" title="禁言"><IconMicOff :size="16" /></button>
             <button v-if="selfIsOwner" class="icon-btn-mini danger" @click="kickMember(m)" title="踢出"><IconUserX :size="16" /></button>
+          </div>
+          <!-- 禁言编辑（创建者操作）：星级低于阈值的成员禁言 -->
+          <div v-if="banEditing && banMode === 'personal' && banTarget === m.peerId" class="stars-editor" @click.stop>
+            <input
+              type="number"
+              v-model.number="banInput"
+              min="0"
+              max="99"
+              class="stars-input"
+              placeholder="星级阈值"
+              @keydown.enter="commitBan"
+              @keydown.esc="cancelBan"
+              autofocus
+            />
+            <button class="icon-btn-mini primary" @click="commitBan" title="确认"><IconCheck :size="14" /></button>
+            <button class="icon-btn-mini" @click="cancelBan" title="取消"><IconClose :size="14" /></button>
           </div>
           <!-- 星标编辑（owner 操作） -->
           <div v-if="starsEditing === m.peerId" class="stars-editor" @click.stop>
@@ -243,6 +281,22 @@ function cancelBan() {
       </ul>
 
       <div v-if="filteredMembers.length === 0" class="empty-state">暂无成员</div>
+
+      <!-- 邀请弹窗：选择在线节点加入房间 -->
+      <div v-if="inviteOpen" class="invite-panel" @click.stop>
+        <div class="invite-head">
+          <span class="invite-title">邀请加入</span>
+          <button class="icon-btn-mini" @click="inviteOpen = false" title="关闭"><IconX :size="14" /></button>
+        </div>
+        <div v-if="inviteCandidates.length === 0" class="invite-empty">没有可邀请的在线节点</div>
+        <ul v-else class="invite-list">
+          <li v-for="p in inviteCandidates" :key="p.peerId" class="invite-item" @click="doInvite(p.peerId)">
+            <span class="member-avatar sm">{{ initial(p.name) }}</span>
+            <span class="invite-name">{{ p.name }}</span>
+            <button class="icon-btn-mini primary" title="邀请"><IconUserPlus :size="14" /></button>
+          </li>
+        </ul>
+      </div>
     </div>
   </aside>
 </template>
@@ -313,6 +367,39 @@ import {
 }
 
 .member-content { flex: 1; overflow-y: auto; padding: var(--sp-3); }
+
+/* 邀请弹窗 */
+.invite-panel {
+  position: sticky;
+  bottom: 0;
+  margin-top: var(--sp-3);
+  padding: var(--sp-3);
+  background: var(--bg-elev2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-3);
+}
+.invite-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-2);
+}
+.invite-title { font-size: var(--fs-13); font-weight: var(--fw-semibold); color: var(--text); }
+.invite-empty { font-size: var(--fs-12); color: var(--text-muted); padding: var(--sp-2) 0; }
+.invite-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
+.invite-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.invite-item:hover { background: var(--bg-hover); }
+.member-avatar.sm { width: 24px; height: 24px; font-size: var(--fs-11); }
+.invite-name { flex: 1; font-size: var(--fs-13); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* 栏目标题（桌面端） */
 .member-head {
