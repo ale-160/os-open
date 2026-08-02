@@ -42,7 +42,15 @@ export const ICON_NAMES = [
   'plus',
   'user',
   'up',
-  'down'
+  'down',
+  'x',
+  'user-plus',
+  'mic-off',
+  'user-x',
+  'star',
+  'info',
+  'alert',
+  'user-minus'
 ]
 
 /** 工厂：为指定 name 生成一个包装组件，props 透传（size/class 等） */
@@ -84,5 +92,13 @@ export const IconPlus = makeIcon('plus')
 export const IconUser = makeIcon('user')
 export const IconUp = makeIcon('up')
 export const IconDown = makeIcon('down')
+export const IconX = makeIcon('x')
+export const IconUserPlus = makeIcon('user-plus')
+export const IconMicOff = makeIcon('mic-off')
+export const IconUserX = makeIcon('user-x')
+export const IconStar = makeIcon('star')
+export const IconInfo = makeIcon('info')
+export const IconAlert = makeIcon('alert')
+export const IconUserMinus = makeIcon('user-minus')
 
 export default Icon

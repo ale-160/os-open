@@ -29,6 +29,8 @@ export const MsgType = {
   SET_STARS: 'set_stars',
   // 邀请
   INVITE: 'invite',
+  // 踢出成员
+  KICK_MEMBER: 'kick_member',
   // 放逐/屏蔽：广播屏蔽规则更新
   BAN_UPDATE: 'ban_update',
   // 文件传输

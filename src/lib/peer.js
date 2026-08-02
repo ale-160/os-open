@@ -58,8 +58,6 @@ import {
   // Phase 2.5: 消息搜索
   searchMessages as searchMessagesInDB
 } from './db.js'
-// 注：saveOutgoingFile/getOutgoingFiles/deleteOutgoingFile 保留导入以兼容 db.js 导出，
-// Phase 2.1 起文件缓存改为 ArrayBuffer 内存模式，不再走 localStorage 持久化。
 import {
   sha256Key,
   keyToHex,

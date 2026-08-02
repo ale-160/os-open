@@ -1,7 +1,9 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useChat } from './composables/useChat.js'
 import { getRoomPassword } from './lib/db.js'
+import { AccessRule } from './lib/protocol.js'
+import { useLayout } from './composables/useLayout.js'
 import SideNav from './components/SideNav.vue'
 import ListBar from './components/ListBar.vue'
 import ChatPanel from './components/ChatPanel.vue'
@@ -10,7 +12,7 @@ import CreateRoomDialog from './components/CreateRoomDialog.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import RoomManager from './components/RoomManager.vue'
 import PromptInstall from './components/PromptInstall.vue'
-import { IconClose, IconLock } from './components/icons'
+import { IconClose, IconLock, IconInfo, IconCheck, IconAlert } from './components/icons'
 import TopologyView from './components/TopologyView.vue'
 
 const {
@@ -45,8 +47,6 @@ const {
   searchingMessages,
   searchMessagesGlobal,
   clearMessageSearch,
-  AccessRule,
-  SpeakRule,
   init,
   setOwnName,
   createRoom,
@@ -77,6 +77,7 @@ const {
   // 屏蔽/放逐
   setBanRule,
   setRoomBanRule,
+  kickMember,
   // 房间与存储管理
   clearRoomStorage,
   deleteRoomCompletely,
@@ -96,6 +97,20 @@ const {
   getDomainsInfo
 } = useChat()
 
+const {
+  width,
+  sideNavOpen,
+  listBarOpen,
+  memberOpen,
+  isDesktop,
+  isTablet,
+  isMobile,
+  toggleSideNav,
+  toggleListBar,
+  toggleMember,
+  closeAll
+} = useLayout()
+
 // 对话框状态
 const showCreateDialog = ref(false)
 const showSettings = ref(false)
@@ -105,11 +120,8 @@ const showTopology = ref(false)
 
 // Phase 4.2: 拓扑数据快照
 const topologyDomains = computed(() => getDomainsInfo())
-function onOpenTopology() {
-  showTopology.value = true
-}
 
-// 三栏布局：SideNav 当前激活的导航项（chat/doc/file/search）
+// 三栏布局：SideNav 当前激活的导航项（chat/search/settings）
 const activeNav = ref('chat')
 
 // Phase 2.5: 从搜索结果跳转定位的消息 ID（传递给 ChatPanel）
@@ -160,7 +172,6 @@ async function onJoinRoom(room) {
     await joinRoom(r.name)
   } else if (access === AccessRule.INVITE) {
     // 邀请制：需收到邀请才能加入
-    // joinRoom 内部会提示
     await joinRoom(r.name)
   } else {
     await joinRoom(r.name)
@@ -214,6 +225,16 @@ function onSetBan(banBelowStars) {
 
 function onSetRoomBan(banBelowStars) {
   if (currentRoom.value) setRoomBanRule(currentRoom.value, banBelowStars)
+}
+
+// 房间规则设置事件
+function onSetRoomRules(rulesPatch) {
+  if (currentRoom.value) setRoomRules(currentRoom.value, rulesPatch)
+}
+
+// 踢出成员事件
+function onKickMember(peerId) {
+  if (currentRoom.value) kickMember(currentRoom.value, peerId)
 }
 
 // 房间管理事件
@@ -360,47 +381,93 @@ function onLocated(msgId) {
     pendingLocateMsgId.value = ''
   }
 }
+
+// 响应式布局辅助
+const inRoom = computed(() => !!currentRoom.value)
+const memberCount = computed(() => members.value.length)
+
+function onOpenTopology() {
+  showTopology.value = true
+}
+
+function onCloseTopology() {
+  showTopology.value = false
+}
 </script>
 
 <template>
-  <div class="app" :class="{ 'is-booting': state.booting, 'in-room': !!currentRoom }">
-    <!-- 三栏布局：SideNav(64px) | ListBar(280px) | ContentArea(1fr) -->
-    <SideNav
-      :active-nav="activeNav"
-      :online="state.online"
-      :own-name="state.ownName"
-      @nav="activeNav = $event"
-      @open-settings="showSettings = true"
-      @open-topology="onOpenTopology"
+  <div
+    class="app"
+    :class="{
+      'has-member': inRoom && memberOpen && !isDesktop,
+      'sidenav-open': sideNavOpen,
+      'listbar-open': listBarOpen,
+      'member-open': memberOpen
+    }"
+  >
+    <!-- Backdrop for mobile drawers/sheets -->
+    <div
+      v-if="!isDesktop && (sideNavOpen || listBarOpen || memberOpen)"
+      class="drawer-backdrop"
+      @click="closeAll"
     />
 
-    <ListBar
-      :active-nav="activeNav"
-      :state="state"
-      :server-label="currentServerLabel"
-      :online="state.online"
-      :search-keyword="searchKeyword"
-      :rooms="rooms"
-      :filtered-rooms="filteredRooms"
-      :current-room="currentRoom"
-      :searching="!!searchKeyword"
-      :joined-rooms="joinedRooms"
-      :message-search-results="messageSearchResults"
-      :searching-messages="searchingMessages"
-      @rename="setOwnName"
-      @search="searchRooms"
-      @clear="clearSearch"
-      @create="showCreateDialog = true"
-      @join="onJoinRoom"
-      @manage="showRoomManager = true"
-      @msg-search="onMsgSearch"
-      @msg-clear="onMsgClear"
-      @msg-locate="onMsgLocate"
-    />
+    <!-- SideNav: Desktop fixed, Mobile drawer -->
+    <aside
+      v-if="isDesktop || sideNavOpen"
+      class="side-nav"
+      :class="{ drawer: !isDesktop && sideNavOpen, open: sideNavOpen }"
+    >
+      <SideNav
+        :active-nav="activeNav"
+        :online="state.online"
+        :own-name="state.ownName"
+        @nav="activeNav = $event"
+        @open-settings="showSettings = true"
+        @open-topology="onOpenTopology"
+      />
+    </aside>
 
-    <main class="content-area" :class="{ 'install-banner-visible': installBannerVisible, 'has-aside': !!currentRoom }">
+    <!-- ListBar: Desktop fixed, Mobile bottom sheet -->
+    <aside
+      v-if="isDesktop || listBarOpen"
+      class="list-bar"
+      :class="{ sheet: !isDesktop && listBarOpen, open: listBarOpen }"
+    >
+      <ListBar
+        :active-nav="activeNav"
+        :state="state"
+        :server-label="currentServerLabel"
+        :online="state.online"
+        :search-keyword="searchKeyword"
+        :rooms="rooms"
+        :filtered-rooms="filteredRooms"
+        :current-room="currentRoom"
+        :searching="!!searchKeyword"
+        :joined-rooms="joinedRooms"
+        :message-search-results="messageSearchResults"
+        :searching-messages="searchingMessages"
+        @rename="setOwnName"
+        @search="searchRooms"
+        @clear="clearSearch"
+        @create="showCreateDialog = true"
+        @join="onJoinRoom"
+        @manage="showRoomManager = true"
+        @msg-search="onMsgSearch"
+        @msg-clear="onMsgClear"
+        @msg-locate="onMsgLocate"
+      />
+    </aside>
+
+    <!-- Main Content Area -->
+    <main
+      class="content-area"
+      :class="{ 'has-member': inRoom && memberOpen && isDesktop }"
+    >
       <div class="content-main">
+        <!-- ChatPanel / RoomList / Settings / Topology -->
         <ChatPanel
+          v-if="inRoom"
           :current-room="currentRoom"
           :messages="messages"
           :online="state.online"
@@ -415,10 +482,10 @@ function onLocated(msgId) {
           :locate-msg-id="pendingLocateMsgId"
           :my-peer-id="state.peerId"
           @send="sendRoomMessage"
+          @leave="leaveCurrentRoom"
+          @back="backToRoomList"
           @send-file="sendFileMessage"
           @download="onDownloadFile"
-          @back="backToRoomList"
-          @leave="leaveCurrentRoom"
           @set-announcement="onSetAnnouncement"
           @toggle-pin="onTogglePin"
           @create-doc="onCreateDoc"
@@ -432,26 +499,142 @@ function onLocated(msgId) {
           @recall-message="onRecallMessage"
           @react-message="onReactMessage"
         />
+
+        <template v-else-if="activeNav === 'chat'">
+          <div class="chat-empty small">
+            <div class="empty-icon">💬</div>
+            <p>未加入房间</p>
+            <p class="sub">点击左侧「+」创建或加入房间</p>
+          </div>
+        </template>
+
+        <SettingsPanel
+          v-else-if="showSettings"
+          :capabilities="capabilities"
+          :role-stats="roleStats"
+          :domains="topologyDomains"
+          :current-server="currentServerLabel"
+          :own-name="state.ownName"
+          :peer-id="state.peerId"
+          @save-role="onSaveRole"
+          @rename="setOwnName"
+          @add-server="onAddServer"
+          @remove-server="onRemoveServer"
+          @switch-server="onSwitchServer"
+          @reset-servers="onResetServers"
+          @close="showSettings = false"
+        />
+
+        <TopologyView
+          v-else-if="showTopology"
+          :domains="topologyDomains"
+          :peers="peers"
+          :connections="connections"
+          @close="onCloseTopology"
+        />
+
+        <div v-else class="empty-state">
+          <div class="empty-icon">🔍</div>
+          <p>选择左侧功能开始</p>
+        </div>
       </div>
-      <aside class="content-aside" v-if="currentRoom">
+
+      <!-- MemberList: Desktop right column, Mobile right drawer -->
+      <aside
+        v-if="inRoom && (isDesktop || memberOpen)"
+        class="content-aside"
+        :class="{ drawer: !isDesktop && memberOpen, open: memberOpen }"
+      >
         <MemberList
           :members="members"
-          :is-owner="isCurrentUserOwner()"
-          :can-approve="canUserApprove()"
-          :pending-requests="pendingRequests"
-          :room-ban-below="currentRoomBanBelow"
-          :my-ban-below="myBanBelow"
+          :current-room="currentRoom"
+          :can-set-announcement="canSetAnnouncement()"
+          :announcement="currentAnnouncement"
+          :pinned-msg-ids="currentRoomPinnedIds"
+          @set-announcement="onSetAnnouncement"
+          @toggle-pin="onTogglePin"
+          @invite="onInvite"
           @set-stars="onSetStars"
-          @approve="onApprove"
-          @reject="onReject"
-          @set-ban="onSetBan"
-          @set-room-ban="onSetRoomBan"
+          @set-rules="onSetRoomRules"
+          @ban="onSetRoomBan"
+          @kick="onKickMember"
         />
       </aside>
     </main>
 
-    <!-- 通知条 -->
-    <div class="notifications" v-if="notifications.length">
+    <!-- Common Modals/Overlays -->
+    <CreateRoomDialog
+      v-if="showCreateDialog"
+      @close="showCreateDialog = false"
+      @create="onCreateRoom"
+    />
+
+    <PromptInstall @visible="installBannerVisible = $event" />
+
+    <TopologyView
+      v-if="showTopology"
+      :domains="topologyDomains"
+      :peers="peers"
+      :connections="connections"
+      @close="onCloseTopology"
+    />
+
+    <RoomManager
+      v-if="showRoomManager"
+      :rooms="rooms"
+      :current-room="currentRoom"
+      :own-peer-id="state.peerId"
+      :is-owner="isCurrentUserOwner"
+      @switch="onSwitchRoom"
+      @clear="onClearStorage"
+      @delete="onDeleteRoom"
+      @close="showRoomManager = false"
+    />
+
+    <SettingsPanel
+      v-if="showSettings"
+      :capabilities="capabilities"
+      :role-stats="roleStats"
+      :domains="topologyDomains"
+      :current-server="currentServerLabel"
+      :own-name="state.ownName"
+      :peer-id="state.peerId"
+      @save-role="onSaveRole"
+      @rename="setOwnName"
+      @add-server="onAddServer"
+      @remove-server="onRemoveServer"
+      @switch-server="onSwitchServer"
+      @reset-servers="onResetServers"
+      @close="showSettings = false"
+    />
+
+    <!-- Password Prompt Modal -->
+    <div v-if="passwordPrompt" class="modal-overlay" @click.self="passwordPrompt = null">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 class="modal-title">加入房间「{{ passwordPrompt.name }}」</h3>
+          <button class="modal-close" @click="passwordPrompt = null"><IconClose :size="20" /></button>
+        </div>
+        <div class="modal-body">
+          <p style="margin: 0 0 var(--sp-3); color: var(--text-dim);">该房间需要密码</p>
+          <input
+            v-model="passwordInput"
+            type="password"
+            class="form-input"
+            placeholder="输入密码"
+            @keydown.enter="onJoinWithPassword"
+            autofocus
+          />
+        </div>
+        <div class="modal-footer">
+          <button class="btn" @click="passwordPrompt = null">取消</button>
+          <button class="btn primary" @click="onJoinWithPassword">加入</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications Toast -->
+    <div class="notifications" aria-live="polite" aria-atomic="true">
       <div
         v-for="n in notifications"
         :key="n.id"
@@ -459,111 +642,81 @@ function onLocated(msgId) {
         :class="n.type"
         @click="dismissNotification(n.id)"
       >
-        <span class="notif-icon">
-          {{ n.type === 'success' ? '✓' : n.type === 'error' ? '✗' : 'ℹ' }}
-        </span>
-        <span class="notif-text">{{ n.text }}</span>
-      </div>
-    </div>
-
-    <!-- 创建房间对话框 -->
-    <CreateRoomDialog
-      v-if="showCreateDialog"
-      @create="onCreateRoom"
-      @close="showCreateDialog = false"
-    />
-
-    <!-- 设置与诊断面板 -->
-    <SettingsPanel
-      v-if="showSettings"
-      @close="showSettings = false"
-      @add-server="onAddServer"
-      @remove-server="onRemoveServer"
-      @switch-server="onSwitchServer"
-      @reset-servers="onResetServers"
-    />
-
-    <!-- 房间与存储管理 -->
-    <RoomManager
-      v-if="showRoomManager"
-      :rooms="rooms"
-      :joined-rooms="joinedRooms"
-      :current-room="currentRoom"
-      :storage-stats="storageStats"
-      @close="showRoomManager = false"
-      @switch="onSwitchRoom"
-      @clear-storage="onClearStorage"
-      @delete-room="onDeleteRoom"
-    />
-
-    <!-- 密码输入对话框 -->
-    <div v-if="passwordPrompt" class="modal-overlay" @click.self="passwordPrompt = null">
-      <div class="modal-card small">
-        <div class="modal-head">
-          <span>加入「{{ passwordPrompt.name }}」</span>
-          <button class="btn-mini icon-only-btn" title="关闭" @click="passwordPrompt = null">
-            <IconClose :size="16" />
-          </button>
+        <div class="notification-icon">
+          <IconInfo v-if="n.type === 'info'" :size="20" />
+          <IconCheck v-if="n.type === 'success'" :size="20" />
+          <IconAlert v-if="n.type === 'warning'" :size="20" />
+          <IconAlert v-if="n.type === 'error'" :size="20" />
         </div>
-        <div class="modal-body">
-          <p class="form-hint"><IconLock :size="14" /> 该房间需要密码</p>
-          <input
-            class="input"
-            v-model="passwordInput"
-            type="password"
-            placeholder="输入房间密码"
-            @keyup.enter="onJoinWithPassword"
-            autofocus
-          />
+        <div class="notification-content">
+          <div class="notification-text">{{ n.text }}</div>
         </div>
-        <div class="modal-foot">
-          <button class="btn" @click="passwordPrompt = null">取消</button>
-          <button class="btn primary" @click="onJoinWithPassword" :disabled="!passwordInput">
-            加入
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- PWA 安装提示 -->
-    <PromptInstall @visible="installBannerVisible = $event" />
-
-    <!-- Phase 4.2: 网络拓扑面板 -->
-    <div v-if="showTopology" class="modal-overlay" @click.self="showTopology = false">
-      <div class="modal-card large">
-        <div class="modal-head">
-          <span>网络拓扑</span>
-          <button class="btn-mini icon-only-btn" title="关闭" @click="showTopology = false">
-            <IconClose :size="16" />
-          </button>
-        </div>
-        <div class="modal-body">
-          <TopologyView :domains="topologyDomains" />
-        </div>
-      </div>
-    </div>
-
-    <!-- Phase 4.2: 网络拓扑面板 -->
-    <div v-if="showTopology" class="modal-overlay" @click.self="showTopology = false">
-      <div class="modal-card large">
-        <div class="modal-head">
-          <span>网络拓扑</span>
-          <button class="btn-mini icon-only-btn" title="关闭" @click="showTopology = false">
-            <IconClose :size="16" />
-          </button>
-        </div>
-        <div class="modal-body">
-          <TopologyView :domains="topologyDomains" />
-        </div>
-      </div>
-    </div>
-
-    <div v-if="state.booting" class="overlay">
-      <div class="overlay-card">
-        <div class="spinner"></div>
-        <div>正在建立 P2P 身份与信令连接…</div>
-        <div class="overlay-sub" v-if="state.error">{{ state.error }}</div>
+        <button class="notification-close" @click.stop="dismissNotification(n.id)"><IconClose :size="16" /></button>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Scoped styles for App-level overlays only */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+  animation: fadeIn var(--t-fast) var(--ease-out);
+}
+.modal-card {
+  background: var(--bg-elev);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-4);
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: scaleIn var(--t-base) var(--ease-out);
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-4) var(--sp-5);
+  border-bottom: 1px solid var(--border-soft);
+}
+.modal-title { font-size: var(--fs-16); font-weight: var(--fw-semibold); color: var(--text); }
+.modal-close { width: 32px; height: 32px; border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim); transition: background var(--t-fast), color var(--t-fast); }
+.modal-close:hover { background: var(--bg-hover); color: var(--text); }
+.modal-body { flex: 1; overflow-y: auto; padding: var(--sp-4) var(--sp-5); }
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-5);
+  border-top: 1px solid var(--border-soft);
+}
+.form-input {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: var(--fs-13);
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.form-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--c-primary-soft);
+  outline: none;
+}
+</style>

@@ -15,7 +15,7 @@
 import { reactive, ref, shallowRef, readonly, computed } from 'vue'
 import { loadOrCreateIdentity } from '../lib/crypto.js'
 import { PeerNetwork } from '../lib/peer.js'
-import { AccessRule, SpeakRule, NodeRole, DEFAULT_CAPABILITIES } from '../lib/protocol.js'
+import { AccessRule, SpeakRule, NodeRole, DEFAULT_CAPABILITIES, MsgType } from '../lib/protocol.js'
 import {
   addMessage,
   hasMessage,
@@ -694,7 +694,6 @@ function canUserApprove() {
   return network._getMyStars(room) >= threshold
 }
 
-/** Phase 2.2: 当前用户是否有权发布公告（owner 或星标 ≥ 50） */
 function canSetAnnouncement() {
   const room = currentRoom.value
   if (!room || !network) return false
@@ -1200,6 +1199,28 @@ async function setRoomBanRule(room, banBelowStars) {
   return await network.setRoomBanRule(room, banBelowStars)
 }
 
+// 踢出成员（仅 owner）
+async function kickMember(room, peerId) {
+  if (!network) return false
+  const known = network.knownRooms?.get?.(room)
+  const meta = network._localRoomMeta?.get?.(room)
+  const owner = meta?.owner || known?.owner
+  if (owner !== network.identity?.peerId) return false
+  if (peerId === network.identity?.peerId) return false
+  // 从本地移除
+  if (network._removeMember) {
+    network._removeMember(room, peerId)
+  }
+  // 广播踢出消息
+  await network._broadcast({
+    type: MsgType.KICK_MEMBER,
+    payload: { room, peerId }
+  })
+  network._recomputeRooms?.()
+  network._emit?.('member:update', { room })
+  return true
+}
+
 // ---------------- 房间与存储管理 ----------------
 /** 清空某房间的本地数据（消息/密码/星标/房间记录） */
 async function clearRoomStorage(room) {
@@ -1406,6 +1427,7 @@ export function useChat() {
     // 屏蔽/放逐
     setBanRule,
     setRoomBanRule,
+    kickMember,
     // 房间与存储管理
     clearRoomStorage,
     deleteRoomCompletely,

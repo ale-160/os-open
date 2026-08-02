@@ -1,64 +1,83 @@
-/**
- * nchat 设计 Token
- *
- * 统一色板 / 字号 / 间距 / 圆角 / 阴影，所有组件应仅引用 var(--*)，
- * 禁止在组件 CSS 中再出现硬编码的 #hex。
- *
- * 色板（与计划 §4.2 对齐）：
- *   primary #2F81F7  / success #2ECC71 / warning #F5B041 / danger #F85149
- *   灰阶 12 级（g00 最深 → g11 最浅）
- */
+/* ===== nchat Design Tokens ===== */
+/* 单一事实来源：所有组件仅引用 var(--*) */
+
 :root {
-  /* ===== 品牌色 ===== */
-  --c-primary: #2f81f7;
-  --c-primary-hover: #4493f8;
-  --c-primary-soft: rgba(47, 129, 247, 0.12);
-  --c-success: #2ecc71;
-  --c-success-soft: rgba(46, 204, 113, 0.14);
-  --c-warning: #f5b041;
-  --c-warning-soft: rgba(245, 176, 65, 0.14);
-  --c-danger: #f85149;
-  --c-danger-soft: rgba(248, 81, 73, 0.12);
-  --c-owner: #f5a623; /* 房主星标色（沿用既有视觉，区别于 warning） */
-  --c-owner-soft: rgba(245, 166, 35, 0.18);
-  --c-white: #ffffff;
-  --c-black: #000000;
-  /* 半透明遮罩（用于 overlay/modal 背景）*/
-  --c-scrim: rgba(13, 17, 23, 0.7);
+  /* --- Color: Brand --- */
+  --c-primary: #4F8CFF;
+  --c-primary-hover: #6AA1FF;
+  --c-primary-soft: rgba(79, 140, 255, 0.12);
+  --c-primary-strong: rgba(79, 140, 255, 0.20);
 
-  /* ===== 灰阶 12 级（g00 最深 → g11 最浅）===== */
-  --c-g00: #0d1117; /* 应用底色 */
-  --c-g01: #11161d;
-  --c-g02: #161b22; /* 侧栏 / 头部 */
-  --c-g03: #1c232c; /* 输入框 / 浮层 */
-  --c-g04: #21262d; /* hover */
-  --c-g05: #2a3038;
-  --c-g06: #30363d; /* 主边框 */
-  --c-g07: #3a434d;
-  --c-g08: #6e7681; /* 弱化文本 */
-  --c-g09: #8b949e; /* 次级文本 */
-  --c-g10: #c2c8d0;
-  --c-g11: #e6edf3; /* 主文本 */
+  /* --- Color: Semantic --- */
+  --c-success: #34D399;
+  --c-success-soft: rgba(52, 211, 153, 0.12);
+  --c-warning: #FBBF24;
+  --c-warning-soft: rgba(251, 191, 36, 0.12);
+  --c-danger: #F87171;
+  --c-danger-soft: rgba(248, 113, 113, 0.12);
 
-  /* ===== 语义别名（兼容既有命名，指向灰阶）===== */
-  --bg: var(--c-g00);
-  --bg-elev: var(--c-g02);
-  --bg-elev2: var(--c-g03);
-  --bg-hover: var(--c-g04);
-  --border: var(--c-g06);
-  --border-soft: var(--c-g04);
-  --text: var(--c-g11);
-  --text-dim: var(--c-g09);
-  --text-muted: var(--c-g08);
-  --accent: var(--c-primary);
-  --accent-hover: var(--c-primary-hover);
-  --accent-soft: var(--c-primary-soft);
-  --green: var(--c-success);
-  --yellow: var(--c-warning);
-  --red: var(--c-danger);
-  --danger-soft: var(--c-danger-soft);
+  /* --- Color: Neutral (Tailwind Gray) --- */
+  --c-neutral-50:  #FAFAFA;
+  --c-neutral-100: #F5F5F5;
+  --c-neutral-200: #E5E5E5;
+  --c-neutral-300: #D4D4D4;
+  --c-neutral-400: #A3A3A3;
+  --c-neutral-500: #737373;
+  --c-neutral-600: #525252;
+  --c-neutral-700: #404040;
+  --c-neutral-800: #262626;
+  --c-neutral-900: #171717;
+  --c-neutral-950: #0A0A0A;
 
-  /* ===== 字号（11-22）===== */
+  /* --- Color: Surface (多级抬升) --- */
+  --bg:            #111115;   /* 主背景 */
+  --bg-elev:       #1A1A20;  /* 一级：侧栏、头栏、底栏 */
+  --bg-elev2:      #24242B;  /* 二级：卡片、气泡 */
+  --bg-hover:      rgba(255,255,255,0.05);
+  --bg-input:      #1E1E24;
+  --text:          #E4E4E7;
+  --text-dim:      #A1A1AA;
+  --text-muted:    #71717A;
+  --border:        rgba(255,255,255,0.08);
+  --border-soft:   rgba(255,255,255,0.05);
+  --accent:        var(--c-primary);
+  --accent-hover:  var(--c-primary-hover);
+  --c-white:       #FFFFFF;
+
+  /* --- 毛玻璃 / 半透明 --- */
+  --glass-bg:        rgba(26, 26, 32, 0.75);
+  --glass-border:    rgba(255, 255, 255, 0.06);
+  --glass-blur:      12px;
+  --glass-saturate:  1.2;
+
+  /* --- Spacing --- */
+  --sp-0: 0;
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+  --sp-12: 48px;
+
+  /* --- Radius --- */
+  --r-none: 0;
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 24px;
+  --r-full: 9999px;
+
+  /* --- Shadow --- */
+  --shadow-1: 0 1px 2px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-2: 0 4px 6px rgba(0,0,0,0.3), 0 2px 4px rgba(0,0,0,0.2);
+  --shadow-3: 0 10px 15px rgba(0,0,0,0.3), 0 4px 6px rgba(0,0,0,0.2);
+  --shadow-4: 0 20px 25px rgba(0,0,0,0.4), 0 10px 10px rgba(0,0,0,0.2);
+
+  /* --- Typography --- */
   --fs-11: 11px;
   --fs-12: 12px;
   --fs-13: 13px;
@@ -67,34 +86,38 @@
   --fs-16: 16px;
   --fs-18: 18px;
   --fs-20: 20px;
-  --fs-22: 22px;
+  --fs-24: 24px;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --lh-tight: 1.3;
+  --lh-normal: 1.5;
+  --lh-relaxed: 1.6;
 
-  /* ===== 间距（4-32，4 的倍数）===== */
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 20px;
-  --sp-6: 24px;
-  --sp-8: 32px;
+  /* --- Transition --- */
+  --t-fast: 100ms;
+  --t-base: 150ms;
+  --t-slow: 200ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
-  /* ===== 圆角（4-16）===== */
-  --r-xs: 4px;
-  --r-sm: 6px;
-  --r-md: 8px;
-  --r-lg: 12px;
-  --r-xl: 16px;
-  --r-pill: 999px;
+  /* --- Z-index --- */
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-drawer: 300;
+  --z-sheet: 400;
+  --z-modal: 500;
+  --z-toast: 600;
+  --z-tooltip: 700;
 
-  /* ===== 阴影 3 档 ===== */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  /* --- Breakpoints --- */
+  --bp-xs: 375px;
+  --bp-sm: 640px;
+  --bp-md: 860px;
+  --bp-lg: 1200px;
+  --bp-xl: 1600px;
 
-  /* 兼容旧用法 */
-  --radius: var(--r-md);
-  --shadow: var(--shadow-lg);
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
+  /* --- Safe Area --- */
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
