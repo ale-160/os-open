@@ -65,6 +65,7 @@ function onClick() {
 
 // PC hover：进入立即显示，离开 400ms 后才隐藏（给用户留出移动到操作条的时间）
 function onMouseEnter() {
+  if (props.msg.deleted) return
   clearTimeout(hideTimer)
   showActions.value = true
 }
@@ -211,9 +212,19 @@ function escapeHtml(s) {
     <div v-if="multiSelect" class="msg-select" :class="{ checked: selected }" @click.stop="emit('toggle-select', msg.id)">
       <IconCheck v-if="selected" :size="12" />
     </div>
+    <!-- 已撤回：纯文本记录，无气泡样式、无功能键 -->
+    <template v-if="msg.deleted">
+      <div class="msg-deleted-line">
+        <IconTrash :size="12" />
+        <span>消息已撤回</span>
+      </div>
+    </template>
+
+    <template v-else>
     <div class="msg-header">
       <span class="msg-name" v-if="!isOwn">{{ msg.name || msg.from.slice(0, 8) }}</span>
       <span class="msg-time">{{ formatTime(msg.timestamp) }}</span>
+      <span v-if="msg.edited" class="msg-edited" :title="'最后编辑于 ' + formatTime(msg.editedAt)">（已编辑）</span>
       <span v-if="msg.status" class="msg-status">{{ msg.status }}</span>
       <span v-if="isStarred" class="star-badge" title="已标记"><IconStar :size="12" class="filled" /></span>
     </div>
@@ -327,18 +338,12 @@ function escapeHtml(s) {
           <button class="btn-mini icon-only-btn" title="下载" @click="downloadFile(msg.file)">
             <IconDownload :size="16" />
           </button>
-        </div>
-      </div>
+          </div>
+          </div>
+          </div>
 
-      <!-- 撤回/删除占位 -->
-      <div v-else-if="msg.deleted" class="msg-recalled">
-        <IconTrash :size="12" />
-        <span>消息已撤回</span>
-      </div>
-    </div>
-
-    <!-- 底部：回应徽章常显；操作键 PC 悬停 / 移动端长按显示 -->
-    <div class="msg-footer" @click.stop>
+          <!-- 底部：回应徽章常显；操作键 PC 悬停 / 移动端长按显示 -->
+          <div class="msg-footer" @click.stop>
       <div class="reactions" v-if="reactionList.length">
         <span
           v-for="r in reactionList"
@@ -404,6 +409,7 @@ function escapeHtml(s) {
         </button>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -470,7 +476,25 @@ function escapeHtml(s) {
   background: var(--bg-elev2);
 }
 .message.deleted {
-  opacity: 0.5;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  align-self: center;
+  padding: var(--sp-1) var(--sp-2);
+  opacity: 1;
+  cursor: default;
+}
+.message.deleted:hover { box-shadow: none; }
+/* 已撤回纯文本记录 */
+.msg-deleted-line {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-12);
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 .msg-header {
   display: flex;
@@ -480,6 +504,13 @@ function escapeHtml(s) {
   color: var(--text-muted);
 }
 .msg-time { white-space: nowrap; }
+.msg-edited {
+  font-size: var(--fs-11);
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  cursor: help;
+}
 .star-badge {
   display: inline-flex;
   align-items: center;
@@ -576,14 +607,6 @@ function escapeHtml(s) {
 .file-image-link .file-image { max-width: 100%; max-height: 40vh; object-fit: contain; border-radius: var(--r-sm); }
 .file-video { max-width: 100%; max-height: 50vh; border-radius: var(--r-sm); }
 .file-audio { width: 100%; }
-.msg-recalled {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  font-size: var(--fs-13);
-  color: var(--text-muted);
-  font-style: italic;
-}
 .msg-footer {
   display: flex;
   align-items: center;
