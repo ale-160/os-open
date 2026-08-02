@@ -29,7 +29,7 @@ const props = defineProps({
   selected: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select'])
+const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select', 'retry-message'])
 
 const reactPicker = ref(false)
 const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
@@ -224,6 +224,9 @@ function escapeHtml(s) {
     <div class="msg-header">
       <span class="msg-name" v-if="!isOwn">{{ msg.name || msg.from.slice(0, 8) }}</span>
       <span class="msg-time">{{ formatTime(msg.timestamp) }}</span>
+      <span v-if="msg.delivery === 'sending'" class="msg-delivery sending" title="发送中">⏳</span>
+      <span v-else-if="msg.delivery === 'sent'" class="msg-delivery sent" title="已送达">✓</span>
+      <span v-else-if="msg.delivery === 'failed'" class="msg-delivery failed" title="发送失败，点击重发" @click.stop="emit('retry-message', msg.id)">⚠️</span>
       <span v-if="msg.edited" class="msg-edited" :title="'最后编辑于 ' + formatTime(msg.editedAt)">（已编辑）</span>
       <span v-if="msg.status" class="msg-status">{{ msg.status }}</span>
       <span v-if="isStarred" class="star-badge" title="已标记"><IconStar :size="12" class="filled" /></span>
@@ -504,6 +507,10 @@ function escapeHtml(s) {
   color: var(--text-muted);
 }
 .msg-time { white-space: nowrap; }
+.msg-delivery { font-size: var(--fs-11); white-space: nowrap; }
+.msg-delivery.sending { color: var(--text-muted); }
+.msg-delivery.sent { color: var(--c-success); }
+.msg-delivery.failed { color: var(--c-danger); cursor: pointer; }
 .msg-edited {
   font-size: var(--fs-11);
   color: var(--text-muted);

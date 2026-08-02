@@ -27,7 +27,11 @@ import {
   searchRooms as searchRoomsInDB,
   searchMessages as searchMessagesInDB,
   clearRoomData,
-  getStorageStats
+  getStorageStats,
+  getLatestTimestamp,
+  getMessageLimit,
+  setMessageLimit,
+  trimRoomMessages
 } from '../lib/db.js'
 import {
   getAllSignalingServers,
@@ -93,6 +97,75 @@ function saveStarred() {
     /* 存储满/隐私模式忽略 */
   }
 }
+
+// ---- P1-4 屏蔽体系（用户级屏蔽 + 星级屏蔽；仅前端过滤，数据保留） ----
+const BLOCKED_KEY = 'nchat:blocked'
+const MIN_STARS_KEY = 'nchat:block-min-stars'
+
+const blockedPeers = ref(loadBlockedPeers())
+function loadBlockedPeers() {
+  try {
+    const raw = localStorage.getItem(BLOCKED_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    return new Set(Array.isArray(list) ? list : [])
+  } catch {
+    return new Set()
+  }
+}
+function saveBlockedPeers() {
+  try {
+    localStorage.setItem(BLOCKED_KEY, JSON.stringify([...blockedPeers.value]))
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+const minBlockStars = ref(loadMinBlockStars())
+function loadMinBlockStars() {
+  try {
+    const v = parseInt(localStorage.getItem(MIN_STARS_KEY), 10)
+    return Number.isFinite(v) && v > 0 ? v : 0
+  } catch {
+    return 0
+  }
+}
+function saveMinBlockStars() {
+  try {
+    localStorage.setItem(MIN_STARS_KEY, String(minBlockStars.value))
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function toggleBlockPeer(peerId) {
+  if (!peerId) return
+  const next = new Set(blockedPeers.value)
+  if (next.has(peerId)) next.delete(peerId)
+  else next.add(peerId)
+  blockedPeers.value = next
+  saveBlockedPeers()
+}
+function setMinBlockStars(n) {
+  minBlockStars.value = Math.max(0, Math.floor(n || 0))
+  saveMinBlockStars()
+}
+
+/** 屏蔽过滤后的可见消息（自己/未屏蔽/星级达标；数据完整保留） */
+const visibleMessages = computed(() => {
+  const blocked = blockedPeers.value
+  const minStars = minBlockStars.value
+  if ((!blocked || blocked.size === 0) && !minStars) return messages.value
+  return messages.value.filter((m) => {
+    if (m.from === state.peerId) return true
+    if (blocked && blocked.has(m.from)) return false
+    if (minStars > 0) {
+      const sender = members.value.find((x) => x.peerId === m.from)
+      // 未知星标（发送者已不在房间）不屏蔽，避免历史消息误伤
+      if (sender !== undefined && (sender.stars ?? 1) < minStars) return false
+    }
+    return true
+  })
+})
 
 // ---- 房间收藏（手动收藏，持久化到 localStorage 'nchat:favorites'） ----
 const favoriteRooms = ref(loadFavorites())
@@ -205,6 +278,15 @@ async function init() {
     state.error = null
     // 恢复已加入的房间（joinedNames 已从 localStorage 恢复，刷新列表）
     refreshJoinedRooms()
+    // 离线补拉：刷新/重新上线后，拉取离线期间错过的消息
+    for (const room of joinedNames.value) {
+      try {
+        const lastTs = await getLatestTimestamp(room)
+        network.requestHistory(room, lastTs).catch(() => {})
+      } catch (e) {
+        /* ignore */
+      }
+    }
   } catch (e) {
     console.error('[nchat] 启动失败：', e)
     state.error = describeError(e)
@@ -485,6 +567,16 @@ function wireEvents(net) {
     fileProgress.value = fp
   })
 
+  // 消息送达回执（P0-2）：更新自己消息的发送状态
+  net.addEventListener('msg:delivery', (e) => {
+    const { msgId, status } = e.detail || {}
+    if (!msgId) return
+    const m = messages.value.find((x) => x.id === msgId)
+    if (m && m.delivery) {
+      m.delivery = status === 'acked' ? 'sent' : 'failed'
+    }
+  })
+
   // Phase 2.2: 群公告
   net.addEventListener('announcement', (e) => {
     const ann = e.detail
@@ -698,6 +790,8 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
     if (!(await hasMessage(chatMsg.id))) {
       await addMessage(chatMsg)
     }
+    // 存储上限：超出条数时自动清理最旧（P1-6；异步裁剪，失败不影响主流程）
+    trimRoomMessages(chatMsg.room).catch(() => {})
   } catch (e) {
     /* ignore */
   }
@@ -1041,8 +1135,21 @@ function backToRoomList() {
 
 async function sendRoomMessage(text, replyTo) {
   if (!network || !currentRoom.value || !text.trim()) return
-  const ok = await network.sendRoomMessage(currentRoom.value, text.trim(), replyTo)
-  if (ok) stats.value.sent++
+  const msgId = await network.sendRoomMessage(currentRoom.value, text.trim(), replyTo)
+  if (msgId) {
+    stats.value.sent++
+    // 标记发送中（送达后由 msg:delivery 更新为 sent/failed）
+    const m = messages.value.find((x) => x.id === msgId)
+    if (m) m.delivery = 'sending'
+  }
+}
+
+// 失败重发：用原消息数据重发（peer 层保持原 msgId/timestamp，接收方幂等）
+async function retryMessage(msgId) {
+  const m = messages.value.find((x) => x.id === msgId)
+  if (!m || !network || !currentRoom.value) return
+  m.delivery = 'sending'
+  await network.retryMessage(currentRoom.value, msgId, m.text, m.replyTo || null, m.timestamp)
 }
 
 // ---- Phase 3.1: 消息编辑 / 撤回 / 回应 ----
@@ -1575,6 +1682,7 @@ export function useChat() {
     clearRoomData,
     backToRoomList,
     sendRoomMessage,
+    retryMessage,
     sendFileMessage,
     downloadFile,
     // Phase 3.1: 消息编辑 / 撤回 / 回应
@@ -1602,6 +1710,12 @@ export function useChat() {
     // 消息星标（本地收藏）
     toggleStar,
     currentRoomStarred,
+    // 屏蔽体系（P1-4：用户级 + 星级，前端过滤）
+    blockedPeers,
+    minBlockStars,
+    toggleBlockPeer,
+    setMinBlockStars,
+    visibleMessages,
     // 房间收藏（手动收藏）
     favoriteRooms,
     toggleFavorite,

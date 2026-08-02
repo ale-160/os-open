@@ -12,7 +12,7 @@ const props = defineProps({
   selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select'])
+const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select', 'retry-message'])
 
 const listRef = ref(null)
 const editingId = ref(null)
@@ -120,6 +120,7 @@ function onDownload(file) {
       @reply="emit('reply', $event)"
       @locate="emit('locate', $event)"
       @toggle-star="emit('toggle-star', $event)"
+      @retry-message="emit('retry-message', $event)"
       @multi-select="emit('multi-select', $event)"
       @toggle-select="emit('toggle-select', $event)"
     />

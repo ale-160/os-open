@@ -70,7 +70,9 @@ export const MsgType = {
   DOC_LIST: 'doc_list', // 文档列表同步请求/响应 { room }
   // ---- Phase 2.5: 消息搜索（本地 + 网络） ----
   MSG_SEARCH: 'msg_search', // 搜索请求 { keyword, from, searchId }
-  MSG_SEARCH_RESULT: 'msg_search_result' // 搜索结果响应 { searchId, results: [...], from }
+  MSG_SEARCH_RESULT: 'msg_search_result', // 搜索结果响应 { searchId, results: [...], from }
+  // ---- 送达确认（P0-2 消息可靠性） ----
+  MSG_ACK: 'msg_ack' // 消息送达回执 { room, msgIds: [...], from }（批量汇总）
 }
 
 /**
@@ -184,14 +186,14 @@ function canonicalString(obj) {
   return parts.join('|')
 }
 
-export async function buildMessage({ type, from, to, payload, extensions }, privateKey) {
+export async function buildMessage({ type, from, to, payload, extensions, id, timestamp }, privateKey) {
   const msg = {
-    id: genMsgId(from),
+    id: id || genMsgId(from),
     type,
     from,
     to: to || '',
     payload: payload || {},
-    timestamp: Date.now(),
+    timestamp: timestamp || Date.now(),
     extensions: extensions || {}
   }
   msg.signature = await sign(privateKey, canonicalString(msg))

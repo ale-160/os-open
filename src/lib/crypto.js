@@ -262,7 +262,46 @@ function writeJWK(jwk) {
   }
 }
 
-/** 取 PeerID 的短显示形式（前 6 + … + 后 4） */
+// ---- 身份备份/恢复（P0-3 跨设备迁移） ----
+// 备份 = 口令派生的 AES-GCM 加密的 JWK（含私钥）；恢复 = 解密后写回 localStorage。
+// 注意：身份是 P2P 的"账号"，私钥即身份，请妥善保管备份与口令。
+async function deriveBackupKey(password) {
+  const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(password))
+  return importAesKey(base58Encode(new Uint8Array(raw)))
+}
+
+/** 导出身份备份（口令加密的 JWK 文本）。返回 null 表示无身份。 */
+export async function exportIdentityBackup(password) {
+  try {
+    const jwk = readJWK()
+    if (!jwk) return null
+    const key = await deriveBackupKey(password)
+    const enc = await aesGcmEncrypt(key, JSON.stringify(jwk))
+    return JSON.stringify({ v: 1, data: enc })
+  } catch (e) {
+    console.warn('[nchat] 身份备份失败:', e)
+    return null
+  }
+}
+
+/** 导入身份备份（口令解密 → 写回 localStorage，需刷新页面生效）。返回 true/false。 */
+export async function importIdentityBackup(backupText, password) {
+  try {
+    const parsed = JSON.parse(backupText)
+    if (!parsed || parsed.v !== 1 || !parsed.data || !parsed.data.iv || !parsed.data.ciphertext) return false
+    const key = await deriveBackupKey(password)
+    const jwk = JSON.parse(await aesGcmDecrypt(key, parsed.data.iv, parsed.data.ciphertext))
+    // 身份存储结构：{ priv: Ed25519私钥JWK(含d/x), pub: 公钥字节数组 }
+    if (!jwk || !jwk.priv || !jwk.priv.d || !jwk.priv.x || !jwk.pub) return false
+    writeJWK(jwk)
+    return true
+  } catch (e) {
+    console.warn('[nchat] 身份恢复失败:', e)
+    return false
+  }
+}
+
+// ---- 取 PeerID 的短显示形式（前 6 + … + 后 4） ----
 export function shortPeerId(peerId) {
   if (!peerId) return ''
   if (peerId.length <= 10) return peerId

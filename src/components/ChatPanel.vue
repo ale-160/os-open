@@ -60,7 +60,7 @@ const emit = defineEmits([
   // Phase 3.1: 消息编辑 / 撤回 / 回应
   'edit-message', 'recall-message', 'react-message',
   // 通知（多选批量删除无可用项时提示）
-  'notify', 'toggle-star', 'toggle-member', 'open-settings'
+  'notify', 'toggle-star', 'toggle-member', 'open-settings', 'retry-message'
 ])
 
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
@@ -393,6 +393,7 @@ function onLocated(msgId) {
             @recall="emit('recall-message', $event)"
             @toggle-pin="emit('toggle-pin', $event)"
             @toggle-star="emit('toggle-star', $event)"
+            @retry-message="emit('retry-message', $event)"
             @react="emit('react-message', $event)"
             @download="onDownloadFile"
             @reply="startReply"

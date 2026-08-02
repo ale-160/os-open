@@ -35,6 +35,11 @@ const {
   currentRoomPins,
   toggleStar,
   currentRoomStarred,
+  // 屏蔽体系（P1-4）
+  visibleMessages,
+  toggleBlockPeer,
+  minBlockStars,
+  setMinBlockStars,
   // 房间收藏（手动收藏）
   favoriteRooms,
   toggleFavorite,
@@ -62,6 +67,7 @@ const {
   clearRoomData,
   backToRoomList,
   sendRoomMessage,
+  retryMessage,
   sendFileMessage,
   downloadFile,
   // Phase 3.1: 消息编辑 / 撤回 / 回应
@@ -306,6 +312,11 @@ async function onToggleStar(msgId) {
   toggleStar(msgId)
 }
 
+// 消息发送失败重发
+function onRetryMessage(msgId) {
+  retryMessage(msgId)
+}
+
 // ChatPanel 通知（多选批量删除无可用项时提示）
 function onNotify({ type = 'error', message } = {}) {
   const id = Date.now() + '-' + Math.random().toString(36).slice(2, 6)
@@ -320,6 +331,9 @@ function onNotify({ type = 'error', message } = {}) {
 function onToggleFavorite(room) {
   toggleFavorite(room)
 }
+
+// 屏蔽列表（Set → 数组，供模板 prop）
+const blockedPeersList = computed(() => [...blockedPeers.value])
 
 // Phase 2.4: 当前房间文档列表
 const currentRoomDocsList = computed(() => currentRoomDocs())
@@ -522,7 +536,7 @@ function onCloseTopology() {
         <ChatPanel
           v-if="inRoom"
           :current-room="currentRoom"
-          :messages="messages"
+          :messages="visibleMessages"
           :online="state.online"
           :stats="stats"
           :members="members"
@@ -544,6 +558,7 @@ function onCloseTopology() {
           @set-announcement="onSetAnnouncement"
           @toggle-pin="onTogglePin"
           @toggle-star="onToggleStar"
+          @retry-message="onRetryMessage"
           @toggle-member="toggleMember"
           @open-settings="showSettings = true"
           @notify="onNotify"
@@ -630,6 +645,7 @@ function onCloseTopology() {
         <MemberList
           :members="members"
           :peers="peers"
+          :blocked-peers="blockedPeersList"
           :current-room="currentRoom"
           :can-set-announcement="canSetAnnouncement()"
           :announcement="currentAnnouncement"
@@ -642,6 +658,7 @@ function onCloseTopology() {
           @set-ban="onSetBan"
           @ban="onSetRoomBan"
           @kick="onKickMember"
+          @toggle-block="toggleBlockPeer"
         />
       </aside>
     </main>

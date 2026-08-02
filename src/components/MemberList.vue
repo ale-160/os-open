@@ -16,6 +16,7 @@ import {
   IconUserPlus,
   IconMicOff,
   IconUserX,
+  IconUserMinus,
   IconSearch,
   IconX
 } from './icons'
@@ -23,6 +24,7 @@ import {
 const props = defineProps({
   members: { type: Array, default: () => [] },
   peers: { type: Array, default: () => [] },
+  blockedPeers: { type: Array, default: () => [] },
   currentRoom: { type: String, default: '' },
   canSetAnnouncement: { type: Boolean, default: false },
   announcement: { type: Object, default: null },
@@ -37,7 +39,8 @@ const emit = defineEmits([
   'set-rules',
   'set-ban',
   'ban',
-  'kick'
+  'kick',
+  'toggle-block'
 ])
 
 const { isDesktop, memberOpen, toggleMember } = useLayout()
@@ -45,6 +48,8 @@ const { isDesktop, memberOpen, toggleMember } = useLayout()
 // 权限：邀请需创建者或星级达标；星标/禁言/踢出仅创建者可操作
 const selfIsOwner = computed(() => props.members.find((m) => m.self)?.isOwner ?? false)
 const canInvite = computed(() => props.members.find((m) => m.self)?.canApprove ?? false)
+// 用户级屏蔽状态
+const isBlocked = (peerId) => props.blockedPeers.includes(peerId)
 
 // 本地排序覆盖：peerId -> 手动顺序（仅 owner 操作，本地生效）
 const orderOverride = ref(new Map())
@@ -244,6 +249,7 @@ function cancelBan() {
             <button v-if="selfIsOwner" class="icon-btn-mini" @click="setStars(m)" title="星标"><IconStar :size="16" :class="{ filled: m.stars > 1 }" /></button>
             <button v-if="selfIsOwner" class="icon-btn-mini" @click="banMember(m)" title="禁言"><IconMicOff :size="16" /></button>
             <button v-if="selfIsOwner" class="icon-btn-mini danger" @click="kickMember(m)" title="踢出"><IconUserX :size="16" /></button>
+            <button class="icon-btn-mini" :class="{ danger: isBlocked(m.peerId) }" @click="emit('toggle-block', m.peerId)" :title="isBlocked(m.peerId) ? '取消屏蔽' : '屏蔽此人（其消息不再显示）'"><IconUserMinus :size="16" /></button>
           </div>
           <!-- 禁言编辑（创建者操作）：星级低于阈值的成员禁言 -->
           <div v-if="banEditing && banMode === 'personal' && banTarget === m.peerId" class="stars-editor" @click.stop>
@@ -300,23 +306,6 @@ function cancelBan() {
     </div>
   </aside>
 </template>
-
-<script>
-import { useLayout } from '@/composables/useLayout.js'
-import {
-  IconCheck,
-  IconClose,
-  IconUp,
-  IconDown,
-  IconEdit,
-  IconStar,
-  IconUserPlus,
-  IconMicOff,
-  IconUserX,
-  IconSearch,
-  IconX
-} from './icons'
-</script>
 
 <style scoped>
 .member-list {

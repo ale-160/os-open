@@ -56,7 +56,9 @@ import {
   getAllDocs,
   deleteDoc,
   // Phase 2.5: 消息搜索
-  searchMessages as searchMessagesInDB
+  searchMessages as searchMessagesInDB,
+  // 离线补拉：本地最新消息时间戳
+  getLatestTimestamp
 } from './db.js'
 import {
   sha256Key,
@@ -65,7 +67,7 @@ import {
   DEFAULT_K as LCAN_DEFAULT_K
 } from './lcan.js'
 import { sha256 } from '@noble/hashes/sha2.js'
-import { sign as edSign, verify as edVerify } from './crypto.js'
+import { sign as edSign, verify as edVerify, hashPassword } from './crypto.js'
 import {
   sendFileMessage,
   _pushFileChunks,
@@ -144,6 +146,11 @@ export class PeerNetwork extends EventTarget {
     this._pendingJoinRequests = new Map()
     /** 已处理消息去重：msgId -> timestamp，避免 gossip 转发导致的重复 emit/转发 */
     this._processedMsgs = new Map()
+    /** 消息送达确认（P0-2）：msgId -> { room, timer }，收到 ACK 或超时后清理 */
+    this._pendingAcks = new Map()
+    /** ACK 批量汇总缓冲：等待 flush 的 msgId 列表 */
+    this._ackBuffer = []
+    this._ackFlushTimer = null
     /** 本节点发送过的大文件 fileId 集合（用于请求时判断"缓存是否已失效"） */
     this._sentFileIds = new Set()
 
@@ -486,6 +493,9 @@ export class PeerNetwork extends EventTarget {
         settle(resolve)
         this._startTimers()
         this._discoverDomain(domainKey)
+        // 重连恢复：补拉本地已加入房间离线期间错过的消息（首次启动时
+        // _localRoomsSet 为空则无操作；刷新后的补拉由 useChat init 负责）
+        this._catchUpLocalRooms().catch(() => {})
       })
 
       // 收到入站连接（per-domain）
@@ -1497,6 +1507,9 @@ export class PeerNetwork extends EventTarget {
       case MsgType.ROOM_MESSAGE:
         this._onRoomMessage(data)
         break
+      case MsgType.MSG_ACK:
+        this._onMsgAck(data)
+        break
       case MsgType.ROOM_LIST:
         this._onRoomList(data)
         break
@@ -1837,8 +1850,10 @@ export class PeerNetwork extends EventTarget {
 
     if (isPasswordRoom && weHavePassword && this._localRoomsSet.has(room)) {
       const expected = this._passwordCache.get(room) || getRoomPassword(room)
-      const provided = msg.payload?.password || ''
-      if (provided !== expected) {
+      // 新版本广播哈希（P0-5 安全）；兼容旧版本广播的明文
+      const providedHash = msg.payload?.passwordHash || (msg.payload?.password ? await hashPassword(msg.payload.password) : '')
+      const expectedHash = await hashPassword(expected)
+      if (!providedHash || providedHash !== expectedHash) {
         await this._sendRaw(connKey, {
           type: MsgType.JOIN_REJECTED,
           payload: { room, reason: '密码错误' }
@@ -1915,6 +1930,8 @@ export class PeerNetwork extends EventTarget {
       replyTo: msg.payload?.replyTo
     }
     this._emit('chat', chatMsg)
+    // 送达回执（P0-2）：确认收到，发送方据此标记"已送达"
+    this._queueAck(room, msg.id)
     // 转发给房间内其他未直连的 peer（gossip 式简化：直接广播给除发送者外的所有连接）
     // 注意：为避免环路，仅当 from 不是我们时转发
     if (msg.from !== this.identity.peerId) {
@@ -2323,9 +2340,12 @@ export class PeerNetwork extends EventTarget {
       if (meta) meta.owner = this.identity.peerId
     }
     this._recomputeRooms()
+    // 密码房间：只广播密码哈希（不明文传输；本地明文仅存于创建者/已验证成员的
+    // localStorage，验证方用哈希比对）
+    const pwHash = actualPassword ? await hashPassword(actualPassword) : undefined
     await this._broadcast({
       type: MsgType.JOIN_ROOM,
-      payload: { room, password: actualPassword }
+      payload: { room, passwordHash: pwHash }
     })
     await this.requestHistory(room, 0)
     // Phase 2.2: 入房后拉取群公告
@@ -2813,7 +2833,7 @@ export class PeerNetwork extends EventTarget {
       return false
     }
     const payload = { room }
-    if (password) payload.password = password
+    if (password) payload.passwordHash = await hashPassword(password)
     for (const pid of targets) {
       await this._sendRaw(pid, {
         type: MsgType.JOIN_REQUEST,
@@ -2893,6 +2913,80 @@ export class PeerNetwork extends EventTarget {
         : undefined
     })
     await this._broadcast(msg)
+    // 送达确认：等待任一在线节点回执（P0-2）
+    this._trackAck(msg.id, room)
+    return msg.id
+  }
+
+  // ---------------- P0-2: 消息送达确认 ----------------
+
+  /** 发送后跟踪 ACK：超时（CONFIG.MSG_ACK_TIMEOUT）未收到 → 标记失败（可重发） */
+  _trackAck(msgId, room) {
+    if (!msgId) return
+    const existing = this._pendingAcks.get(msgId)
+    if (existing) clearTimeout(existing.timer)
+    const timer = setTimeout(() => {
+      this._pendingAcks.delete(msgId)
+      this._emit('msg:delivery', { msgId, room, status: 'failed' })
+    }, CONFIG.MSG_ACK_TIMEOUT || 10000)
+    this._pendingAcks.set(msgId, { room, timer })
+  }
+
+  /** 收到消息后批量回 ACK（500ms 汇总，减少广播量） */
+  _queueAck(room, msgId) {
+    this._ackBuffer.push(msgId)
+    if (this._ackFlushTimer) return
+    this._ackFlushTimer = setTimeout(() => {
+      this._ackFlushTimer = null
+      const ids = this._ackBuffer.splice(0)
+      if (!ids.length) return
+      buildMessage(
+        {
+          type: MsgType.MSG_ACK,
+          from: this.identity.peerId,
+          to: room,
+          payload: { room, msgIds: ids }
+        },
+        this.identity.privateKey
+      )
+        .then((m) => this._broadcast(m))
+        .catch(() => {})
+    }, 500)
+  }
+
+  /** 收到 ACK 回执：清除 pending，通知发送方 */
+  _onMsgAck(msg) {
+    const ids = msg.payload?.msgIds || []
+    if (!ids.length) return
+    for (const id of ids) {
+      const pending = this._pendingAcks.get(id)
+      if (pending) {
+        clearTimeout(pending.timer)
+        this._pendingAcks.delete(id)
+        this._emit('msg:delivery', { msgId: id, room: pending.room, status: 'acked' })
+      }
+    }
+  }
+
+  /** 失败重发：用原 msgId/timestamp 重建消息（签名与原始一致，接收方幂等去重） */
+  async retryMessage(room, msgId, text, replyTo, timestamp) {
+    const msg = await buildMessage(
+      {
+        type: MsgType.ROOM_MESSAGE,
+        from: this.identity.peerId,
+        to: room,
+        id: msgId,
+        timestamp: timestamp || Date.now(),
+        payload: replyTo
+          ? { room, text, replyTo: { msgId: replyTo.msgId, text: replyTo.text, name: replyTo.name } }
+          : { room, text },
+        extensions: { name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+    this._markProcessed(msg.id)
+    await this._broadcast(msg)
+    this._trackAck(msg.id, room)
     return true
   }
 
@@ -3478,6 +3572,18 @@ export class PeerNetwork extends EventTarget {
       },
       room
     )
+  }
+
+  /** 重连补拉：对本地已加入的房间请求 since 之后的历史（消息可靠性的兜底） */
+  async _catchUpLocalRooms() {
+    for (const room of this._localRoomsSet) {
+      try {
+        const lastTs = await getLatestTimestamp(room)
+        await this.requestHistory(room, lastTs)
+      } catch (e) {
+        /* 单个房间失败不影响其他房间 */
+      }
+    }
   }
 
   // ---------------- 心跳与发现 ----------------

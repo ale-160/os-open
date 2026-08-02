@@ -238,8 +238,8 @@ export async function addMessage(msg) {
     try {
       await migrateMessagesToIDB(db)
       await db.put(IDB_STORE, msg)
-      // 裁剪：每房间最多 HISTORY_LIMIT 条（新成员能看到的历史有上限即可，不无限累积）
-      await trimRoomMessages(db, msg.room)
+      // 裁剪：每房间最多消息条数上限（默认 5000，可在设置中调整；超出清理最旧）
+      await trimRoomMessages(msg.room)
       return
     } catch (e) {
       console.warn('[nchat] IndexedDB 写入失败，回退 localStorage：', e?.message)
@@ -251,31 +251,67 @@ export async function addMessage(msg) {
   if (!list.some((m) => m.id === msg.id)) {
     list.push(msg)
   }
-  // 房间消息超限时裁剪最早的
-  if (list.length > CONFIG.HISTORY_LIMIT) {
+  // 房间消息超限时裁剪最早的（与 IndexedDB 共用同一上限设置）
+  const limit = getMessageLimit()
+  if (list.length > limit) {
     list.sort((a, b) => a.timestamp - b.timestamp)
-    store[msg.room] = list.slice(list.length - CONFIG.HISTORY_LIMIT)
+    store[msg.room] = list.slice(list.length - limit)
   } else {
     store[msg.room] = list
   }
   writeJSON(KEYS.messages, store)
 }
 
-/** IndexedDB 中裁剪某房间的旧消息（保留最近 HISTORY_LIMIT 条） */
-async function trimRoomMessages(db, room) {
+// ---- 存储上限（P1-6）：每房间消息条数上限，0=不限 ----
+const MSG_LIMIT_KEY = 'nchat:msg-limit'
+export function getMessageLimit() {
   try {
-    const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
-    if (all.length <= CONFIG.HISTORY_LIMIT) return
-    all.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
-    const excess = all.slice(0, all.length - CONFIG.HISTORY_LIMIT)
-    const tx = db.transaction(IDB_STORE, 'readwrite')
-    for (const m of excess) {
-      tx.store.delete(m.id)
-    }
-    await tx.done
+    const v = parseInt(localStorage.getItem(MSG_LIMIT_KEY), 10)
+    return Number.isFinite(v) && v >= 0 ? v : 5000
+  } catch {
+    return 5000
+  }
+}
+export function setMessageLimit(n) {
+  try {
+    localStorage.setItem(MSG_LIMIT_KEY, String(n))
   } catch (e) {
     /* ignore */
   }
+}
+
+/** 裁剪房间消息：超出上限时删除最旧（自动清理；0 或负数 = 不限） */
+export async function trimRoomMessages(room, limit = getMessageLimit()) {
+  if (!limit || limit <= 0) return 0
+  let removed = 0
+  try {
+    const db = await openMessagesDB()
+    if (db) {
+      await migrateMessagesToIDB(db)
+      const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
+      if (all.length > limit) {
+        const sorted = all.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+        const victims = sorted.slice(0, all.length - limit)
+        const tx = db.transaction(IDB_STORE, 'readwrite')
+        for (const m of victims) tx.store.delete(m.id)
+        await tx.done
+        removed = victims.length
+      }
+      return removed
+    }
+  } catch (e) {
+    /* 回退下方 localStorage */
+  }
+  // localStorage 回退
+  const store = readJSON(KEYS.messages, {})
+  const list = store[room] || []
+  if (list.length > limit) {
+    const sorted = [...list].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0))
+    store[room] = sorted.slice(list.length - limit)
+    writeJSON(KEYS.messages, store)
+    removed = sorted.length - limit
+  }
+  return removed
 }
 
 export async function getMessages(room, since = 0, limit = CONFIG.HISTORY_FETCH_BATCH) {
@@ -298,6 +334,21 @@ export async function getMessages(room, since = 0, limit = CONFIG.HISTORY_FETCH_
     .filter((m) => m.timestamp > since)
     .sort((a, b) => a.timestamp - b.timestamp)
     .slice(0, limit)
+}
+
+export async function getLatestTimestamp(room) {
+  try {
+    const db = await openMessagesDB()
+    if (db) {
+      const all = await db.getAllFromIndex(IDB_STORE, 'room', room)
+      return all.reduce((max, m) => Math.max(max, m.timestamp || 0), 0)
+    }
+  } catch (e) {
+    /* 回退下方 localStorage */
+  }
+  const store = readJSON(KEYS.messages, {})
+  const list = store[room] || []
+  return list.reduce((max, m) => Math.max(max, m.timestamp || 0), 0)
 }
 
 export async function hasMessage(id) {

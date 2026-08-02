@@ -5,12 +5,15 @@ import {
   getDiagnostics
 } from '../config.js'
 import { formatBytes } from '../lib/db.js'
+import { exportIdentityBackup, importIdentityBackup, shortPeerId } from '../lib/crypto.js'
+import { getMessageLimit, setMessageLimit, trimRoomMessages, getAllRooms } from '../lib/db.js'
 import { IconClose } from './icons'
 import { useChat } from '../composables/useChat.js'
 
 const emit = defineEmits(['close', 'add-server', 'remove-server', 'switch-server', 'reset-servers'])
 
 const {
+  state,
   capabilities,
   roleStats,
   domains,
@@ -24,8 +27,24 @@ const {
   notificationsEnabled
 } = useChat()
 
-const tab = ref('diagnostics') // diagnostics | signaling | network | role | lan
+const tab = ref('diagnostics') // diagnostics | signaling | network | role | lan | identity
 const diagnostics = ref({})
+// 存储限制（P1-6）
+const msgLimit = ref(getMessageLimit())
+async function onMsgLimitChange() {
+  const v = Math.max(0, Math.floor(msgLimit.value || 0))
+  msgLimit.value = v
+  setMessageLimit(v)
+  // 立即对本地所有房间执行一次裁剪
+  try {
+    const rooms = await getAllRooms()
+    for (const r of rooms) {
+      await trimRoomMessages(r.name, v)
+    }
+  } catch (e) {
+    /* ignore */
+  }
+}
 const servers = ref([])
 const currentServer = ref(null)
 
@@ -162,6 +181,44 @@ function onSwitch(s) {
   refresh()
 }
 
+// ---- 身份备份/恢复（P0-3 跨设备迁移） ----
+const backupPassword = ref('')
+const backupOutput = ref('')
+const restoreText = ref('')
+const restorePassword = ref('')
+const identityMsg = ref('')
+
+async function onBackupIdentity() {
+  if (!backupPassword.value) {
+    identityMsg.value = '请先输入备份口令'
+    return
+  }
+  const backup = await exportIdentityBackup(backupPassword.value)
+  if (!backup) {
+    identityMsg.value = '未找到身份信息'
+    return
+  }
+  backupOutput.value = backup
+  identityMsg.value = '备份已生成，请复制并妥善保管（连同口令），在新设备上粘贴恢复'
+}
+
+async function onCopyBackup() {
+  if (!backupOutput.value) return
+  await copyToClipboard(backupOutput.value)
+  identityMsg.value = '备份已复制'
+}
+
+async function onRestoreIdentity() {
+  if (!restoreText.value || !restorePassword.value) {
+    identityMsg.value = '请粘贴备份并输入口令'
+    return
+  }
+  const ok = await importIdentityBackup(restoreText.value.trim(), restorePassword.value)
+  identityMsg.value = ok
+    ? '身份恢复成功，刷新页面后生效（身份/昵称/房间将变为备份时的状态）'
+    : '恢复失败：备份或口令不正确'
+}
+
 function copyToClipboard(text) {
   try {
     navigator.clipboard.writeText(text)
@@ -217,10 +274,25 @@ function copyToClipboard(text) {
         >
           连接帮助
         </button>
+        <button
+          class="tab-btn"
+          :class="{ active: tab === 'identity' }"
+          @click="tab = 'identity'"
+        >
+          身份
+        </button>
       </div>
 
       <!-- 诊断面板 -->
       <div v-if="tab === 'diagnostics'" class="modal-body">
+        <div class="diag-section">
+          <h4>存储限制</h4>
+          <label class="role-toggle">
+            <input type="number" v-model.number="msgLimit" min="0" step="500" @change="onMsgLimitChange" />
+            <span>每房间消息条数上限（0 = 不限，超出自动清理最旧）</span>
+          </label>
+        </div>
+
         <div class="diag-section">
           <h4>通知</h4>
           <label class="role-toggle">
@@ -481,6 +553,48 @@ function copyToClipboard(text) {
         <button class="btn primary" :disabled="roleSaving" @click="onSaveRole">
           {{ roleSaving ? '保存中…' : '保存并广播' }}
         </button>
+      </div>
+
+      <!-- 身份备份/恢复 -->
+      <div v-if="tab === 'identity'" class="modal-body">
+        <div class="diag-section">
+          <h4>身份（P2P 账号）</h4>
+          <p class="form-hint">
+            当前身份 ID：<span class="mono">{{ shortPeerId(state.peerId) }}</span>。
+            身份即私钥，绑定你的昵称、星标与房间关系。换设备/清缓存后身份会丢失，
+            请提前备份。
+          </p>
+        </div>
+
+        <div class="diag-section">
+          <h4>备份身份</h4>
+          <label class="form-hint">设置备份口令（用于加密备份，请牢记）</label>
+          <input v-model="backupPassword" type="password" class="input" placeholder="备份口令" />
+          <div class="btn-row" style="display: flex; gap: var(--sp-2); margin-top: var(--sp-2)">
+            <button class="btn" @click="onBackupIdentity">生成备份</button>
+            <button class="btn" :disabled="!backupOutput" @click="onCopyBackup">复制备份</button>
+          </div>
+          <textarea
+            v-if="backupOutput"
+            v-model="backupOutput"
+            class="input mono"
+            rows="4"
+            readonly
+            style="margin-top: var(--sp-2); font-size: var(--fs-11); word-break: break-all"
+          ></textarea>
+        </div>
+
+        <div class="diag-section">
+          <h4>恢复身份</h4>
+          <label class="form-hint">粘贴备份文本并输入原口令</label>
+          <textarea v-model="restoreText" class="input mono" rows="4" placeholder="备份文本"></textarea>
+          <input v-model="restorePassword" type="password" class="input" placeholder="备份口令" style="margin-top: var(--sp-2)" />
+          <div class="btn-row" style="margin-top: var(--sp-2)">
+            <button class="btn" @click="onRestoreIdentity">恢复身份</button>
+          </div>
+        </div>
+
+        <p v-if="identityMsg" class="form-hint" style="color: var(--c-warning)">{{ identityMsg }}</p>
       </div>
 
       <!-- 连接帮助 -->
