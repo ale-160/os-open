@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>nchat regression 375</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: ui-sans-serif, system-ui, sans-serif; background:#0b0d12; color:#e6e8ee; }
+  .wrap { max-width: 375px; margin: 0 auto; min-height: 100vh; border-left:1px solid #1f2330; border-right:1px solid #1f2330; }
+  .top { padding: 12px; border-bottom:1px solid #1f2330; display:flex; align-items:center; gap:10px; }
+  .avatar { width:32px; height:32px; border-radius:50%; background:#2d6cdf; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .title { font-size: 14px; font-weight: 600; }
+  .sub { font-size: 12px; color:#8a90a0; }
+  .messages { padding: 12px; display:flex; flex-direction:column; gap:10px; }
+  .msg { background:#11141b; border:1px solid #1f2330; border-radius:14px; padding:10px 12px; }
+  .name { font-size: 12px; color:#8a90a0; margin-bottom:4px; }
+  .text { font-size: 14px; line-height: 1.35; word-break: break-word; }
+  .input { position: sticky; bottom: 0; padding: 10px 12px; background:#0b0d12; border-top:1px solid #1f2330; display:flex; gap:8px; }
+  .input input { flex:1; border-radius:12px; border:1px solid #2a2f3d; padding: 10px 12px; color:#e6e8ee; background:#11141b; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; background:#1f2330; color:#c8ccd8; font-size:11px; margin-top:6px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <div class="avatar">A</div>
+      <div>
+        <div class="title"># verify-room</div>
+        <div class="sub">375px 移动端视图</div>
+      </div>
+    </div>
+    <div class="messages" id="messages"></div>
+    <div class="input">
+      <input id="draft" placeholder="输入消息..." />
+      <button id="send" style="border:none;background:#2d6cdf;color:#fff;padding:0 14px;border-radius:12px;font-weight:600;">发送</button>
+    </div>
+  </div>
+<script>
+  const msgs = [
+    { name: 'Ale', text: 'hello from Ale', time: '12:00' },
+    { name: '远方节点', text: 'hello from 远方节点', time: '12:00' },
+    { name: 'Ale', text: 'sync check from Ale', time: '12:01' },
+    { name: '远方节点', text: 'sync check from 远方节点', time: '12:01' }
+  ]
+  const box = document.getElementById('messages')
+  for (const m of msgs) {
+    const el = document.createElement('div')
+    el.className = 'msg'
+    el.innerHTML = `<div class="name">${m.name} · ${m.time}</div><div class="text">${m.text}</div><div class="badge">已读 2 人</div>`
+    box.appendChild(el)
+  }
+  document.getElementById('send').onclick = () => {
+    const input = document.getElementById('draft')
+    const text = input.value.trim()
+    if (!text) return
+    const el = document.createElement('div')
+    el.className = 'msg'
+    el.innerHTML = `<div class="name">我 · 刚刚</div><div class="text">${text}</div><div class="badge">已读 1 人</div>`
+    box.appendChild(el)
+    input.value = ''
+    box.scrollTop = box.scrollHeight
+  }
+</script>
+</body>
+</html>
