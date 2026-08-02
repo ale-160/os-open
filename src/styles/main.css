@@ -1023,6 +1023,28 @@ select.input {
   }
 }
 
+@media (max-width: 375px) {
+  .room-name {
+    font-size: var(--fs-12);
+  }
+  .msg-name {
+    font-size: var(--fs-11);
+  }
+  .msg-text {
+    font-size: var(--fs-12);
+  }
+  .input-area input {
+    font-size: var(--fs-13);
+  }
+  .btn-mini {
+    padding: 4px 8px;
+    font-size: var(--fs-11);
+  }
+  .side-nav-btn {
+    padding: 6px 8px;
+  }
+}
+
 /* ===== Header 操作按钮（保留供模态/其他场景使用） ===== */
 .header-actions {
   display: flex;
