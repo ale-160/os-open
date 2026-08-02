@@ -168,6 +168,12 @@ function cancelBan() {
     </header>
 
     <div class="member-content">
+      <!-- 栏目标题（桌面端） -->
+      <div class="member-head" v-if="isDesktop">
+        <span class="member-head-title">成员</span>
+        <span class="member-head-count">{{ filteredMembers.length }}</span>
+      </div>
+
       <!-- 搜索框（桌面端显示在列表上方） -->
       <div class="member-search" v-if="isDesktop">
         <input
@@ -271,6 +277,28 @@ import {
 }
 
 .member-content { flex: 1; overflow-y: auto; padding: var(--sp-3); }
+
+/* 栏目标题（桌面端） */
+.member-head {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-1) var(--sp-2);
+}
+.member-head-title {
+  font-size: var(--fs-11);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.member-head-count {
+  background: var(--bg-elev2);
+  padding: 1px 8px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-11);
+  color: var(--text-dim);
+}
 
 .member-search { margin-bottom: var(--sp-3); }
 .search-input {

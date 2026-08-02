@@ -503,10 +503,33 @@ function onCloseTopology() {
         />
 
         <template v-else-if="activeNav === 'chat'">
-          <div class="chat-empty small">
-            <div class="empty-icon">💬</div>
-            <p>未加入房间</p>
-            <p class="sub">点击左侧「+」创建或加入房间</p>
+          <div class="welcome-card">
+            <svg class="welcome-logo" width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 2 L21 7 V17 L12 22 L3 17 V7 Z"
+                stroke="var(--c-primary)"
+                stroke-width="1.5"
+                stroke-linejoin="round"
+                fill="var(--c-primary-soft)"
+              />
+              <path
+                d="M12 7 L16 9.5 V14.5 L12 17 L8 14.5 V9.5 Z"
+                stroke="var(--c-primary)"
+                stroke-width="1.2"
+                stroke-linejoin="round"
+                fill="none"
+                opacity="0.7"
+              />
+            </svg>
+            <h2 class="welcome-title">nchat</h2>
+            <p class="welcome-sub">去中心化 P2P 聊天室</p>
+            <p class="welcome-desc">
+              没有中心服务器，消息只在节点之间直接流转。<br />
+              搜索或创建一个房间，与同一网络中的节点实时通信。
+            </p>
+            <div class="welcome-actions">
+              <button class="btn primary" @click="showCreateDialog = true">＋ 创建房间</button>
+            </div>
           </div>
         </template>
 
@@ -661,6 +684,57 @@ function onCloseTopology() {
 
 <style scoped>
 /* Scoped styles for App-level overlays only */
+.welcome-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  padding: var(--sp-8);
+  text-align: center;
+  min-height: 0;
+}
+.welcome-logo {
+  margin-bottom: var(--sp-3);
+  filter: drop-shadow(0 0 24px rgba(79, 140, 255, 0.35));
+  animation: welcomeFloat 3s var(--ease-in-out) infinite;
+}
+@keyframes welcomeFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.welcome-title {
+  margin: 0;
+  font-size: var(--fs-24);
+  font-weight: var(--fw-bold);
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.welcome-sub {
+  margin: 0;
+  font-size: var(--fs-14);
+  color: var(--text-dim);
+}
+.welcome-desc {
+  margin: var(--sp-2) 0 0;
+  font-size: var(--fs-13);
+  color: var(--text-muted);
+  line-height: 1.8;
+}
+.welcome-actions {
+  margin-top: var(--sp-6);
+  display: flex;
+  gap: var(--sp-3);
+}
+.welcome-actions .btn {
+  min-width: 140px;
+  min-height: 44px;
+  padding: var(--sp-2) var(--sp-6);
+  border-radius: var(--r-full);
+  font-size: var(--fs-14);
+}
+
 .modal-overlay {
   position: fixed;
   inset: 0;

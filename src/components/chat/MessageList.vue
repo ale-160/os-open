@@ -77,10 +77,12 @@ function onDownload(file) {
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: var(--sp-4);
+  padding: var(--sp-4) var(--sp-4) var(--sp-6);
   display: flex;
   flex-direction: column;
-  gap: var(--sp-2);
+  gap: var(--sp-3);
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-elev3) transparent;
 }
 .scroll-anchor { height: 1px; }
 </style>
