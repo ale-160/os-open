@@ -349,6 +349,7 @@ function escapeHtml(s) {
 
 <style scoped>
 .message {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--sp-1);
@@ -467,17 +468,18 @@ function escapeHtml(s) {
   font-style: italic;
 }
 .msg-footer {
-  position: relative;
   display: flex;
   align-items: center;
   gap: var(--sp-2);
   margin-top: 2px;
 }
-/* 操作键：默认隐藏，PC 悬停 / 移动端长按显示（浮于气泡正上方外部，不遮挡消息内容） */
+/* 操作键：默认隐藏，PC 悬停 / 移动端长按显示
+   定位在气泡侧面的同行空白区（对方=气泡右侧，自己=气泡左侧），永不遮挡任何消息 */
 .msg-actions-bar {
   position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
+  top: 0;
+  left: calc(100% + 10px);
+  right: auto;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -490,15 +492,21 @@ function escapeHtml(s) {
   box-shadow: var(--shadow-2);
   opacity: 0;
   pointer-events: none;
-  transform: translateY(4px);
+  transform: translateX(4px);
   transition: opacity var(--t-fast), transform var(--t-fast);
   z-index: 2;
+}
+/* 自己的消息靠右：操作条放到气泡左侧的同行空白区 */
+.message.own .msg-actions-bar {
+  left: auto;
+  right: calc(100% + 10px);
+  transform: translateX(-4px);
 }
 @media (hover: hover) {
   .message:hover .msg-actions-bar {
     opacity: 1;
     pointer-events: auto;
-    transform: translateY(0);
+    transform: translateX(0);
   }
 }
 @media (hover: none) {
@@ -511,7 +519,7 @@ function escapeHtml(s) {
 .message.actions-visible .msg-actions-bar {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  transform: translateX(0);
 }
 .react-picker { display: flex; gap: 4px; padding: 2px; background: var(--bg-input); border-radius: var(--r-sm); }
 .emoji-btn { font-size: 16px; line-height: 1; padding: 4px 8px; border-radius: var(--r-sm); background: transparent; border: none; cursor: pointer; }

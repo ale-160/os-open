@@ -91,8 +91,9 @@ function onDownload(file) {
 <style scoped>
 .message-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 48px var(--sp-4) var(--sp-6);
+  padding: var(--sp-4) var(--sp-4) var(--sp-6);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
