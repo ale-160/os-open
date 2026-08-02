@@ -1857,7 +1857,8 @@ export class PeerNetwork extends EventTarget {
       from: msg.from,
       name: msg.extensions?.name || msg.from.slice(0, 8),
       text,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
+      replyTo: msg.payload?.replyTo
     }
     this._emit('chat', chatMsg)
     // 转发给房间内其他未直连的 peer（gossip 式简化：直接广播给除发送者外的所有连接）
@@ -2781,7 +2782,7 @@ export class PeerNetwork extends EventTarget {
     this._emit('member:update', { room })
   }
 
-  async sendRoomMessage(room, text) {
+  async sendRoomMessage(room, text, replyTo) {
     if (!this._localRoomsSet.has(room)) {
       // 自动加入
       await this.joinRoom(room)
@@ -2804,7 +2805,9 @@ export class PeerNetwork extends EventTarget {
         type: MsgType.ROOM_MESSAGE,
         from: this.identity.peerId,
         to: room,
-        payload: { room, text },
+        payload: replyTo
+          ? { room, text, replyTo: { msgId: replyTo.msgId, text: replyTo.text, name: replyTo.name } }
+          : { room, text },
         extensions: { name: this.ownName }
       },
       this.identity.privateKey
@@ -2818,7 +2821,10 @@ export class PeerNetwork extends EventTarget {
       from: msg.from,
       name: this.ownName,
       text,
-      timestamp: msg.timestamp
+      timestamp: msg.timestamp,
+      replyTo: replyTo
+        ? { msgId: replyTo.msgId, text: replyTo.text, name: replyTo.name }
+        : undefined
     })
     await this._broadcast(msg)
     return true

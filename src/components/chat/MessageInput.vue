@@ -11,10 +11,11 @@ import {
 
 const props = defineProps({
   disabled: { type: Boolean, default: false },
-  placeholder: { type: String, default: '输入消息，回车发送，Shift+Enter 换行' }
+  placeholder: { type: String, default: '输入消息，回车发送，Shift+Enter 换行' },
+  replyingTo: { type: Object, default: null }
 })
 
-const emit = defineEmits(['send', 'file', 'mention'])
+const emit = defineEmits(['send', 'file', 'mention', 'cancel-reply'])
 
 const draft = ref('')
 const showEmoji = ref(false)
@@ -53,32 +54,44 @@ function onFileChange(e) {
 
 <template>
   <div class="message-input-area">
-    <div class="input-toolbar">
-      <button class="icon-btn" @click="showAttach = !showAttach" title="附件">
-        <IconPlus :size="20" />
-      </button>
-      <button class="icon-btn" @click="showEmoji = !showEmoji" title="表情">
-        <IconReact :size="20" />
+    <!-- 回复引用条 -->
+    <div class="reply-bar" v-if="replyingTo">
+      <span class="reply-icon"><IconThread :size="14" /></span>
+      <span class="reply-label">回复 {{ replyingTo.name || '对方' }}</span>
+      <span class="reply-snippet">{{ replyingTo.text || '（文件/图片消息）' }}</span>
+      <button class="reply-close" @click="emit('cancel-reply')" title="取消回复">
+        <IconClose :size="14" />
       </button>
     </div>
 
-    <div class="input-wrapper">
-      <textarea
-        v-model="draft"
-        class="input-field"
-        :placeholder="placeholder"
-        @input="handleInput"
-        @keydown="handleKeydown"
-        :disabled="props.disabled"
-        rows="1"
-        style="resize: none; min-height: 44px; max-height: 160px;"
-      ></textarea>
-    </div>
+    <div class="input-row">
+      <div class="input-toolbar">
+        <button class="icon-btn" @click="showAttach = !showAttach" title="附件">
+          <IconPlus :size="20" />
+        </button>
+        <button class="icon-btn" @click="showEmoji = !showEmoji" title="表情">
+          <IconReact :size="20" />
+        </button>
+      </div>
 
-    <div class="input-actions">
-      <button class="icon-btn primary" :disabled="!canSend" @click="handleSend" title="发送">
-        <IconSend :size="20" />
-      </button>
+      <div class="input-wrapper">
+        <textarea
+          v-model="draft"
+          class="input-field"
+          :placeholder="placeholder"
+          @input="handleInput"
+          @keydown="handleKeydown"
+          :disabled="props.disabled"
+          rows="1"
+          style="resize: none; min-height: 44px; max-height: 160px;"
+        ></textarea>
+      </div>
+
+      <div class="input-actions">
+        <button class="icon-btn primary" :disabled="!canSend" @click="handleSend" title="发送">
+          <IconSend :size="20" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -86,14 +99,54 @@ function onFileChange(e) {
 <style scoped>
 .message-input-area {
   display: flex;
-  align-items: flex-end;
-  gap: var(--sp-3);
-  padding: var(--sp-3) var(--sp-4);
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4) var(--sp-3);
   background: var(--glass-bg);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
   border-top: 1px solid var(--glass-border);
   flex-shrink: 0;
+}
+/* 回复引用条 */
+.reply-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-elev2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  font-size: var(--fs-12);
+  min-height: 34px;
+}
+.reply-icon { color: var(--accent); flex-shrink: 0; display: flex; }
+.reply-label { color: var(--accent); font-weight: var(--fw-medium); white-space: nowrap; }
+.reply-snippet {
+  color: var(--text-muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reply-close {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.reply-close:hover { background: var(--bg-hover); color: var(--text); }
+.input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
 }
 .input-toolbar {
   display: flex;

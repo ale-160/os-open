@@ -7,9 +7,12 @@ const props = defineProps({
   myPeerId: { type: String, default: '' },
   locateMsgId: { type: String, default: '' },
   pinnedIds: { type: Array, default: () => [] },
+  starredIds: { type: Array, default: () => [] },
+  multiSelect: { type: Boolean, default: false },
+  selectedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download'])
+const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select'])
 
 const listRef = ref(null)
 const editingId = ref(null)
@@ -103,6 +106,9 @@ function onDownload(file) {
       :draft="editDraft"
       :highlight="locateMsgId === m.id"
       :pinned-ids="pinnedIds"
+      :starred-ids="starredIds"
+      :multi-select="multiSelect"
+      :selected="selectedIds.includes(m.id)"
       @edit="startEdit"
       @save-edit="saveEdit"
       @update-draft="updateDraft"
@@ -111,6 +117,11 @@ function onDownload(file) {
       @toggle-pin="emit('toggle-pin', $event)"
       @react="onReact"
       @download="onDownload"
+      @reply="emit('reply', $event)"
+      @locate="emit('locate', $event)"
+      @toggle-star="emit('toggle-star', $event)"
+      @multi-select="emit('multi-select', $event)"
+      @toggle-select="emit('toggle-select', $event)"
     />
     <div class="scroll-anchor" ref="anchor" />
   </div>

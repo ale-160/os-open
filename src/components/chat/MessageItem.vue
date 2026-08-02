@@ -13,6 +13,8 @@ import {
   IconCheck,
   IconClose,
   IconCopy,
+  IconThread,
+  IconStar,
 } from '../icons'
 
 const props = defineProps({
@@ -22,9 +24,12 @@ const props = defineProps({
   draft: { type: String, default: '' },
   highlight: { type: Boolean, default: false },
   pinnedIds: { type: Array, default: () => [] },
+  starredIds: { type: Array, default: () => [] },
+  multiSelect: { type: Boolean, default: false },
+  selected: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download'])
+const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select'])
 
 const reactPicker = ref(false)
 const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
@@ -48,6 +53,11 @@ function onTouchStart() {
 function onTouchEnd() { clearTimeout(longPressTimer) }
 function onTouchMove() { clearTimeout(longPressTimer) }
 function onClick() {
+  // 多选模式：点击消息切换选中
+  if (props.multiSelect) {
+    emit('toggle-select', props.msg.id)
+    return
+  }
   // 短按消息任意处：若操作键已显示则收起（长按引发的 click 不收起）
   if (actionsVisible.value && !longPressFired) actionsVisible.value = false
   longPressFired = false
@@ -69,6 +79,7 @@ onUnmounted(() => {
 
 const isOwn = computed(() => !!props.msg && props.msg.from === props.myPeerId)
 const isPinned = computed(() => props.pinnedIds.includes(props.msg.id))
+const isStarred = computed(() => props.starredIds.includes(props.msg.id))
 const RECALL_WINDOW = 5 * 60 * 1000
 const canRecall = computed(() => isOwn.value && !props.msg.deleted && (Date.now() - (props.msg.timestamp || 0)) <= RECALL_WINDOW)
 const reactions = computed(() => props.msg.reactions || {})
@@ -185,6 +196,7 @@ function escapeHtml(s) {
       'has-reactions': reactionList.length,
       highlight,
       pinned: isPinned,
+      selected,
       'actions-visible': actionsVisible || showActions
     }"
     data-msg-id="msg.id"
@@ -195,10 +207,27 @@ function escapeHtml(s) {
     @mouseenter="onMouseEnter"
     @mouseleave="onMouseLeave"
   >
+    <!-- 多选模式复选框 -->
+    <div v-if="multiSelect" class="msg-select" :class="{ checked: selected }" @click.stop="emit('toggle-select', msg.id)">
+      <IconCheck v-if="selected" :size="12" />
+    </div>
     <div class="msg-header">
       <span class="msg-name" v-if="!isOwn">{{ msg.name || msg.from.slice(0, 8) }}</span>
       <span class="msg-time">{{ formatTime(msg.timestamp) }}</span>
       <span v-if="msg.status" class="msg-status">{{ msg.status }}</span>
+      <span v-if="isStarred" class="star-badge" title="已标记"><IconStar :size="12" class="filled" /></span>
+    </div>
+
+    <!-- 回复引用块：点击定位到原消息 -->
+    <div
+      v-if="msg.replyTo && !msg.deleted"
+      class="msg-quote"
+      @click="emit('locate', msg.replyTo.msgId)"
+      title="点击定位到原消息"
+    >
+      <span class="quote-arrow"><IconThread :size="12" /></span>
+      <span class="quote-name">{{ msg.replyTo.name || '对方' }}</span>
+      <span class="quote-text">{{ msg.replyTo.text || '（文件/图片消息）' }}</span>
     </div>
 
     <div class="msg-body">
@@ -350,6 +379,18 @@ function escapeHtml(s) {
           <IconReact :size="14" />
         </button>
 
+        <button class="icon-btn-mini" @click="$emit('reply', msg)" title="回复">
+          <IconThread :size="14" />
+        </button>
+
+        <button class="icon-btn-mini" :class="{ starred: isStarred }" @click="$emit('toggle-star', msg.id)" title="标记">
+          <IconStar :size="14" :class="{ filled: isStarred }" />
+        </button>
+
+        <button class="icon-btn-mini" @click="$emit('multi-select', msg)" title="多选">
+          <IconCheck :size="14" />
+        </button>
+
         <button v-if="isOwn && !msg.deleted" class="icon-btn-mini" @click="$emit('edit', msg)" title="编辑">
           <IconEdit :size="14" />
         </button>
@@ -391,6 +432,32 @@ function escapeHtml(s) {
   background: linear-gradient(135deg, rgba(79,140,255,0.18), rgba(79,140,255,0.06));
   border-color: rgba(79,140,255,0.25);
 }
+/* 多选模式：消息整体高亮 + 左侧复选框 */
+.message.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--c-primary-soft);
+}
+.msg-select {
+  position: absolute;
+  left: -30px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: var(--bg-elev2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.msg-select.checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
 .message.highlight {
   animation: pin-highlight 2s ease-out;
 }
@@ -413,6 +480,37 @@ function escapeHtml(s) {
   color: var(--text-muted);
 }
 .msg-time { white-space: nowrap; }
+.star-badge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--c-warning);
+  margin-left: auto;
+}
+.star-badge .filled { fill: currentColor; }
+/* 回复引用块 */
+.msg-quote {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-elev2);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--r-sm);
+  font-size: var(--fs-12);
+  cursor: pointer;
+  min-width: 0;
+  transition: background var(--t-fast);
+}
+.msg-quote:hover { background: var(--bg-hover); }
+.quote-arrow { color: var(--accent); flex-shrink: 0; display: inline-flex; }
+.quote-name { color: var(--accent); font-weight: var(--fw-medium); white-space: nowrap; }
+.quote-text {
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 .msg-body {
   display: flex;
   flex-direction: column;
@@ -560,6 +658,7 @@ function escapeHtml(s) {
   transition: background var(--t-fast), color var(--t-fast);
 }
 .icon-btn-mini:hover { background: var(--bg-hover); color: var(--text); }
+.icon-btn-mini.starred { color: var(--c-warning); background: var(--c-warning-soft); }
 .icon-btn-mini.danger:hover { background: var(--c-danger-soft); color: var(--c-danger); border-color: var(--c-danger); }
 .icon-btn-mini .filled { fill: currentColor; }
 </style>

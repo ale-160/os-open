@@ -46,6 +46,26 @@ input {
   outline: none;
 }
 
+/* ===== 全局细滚动条（所有可滚动区域统一，消息列表另有按需显隐逻辑） ===== */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-elev3) transparent;
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--bg-elev3);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-elev4);
+}
+
 /* ===== 应用骨架（三栏布局：SideNav | ListBar | ContentArea） ===== */
 .app {
   display: flex;

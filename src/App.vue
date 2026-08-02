@@ -33,6 +33,8 @@ const {
   // Phase 2.3: Pin 置顶
   togglePin,
   currentRoomPins,
+  toggleStar,
+  currentRoomStarred,
   // Phase 2.4: 云文档
   currentRoomDocs,
   createDoc,
@@ -290,9 +292,29 @@ const currentAnnouncement = computed(() => {
 
 // Phase 2.3: 当前房间 Pin 列表
 const currentRoomPinnedIds = computed(() => currentRoomPins())
+const currentRoomStarredIds = computed(() => currentRoomStarred())
+
+async function onToggleStar(msgId) {
+  toggleStar(msgId)
+}
+
+// ChatPanel 通知（多选批量删除无可用项时提示）
+function onNotify({ type = 'error', message } = {}) {
+  const id = Date.now() + '-' + Math.random().toString(36).slice(2, 6)
+  notifications.value.push({ id, type, text: message, timestamp: Date.now() })
+  setTimeout(() => {
+    const idx = notifications.value.findIndex((n) => n.id === id)
+    if (idx >= 0) notifications.value.splice(idx, 1)
+  }, 5000)
+}
 
 // Phase 2.4: 当前房间文档列表
 const currentRoomDocsList = computed(() => currentRoomDocs())
+
+async function onSendChat({ text, replyTo } = {}) {
+  if (!text) return
+  await sendRoomMessage(text, replyTo)
+}
 
 // Phase 2.2: 发布/编辑公告
 async function onSetAnnouncement(text) {
@@ -479,17 +501,20 @@ function onCloseTopology() {
           :announcement="currentAnnouncement"
           :can-set-announcement="canSetAnnouncement()"
           :pinned-msg-ids="currentRoomPinnedIds"
+          :starred-msg-ids="currentRoomStarredIds"
           :docs="currentRoomDocsList"
           :doc-conflicts="docConflicts"
           :locate-msg-id="pendingLocateMsgId"
           :my-peer-id="state.peerId"
-          @send="sendRoomMessage"
+          @send="onSendChat"
           @leave="leaveCurrentRoom"
           @back="backToRoomList"
           @send-file="sendFileMessage"
           @download="onDownloadFile"
           @set-announcement="onSetAnnouncement"
           @toggle-pin="onTogglePin"
+          @toggle-star="onToggleStar"
+          @notify="onNotify"
           @create-doc="onCreateDoc"
           @update-doc="onUpdateDoc"
           @rename-doc="onRenameDoc"

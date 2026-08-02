@@ -38,6 +38,7 @@ const props = defineProps({
   announcement: { type: Object, default: null },
   canSetAnnouncement: { type: Boolean, default: false },
   pinnedMsgIds: { type: Array, default: () => [] },
+  starredMsgIds: { type: Array, default: () => [] },
   // Phase 2.4: 云文档
   docs: { type: Array, default: () => [] },
   docConflicts: { type: Map, default: () => new Map() },
@@ -56,7 +57,9 @@ const emit = defineEmits([
   // Phase 2.5: 定位完成通知（父组件清除 locateMsgId）
   'located',
   // Phase 3.1: 消息编辑 / 撤回 / 回应
-  'edit-message', 'recall-message', 'react-message'
+  'edit-message', 'recall-message', 'react-message',
+  // 通知（多选批量删除无可用项时提示）
+  'notify', 'toggle-star'
 ])
 
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
@@ -92,6 +95,51 @@ function clearAnnouncement() {
 // ===== Phase 2.3: Pin 置顶 =====
 const pinListExpanded = ref(false)
 const highlightMsgId = ref(null)
+
+// 回复引用：{ msgId, name, text }，设置后输入框显示引用条
+const replyingTo = ref(null)
+function startReply(msg) {
+  replyingTo.value = { msgId: msg.id, name: msg.name || msg.from?.slice(0, 8), text: msg.text || '' }
+}
+function cancelReply() {
+  replyingTo.value = null
+}
+
+// ---- 多选模式：批量撤回/删除 ----
+const multiSelect = ref({ active: false, ids: new Set() })
+const selectedIds = computed(() => [...multiSelect.value.ids])
+const deletableCount = computed(() => {
+  let n = 0
+  for (const id of multiSelect.value.ids) {
+    const m = props.messages.find((x) => x.id === id)
+    if (m && m.from === props.myPeerId && !m.deleted && Date.now() - (m.timestamp || 0) <= 5 * 60 * 1000) n++
+  }
+  return n
+})
+function enterMultiSelect(msg) {
+  multiSelect.value = { active: true, ids: new Set([msg.id]) }
+}
+function toggleSelect(id) {
+  const ids = new Set(multiSelect.value.ids)
+  if (ids.has(id)) ids.delete(id)
+  else ids.add(id)
+  multiSelect.value = { active: true, ids }
+}
+function exitMultiSelect() {
+  multiSelect.value = { active: false, ids: new Set() }
+}
+function batchDelete() {
+  let deleted = 0
+  for (const id of multiSelect.value.ids) {
+    const m = props.messages.find((x) => x.id === id)
+    if (m && m.from === props.myPeerId && !m.deleted && Date.now() - (m.timestamp || 0) <= 5 * 60 * 1000) {
+      emit('recall-message', m)
+      deleted++
+    }
+  }
+  exitMultiSelect()
+  if (deleted === 0) emit('notify', { type: 'error', message: '没有可删除的消息（仅限自己 5 分钟内发送的）' })
+}
 
 // Phase 2.5: 通用消息定位（Pin / 搜索结果跳转共用）
 async function locateMessage(msgId) {
@@ -140,13 +188,16 @@ watch(() => props.currentRoom, () => {
   pinListExpanded.value = false
   highlightMsgId.value = null
   activeTab.value = 'chat'
+  replyingTo.value = null
+  exitMultiSelect()
   // 切换房间强制滚到底（由 MessageList 的智能滚动接管新消息场景）
   scrollToBottom()
 })
 
 function onSend(text) {
   if (!text || !inRoom.value) return
-  emit('send', text)
+  emit('send', { text, replyTo: replyingTo.value || undefined })
+  replyingTo.value = null
 }
 
 function onSendFile(file) {
@@ -320,22 +371,43 @@ function onLocated(msgId) {
             :my-peer-id="myPeerId"
             :locate-msg-id="locateMsgId"
             :pinned-ids="pinnedMsgIds"
+            :starred-ids="starredMsgIds"
+            :multi-select="multiSelect.active"
+            :selected-ids="selectedIds"
             @edit="emit('edit-message', $event)"
             @recall="emit('recall-message', $event)"
             @toggle-pin="emit('toggle-pin', $event)"
+            @toggle-star="emit('toggle-star', $event)"
             @react="emit('react-message', $event)"
             @download="onDownloadFile"
+            @reply="startReply"
+            @locate="locateMessage"
+            @multi-select="enterMultiSelect"
+            @toggle-select="toggleSelect"
           />
         </template>
+      </div>
+
+      <!-- 多选操作栏 -->
+      <div v-if="multiSelect.active" class="multi-select-bar">
+        <span class="ms-count">已选 {{ multiSelect.ids.size }} 条</span>
+        <div class="ms-actions">
+          <button class="ms-btn primary" :disabled="deletableCount === 0" @click="batchDelete" title="仅限自己 5 分钟内发送的消息">
+            <IconTrash :size="14" /> 删除{{ deletableCount ? ` (${deletableCount})` : '' }}
+          </button>
+          <button class="ms-btn" @click="exitMultiSelect">取消</button>
+        </div>
       </div>
 
       <!-- 输入区 -->
       <MessageInput
         :disabled="!inRoom"
         placeholder="输入消息，回车发送，Shift+Enter 换行"
+        :replying-to="replyingTo"
         @send="onSend"
         @file="onSendFile"
         @mention="() => {}"
+        @cancel-reply="cancelReply"
       />
     </template>
 
@@ -411,4 +483,46 @@ function onLocated(msgId) {
   line-height: 1;
   flex-shrink: 0;
 }
+
+/* ===== 多选操作栏 ===== */
+.multi-select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--bg-elev2);
+  border-top: 1px solid var(--border-soft);
+  flex-shrink: 0;
+}
+.ms-count {
+  font-size: var(--fs-12);
+  color: var(--text-dim);
+}
+.ms-actions {
+  display: flex;
+  gap: var(--sp-2);
+}
+.ms-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: var(--bg-elev2);
+  color: var(--text);
+  font-size: var(--fs-12);
+  cursor: pointer;
+  min-height: 32px;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.ms-btn:hover { background: var(--bg-hover); }
+.ms-btn.primary {
+  background: var(--c-danger);
+  border-color: var(--c-danger);
+  color: white;
+}
+.ms-btn.primary:hover:not(:disabled) { background: var(--c-danger); opacity: 0.9; }
+.ms-btn.primary:disabled { opacity: 0.4; cursor: not-allowed; }
 </style>

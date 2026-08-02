@@ -76,6 +76,40 @@ const domains = ref([])
 const announcements = ref(new Map())
 // Phase 2.3: Pin 置顶（room -> [msgId...]）
 const pins = ref(new Map())
+
+// ---- 消息星标（本地收藏，按房间持久化到 localStorage） ----
+const starredByRoom = ref(loadStarred())
+function loadStarred() {
+  try {
+    return JSON.parse(localStorage.getItem('nchat:stars') || '{}')
+  } catch {
+    return {}
+  }
+}
+function saveStarred() {
+  try {
+    localStorage.setItem('nchat:stars', JSON.stringify(starredByRoom.value))
+  } catch {
+    /* 存储满/隐私模式忽略 */
+  }
+}
+/** 当前房间已标记消息 id 列表 */
+function currentRoomStarred() {
+  const room = currentRoom.value
+  if (!room) return []
+  return starredByRoom.value[room] || []
+}
+/** 切换消息星标（仅本地收藏，不广播） */
+function toggleStar(msgId) {
+  const room = currentRoom.value
+  if (!room || !msgId) return false
+  const next = { ...starredByRoom.value }
+  const list = next[room] || []
+  next[room] = list.includes(msgId) ? list.filter((x) => x !== msgId) : [...list, msgId]
+  starredByRoom.value = next
+  saveStarred()
+  return true
+}
 // Phase 2.4: 云文档（room -> [doc...]）
 const docs = ref(new Map())
 // Phase 2.4: 文档冲突提示（docId -> { local, remote }）
@@ -905,9 +939,9 @@ function backToRoomList() {
   pendingRequests.value = []
 }
 
-async function sendRoomMessage(text) {
+async function sendRoomMessage(text, replyTo) {
   if (!network || !currentRoom.value || !text.trim()) return
-  const ok = await network.sendRoomMessage(currentRoom.value, text.trim())
+  const ok = await network.sendRoomMessage(currentRoom.value, text.trim(), replyTo)
   if (ok) stats.value.sent++
 }
 
@@ -1410,6 +1444,9 @@ export function useChat() {
     togglePin,
     isPinned,
     currentRoomPins,
+    // 消息星标（本地收藏）
+    toggleStar,
+    currentRoomStarred,
     // Phase 2.4: 云文档
     currentRoomDocs,
     createDoc,
