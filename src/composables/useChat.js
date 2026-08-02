@@ -203,10 +203,8 @@ async function init() {
     state.online = true
     state.activeServer = network.getActiveServer()
     state.error = null
-    // 恢复已加入的房间（页面刷新后保持「已加入」状态）
-    for (const room of network.localRooms()) {
-      markJoined(room)
-    }
+    // 恢复已加入的房间（joinedNames 已从 localStorage 恢复，刷新列表）
+    refreshJoinedRooms()
   } catch (e) {
     console.error('[nchat] 启动失败：', e)
     state.error = describeError(e)
@@ -1273,8 +1271,25 @@ const filteredRooms = computed(() => {
   })
 })
 
-/** 已加入的房间列表（显式维护 joinedNames + 手动刷新，避免 computed 缓存问题） */
-const joinedNames = ref(new Set())
+/** 已加入的房间列表（显式维护 joinedNames + 手动刷新，持久化到 localStorage 与收藏一致） */
+const joinedNames = ref(loadJoinedNames())
+function loadJoinedNames() {
+  try {
+    const raw = localStorage.getItem('nchat:joined')
+    if (!raw) return new Set()
+    const list = JSON.parse(raw)
+    return new Set(Array.isArray(list) ? list.filter((x) => typeof x === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+function saveJoinedNames() {
+  try {
+    localStorage.setItem('nchat:joined', JSON.stringify([...joinedNames.value]))
+  } catch {
+    /* ignore */
+  }
+}
 const joinedRooms = ref([])
 function refreshJoinedRooms() {
   if (!network) {
@@ -1289,6 +1304,7 @@ function markJoined(name) {
   const next = new Set(joinedNames.value)
   next.add(name)
   joinedNames.value = next
+  saveJoinedNames()
   refreshJoinedRooms()
 }
 function markLeft(name) {
@@ -1296,6 +1312,7 @@ function markLeft(name) {
   const next = new Set(joinedNames.value)
   next.delete(name)
   joinedNames.value = next
+  saveJoinedNames()
   refreshJoinedRooms()
 }
 
