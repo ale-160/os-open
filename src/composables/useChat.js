@@ -376,22 +376,36 @@ function wireEvents(net) {
     domains.value = list.map((d) => ({ ...d }))
   })
 
-  // 房间列表（合并而非替换，保留缓存房间和别名）
+  // 房间列表：以各节点广播的活跃房间为准（覆盖/新增），
+  // 本地已加入的房间保留（广播可能未覆盖），其余（含已销毁的空房间缓存）移除
   net.addEventListener('rooms', (e) => {
     const incoming = e.detail || []
-    const existing = new Map(rooms.value.map((r) => [r.name, r]))
-    // 合并：新数据更新已有房间，新房间添加到列表
+    const localJoined = new Set(network ? network.localRooms() : [])
+    const incomingMap = new Map(incoming.map((r) => [r.name, r]))
+    const next = new Map()
+    // 保留：incoming 未覆盖但本地已加入的房间
+    for (const r of rooms.value) {
+      if (incomingMap.has(r.name)) continue
+      if (localJoined.has(r.name)) next.set(r.name, r)
+    }
+    // 合并 incoming（覆盖旧值，别名取并集）
     for (const r of incoming) {
-      const old = existing.get(r.name)
+      const old = next.get(r.name)
       if (old) {
-        // 合并别名（取并集）
         const allAliases = new Set([...(r.aliases || []), ...(old.aliases || [])])
-        existing.set(r.name, { ...old, ...r, aliases: [...allAliases] })
+        next.set(r.name, { ...old, ...r, aliases: [...allAliases] })
       } else {
-        existing.set(r.name, r)
+        next.set(r.name, r)
       }
     }
-    rooms.value = [...existing.values()]
+    rooms.value = [...next.values()]
+  })
+
+  // 房间销毁（无成员）：从列表移除，避免残留空房间
+  net.addEventListener('room:removed', (e) => {
+    const room = e.detail?.room
+    if (!room) return
+    rooms.value = rooms.value.filter((r) => r.name !== room)
   })
 
   // 聊天消息

@@ -1181,7 +1181,8 @@ export class PeerNetwork extends EventTarget {
 
   /**
    * 处理房间继承：owner 下线后，由星标最高的在线成员继承
-   * 无继承者时，如果本地也不在房间，则房间销毁
+   * 无高星继承者时：本地在房间 → 第一个在线成员继承为房主（无星级门槛）；
+   * 本地不在房间 → 房间销毁
    */
   _handleInheritance(roomName, oldOwner) {
     const r = this.knownRooms.get(roomName)
@@ -1205,13 +1206,26 @@ export class PeerNetwork extends EventTarget {
       const meta = this._localRoomMeta.get(roomName)
       if (meta) meta.owner = bestPeer
       this._emit('member:update', { room: roomName })
-    } else {
-      // 无继承者：如果本地不在房间，销毁
-      if (!this._localRoomsSet.has(roomName)) {
-        this.knownRooms.delete(roomName)
-        deleteRoomStars(roomName)
+      return
+    }
+    // 无高星继承者
+    if (this._localRoomsSet.has(roomName)) {
+      // 本地在房间：第一个在线成员继承为房主（房间无人则后续进入者自动成为房主）
+      const firstPeer = r.members.keys().next().value
+      if (firstPeer && firstPeer !== oldOwner) {
+        r.owner = firstPeer
+        const member = r.members.get(firstPeer)
+        if (member) member.stars = Stars.CREATOR
+        const meta = this._localRoomMeta.get(roomName)
+        if (meta) meta.owner = firstPeer
+        this._emit('member:update', { room: roomName })
+        return
       }
     }
+    // 本地不在房间（或无人可继）：销毁
+    this.knownRooms.delete(roomName)
+    deleteRoomStars(roomName)
+    this._emit('room:removed', { room: roomName })
   }
 
   /**
@@ -1824,7 +1838,21 @@ export class PeerNetwork extends EventTarget {
     if (!room) return
     const entry = this.connections.get(connKey)
     if (entry) entry.rooms.delete(room)
+    const r = this.knownRooms.get(room)
+    const isOwner = r?.owner === msg.from
+    const wasLastMember = r ? r.members.size <= 1 : false
     this._removeMember(room, msg.from)
+    if (isOwner) {
+      // owner 离开：触发继承（无继承者且本地不在房间时销毁）
+      this._handleInheritance(room, msg.from)
+    } else if (wasLastMember) {
+      // 最后一人离开且本地不在房间：销毁
+      if (!this._localRoomsSet.has(room)) {
+        this.knownRooms.delete(room)
+        deleteRoomStars(room)
+        this._emit('room:removed', { room })
+      }
+    }
     this._recomputeRooms()
     this._emit('member:update', { room })
   }
@@ -2055,6 +2083,7 @@ export class PeerNetwork extends EventTarget {
       const localIn = this._localRoomsSet.has(name)
       if (r.members.size === 0 && !localIn) {
         this.knownRooms.delete(name)
+        this._emit('room:removed', { room: name })
         continue
       }
       // 合并本地元数据中的别名和规则
@@ -2256,6 +2285,15 @@ export class PeerNetwork extends EventTarget {
       })
     }
     this._mergeRoom(room, this.peerJsId, this.identity.peerId, this.ownName)
+    // 空房间接管：房主悬空（无房主或房主已不在房间）时，第一个进入者成为房主
+    const kr = this.knownRooms.get(room)
+    if (kr && (!kr.owner || !kr.members.has(kr.owner))) {
+      kr.owner = this.identity.peerId
+      const me = kr.members.get(this.identity.peerId)
+      if (me) me.stars = Stars.CREATOR
+      const meta = this._localRoomMeta.get(room)
+      if (meta) meta.owner = this.identity.peerId
+    }
     this._recomputeRooms()
     await this._broadcast({
       type: MsgType.JOIN_ROOM,
