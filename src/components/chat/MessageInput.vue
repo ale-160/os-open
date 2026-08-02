@@ -15,7 +15,7 @@ const props = defineProps({
   replyingTo: { type: Object, default: null }
 })
 
-const emit = defineEmits(['send', 'file', 'mention', 'cancel-reply'])
+const emit = defineEmits(['send', 'file', 'mention', 'cancel-reply', 'typing'])
 
 const draft = ref('')
 const showEmoji = ref(false)
@@ -33,7 +33,8 @@ function handleSend() {
 }
 
 function handleInput() {
-  // @提及逻辑可以在这里扩展
+  // P2-8: 打字状态（peer 层 2s 节流）
+  emit('typing')
 }
 
 function handleKeydown(e) {

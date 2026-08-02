@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CONFIG } from '../config.js'
-import { IconLock, IconUser, IconChat, IconEdit, IconStar } from './icons'
+import { IconLock, IconUser, IconChat, IconEdit, IconStar, IconUserPlus } from './icons'
 
 const props = defineProps({
   rooms: { type: Array, default: () => [] },
@@ -12,7 +12,7 @@ const props = defineProps({
   favorites: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['join', 'toggle-fav'])
+const emit = defineEmits(['join', 'toggle-fav', 'invite'])
 
 // 筛选标签：faved=收藏, joined=已加入, discover=发现
 const filterTab = ref('faved')
@@ -148,6 +148,15 @@ function speakIconName(rules) {
           @click.stop="emit('toggle-fav', r.name)"
         >
           <IconStar :size="14" :class="{ filled: favNames.has(r.name) }" />
+        </span>
+        <!-- 邀请按钮：生成分享链接/二维码 -->
+        <span
+          class="invite-btn"
+          :title="'邀请加入 ' + r.name"
+          role="button"
+          @click.stop="emit('invite', r.name)"
+        >
+          <IconUserPlus :size="14" />
         </span>
         <div class="room-name">
           <span class="room-icons">

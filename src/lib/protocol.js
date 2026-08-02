@@ -72,7 +72,9 @@ export const MsgType = {
   MSG_SEARCH: 'msg_search', // 搜索请求 { keyword, from, searchId }
   MSG_SEARCH_RESULT: 'msg_search_result', // 搜索结果响应 { searchId, results: [...], from }
   // ---- 送达确认（P0-2 消息可靠性） ----
-  MSG_ACK: 'msg_ack' // 消息送达回执 { room, msgIds: [...], from }（批量汇总）
+  MSG_ACK: 'msg_ack', // 消息送达回执 { room, msgIds: [...], from }（批量汇总）
+  // ---- 打字状态（P2-8） ----
+  TYPING: 'typing' // 正在输入 { room, from, name }（节流广播）
 }
 
 /**

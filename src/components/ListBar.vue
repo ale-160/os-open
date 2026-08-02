@@ -40,6 +40,7 @@ const emit = defineEmits([
   'create',
   'join',
   'toggle-fav',
+  'invite',
   'manage',
   'menu',
   // Phase 2.5: 消息搜索
@@ -101,7 +102,7 @@ const showManage = computed(() => props.activeNav === 'chat')
           </div>
         </div>
         <RoomSearch :online="online" :keyword="searchKeyword" @search="emit('search', $event)" @clear="emit('clear')" @create="emit('create')" />
-        <RoomList :rooms="filteredRooms" :current-room="currentRoom" :online="online" :searching="searching" :joined-rooms="joinedRooms" :favorites="favorites" @join="emit('join', $event)" @toggle-fav="emit('toggle-fav', $event)" />
+        <RoomList :rooms="filteredRooms" :current-room="currentRoom" :online="online" :searching="searching" :joined-rooms="joinedRooms" :favorites="favorites" @join="emit('join', $event)" @toggle-fav="emit('toggle-fav', $event)" @invite="emit('invite', $event)" />
       </template>
 
       <template v-else-if="activeNav === 'search'">

@@ -21,6 +21,7 @@ const props = defineProps({
   inRoom: { type: Boolean, default: false },
   memberOpen: { type: Boolean, default: true },
   callOpen: { type: Boolean, default: false },
+  typingName: { type: String, default: '' },
 })
 
 const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member', 'toggle-call', 'open-settings', 'edit-announcement'])
@@ -37,7 +38,8 @@ const showAnnouncement = computed(() => !!props.announcement?.text)
       </button>
       <div class="room-title">
         <span class="room-name"># {{ currentRoom }}</span>
-        <span class="room-meta">{{ memberCount }} 人 · {{ online ? '在线' : '离线' }}</span>
+        <span class="room-meta" v-if="typingName">{{ typingName }} 正在输入…</span>
+        <span class="room-meta" v-else>{{ memberCount }} 人 · {{ online ? '在线' : '离线' }}</span>
       </div>
     </div>
 

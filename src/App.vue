@@ -11,6 +11,8 @@ import MemberList from './components/MemberList.vue'
 import CreateRoomDialog from './components/CreateRoomDialog.vue'
 import SettingsPanel from './components/SettingsPanel.vue'
 import RoomManager from './components/RoomManager.vue'
+import InviteDialog from './components/InviteDialog.vue'
+import RoomSettingsDialog from './components/RoomSettingsDialog.vue'
 import PromptInstall from './components/PromptInstall.vue'
 import { IconClose, IconLock, IconInfo, IconCheck, IconAlert } from './components/icons'
 import TopologyView from './components/TopologyView.vue'
@@ -40,6 +42,11 @@ const {
   toggleBlockPeer,
   minBlockStars,
   setMinBlockStars,
+  // P2-8: 打字状态 + 免打扰
+  typingByRoom,
+  mutedRooms,
+  toggleMute,
+  sendTyping,
   // 房间收藏（手动收藏）
   favoriteRooms,
   toggleFavorite,
@@ -68,6 +75,7 @@ const {
   backToRoomList,
   sendRoomMessage,
   retryMessage,
+  exportRoomMessages,
   sendFileMessage,
   downloadFile,
   // Phase 3.1: 消息编辑 / 撤回 / 回应
@@ -129,6 +137,10 @@ const {
 const showCreateDialog = ref(false)
 const showSettings = ref(false)
 const showRoomManager = ref(false)
+// T7: 邀请弹窗（目标房间）
+const inviteRoomName = ref('')
+// T10: 聊天室级设置（标题栏齿轮，房间内打开）
+const showRoomSettings = ref(false)
 const installBannerVisible = ref(false)
 const showTopology = ref(false)
 
@@ -165,7 +177,16 @@ const passwordPrompt = ref(null) // { name }
 const passwordInput = ref('')
 
 onMounted(() => {
-  init()
+  init().then(() => {
+    // T7: 邀请链接 ?room=xxx —— 自动加入目标房间
+    const params = new URLSearchParams(location.search)
+    const target = params.get('room')
+    if (target) {
+      onJoinRoom({ name: target })
+      // 清理 URL 参数，避免刷新后重复加入
+      history.replaceState(null, '', location.pathname)
+    }
+  })
 })
 
 async function onJoinRoom(room) {
@@ -334,6 +355,19 @@ function onToggleFavorite(room) {
 
 // 屏蔽列表（Set → 数组，供模板 prop）
 const blockedPeersList = computed(() => [...blockedPeers.value])
+// P2-8: 当前房间正在输入的人
+const currentTypingName = computed(() => typingByRoom.value.get(currentRoom.value)?.name || '')
+// T10: 免打扰列表（Set → 数组）+ 成员名映射
+const mutedRoomsList = computed(() => [...mutedRooms.value])
+const memberNameMap = computed(() => {
+  const map = {}
+  for (const m of members.value) map[m.peerId] = m.name || m.peerId.slice(0, 8)
+  return map
+})
+async function onExportRoom() {
+  const count = await exportRoomMessages(currentRoom.value)
+  onNotify({ type: 'info', message: count ? `已导出 ${count} 条消息` : '该房间暂无消息' })
+}
 
 // Phase 2.4: 当前房间文档列表
 const currentRoomDocsList = computed(() => currentRoomDocs())
@@ -518,6 +552,7 @@ function onCloseTopology() {
         @create="showCreateDialog = true"
         @join="onJoinRoom"
         @toggle-fav="onToggleFavorite"
+        @invite="inviteRoomName = $event"
         @manage="showRoomManager = true"
         @menu="toggleSideNav"
         @msg-search="onMsgSearch"
@@ -537,6 +572,7 @@ function onCloseTopology() {
           v-if="inRoom"
           :current-room="currentRoom"
           :messages="visibleMessages"
+          :typing-name="currentTypingName"
           :online="state.online"
           :stats="stats"
           :members="members"
@@ -559,8 +595,9 @@ function onCloseTopology() {
           @toggle-pin="onTogglePin"
           @toggle-star="onToggleStar"
           @retry-message="onRetryMessage"
+          @typing="sendTyping(currentRoom)"
           @toggle-member="toggleMember"
-          @open-settings="showSettings = true"
+          @open-settings="inRoom ? (showRoomSettings = true) : (showSettings = true)"
           @notify="onNotify"
           @create-doc="onCreateDoc"
           @update-doc="onUpdateDoc"
@@ -687,6 +724,28 @@ function onCloseTopology() {
       :storage-stats="storageStats"
       @clear-storage="onClearStorage"
       @close="showRoomManager = false"
+    />
+
+    <!-- T7: 邀请弹窗（链接/二维码） -->
+    <InviteDialog
+      v-if="inviteRoomName"
+      :room="inviteRoomName"
+      @close="inviteRoomName = ''"
+    />
+
+    <!-- T10: 聊天室级设置 -->
+    <RoomSettingsDialog
+      v-if="showRoomSettings && currentRoom"
+      :room="currentRoom"
+      :muted-rooms="mutedRoomsList"
+      :min-block-stars="minBlockStars"
+      :blocked-peers="blockedPeersList"
+      :member-names="memberNameMap"
+      @close="showRoomSettings = false"
+      @toggle-mute="toggleMute(currentRoom)"
+      @set-min-stars="setMinBlockStars($event)"
+      @unblock="toggleBlockPeer($event)"
+      @export="onExportRoom"
     />
 
     <SettingsPanel

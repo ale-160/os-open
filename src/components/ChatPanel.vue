@@ -36,6 +36,7 @@ const props = defineProps({
   members: { type: Array, default: () => [] },
   fileProgress: { type: Map, default: () => new Map() },
   announcement: { type: Object, default: null },
+  typingName: { type: String, default: '' },
   canSetAnnouncement: { type: Boolean, default: false },
   pinnedMsgIds: { type: Array, default: () => [] },
   starredMsgIds: { type: Array, default: () => [] },
@@ -60,7 +61,7 @@ const emit = defineEmits([
   // Phase 3.1: 消息编辑 / 撤回 / 回应
   'edit-message', 'recall-message', 'react-message',
   // 通知（多选批量删除无可用项时提示）
-  'notify', 'toggle-star', 'toggle-member', 'open-settings', 'retry-message'
+  'notify', 'toggle-star', 'toggle-member', 'open-settings', 'retry-message', 'typing'
 ])
 
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
@@ -315,6 +316,7 @@ function onLocated(msgId) {
       :in-room="inRoom"
       :member-open="memberOpen"
       :call-open="callOpen"
+      :typing-name="typingName"
       @back="emit('back')"
       @leave="emit('leave')"
       @toggle-member="emit('toggle-member')"
@@ -424,6 +426,7 @@ function onLocated(msgId) {
         @file="onSendFile"
         @mention="() => {}"
         @cancel-reply="cancelReply"
+        @typing="emit('typing')"
       />
     </template>
 

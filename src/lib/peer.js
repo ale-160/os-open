@@ -1510,6 +1510,9 @@ export class PeerNetwork extends EventTarget {
       case MsgType.MSG_ACK:
         this._onMsgAck(data)
         break
+      case MsgType.TYPING:
+        this._onTyping(data)
+        break
       case MsgType.ROOM_LIST:
         this._onRoomList(data)
         break
@@ -2966,6 +2969,40 @@ export class PeerNetwork extends EventTarget {
         this._emit('msg:delivery', { msgId: id, room: pending.room, status: 'acked' })
       }
     }
+  }
+
+  // ---------------- P2-8: 打字状态 ----------------
+
+  /** 广播打字状态（节流 2 秒） */
+  sendTyping(room) {
+    if (!room || !this._localRoomsSet.has(room)) return
+    const now = Date.now()
+    if (now - (this._lastTypingSent?.get(room) || 0) < 2000) return
+    if (!this._lastTypingSent) this._lastTypingSent = new Map()
+    this._lastTypingSent.set(room, now)
+    buildMessage(
+      {
+        type: MsgType.TYPING,
+        from: this.identity.peerId,
+        to: room,
+        payload: { room, name: this.ownName }
+      },
+      this.identity.privateKey
+    )
+      .then((m) => this._broadcast(m))
+      .catch(() => {})
+  }
+
+  /** 收到打字状态：转发给 UI（不转发 gossip，避免放大） */
+  _onTyping(msg) {
+    const room = msg.payload?.room
+    if (!room || msg.from === this.identity.peerId) return
+    this._emit('typing', {
+      room,
+      peerId: msg.from,
+      name: msg.payload?.name || msg.extensions?.name || msg.from.slice(0, 8),
+      timestamp: Date.now()
+    })
   }
 
   /** 失败重发：用原 msgId/timestamp 重建消息（签名与原始一致，接收方幂等去重） */

@@ -167,6 +167,39 @@ const visibleMessages = computed(() => {
   })
 })
 
+// ---- P2-8 打字状态 + 免打扰 ----
+const typingByRoom = ref(new Map())
+const typingTimers = new Map()
+const MUTED_KEY = 'nchat:muted'
+const mutedRooms = ref(loadMutedRooms())
+function loadMutedRooms() {
+  try {
+    const raw = localStorage.getItem(MUTED_KEY)
+    const list = raw ? JSON.parse(raw) : []
+    return new Set(Array.isArray(list) ? list : [])
+  } catch {
+    return new Set()
+  }
+}
+function saveMutedRooms() {
+  try {
+    localStorage.setItem(MUTED_KEY, JSON.stringify([...mutedRooms.value]))
+  } catch (e) {
+    /* ignore */
+  }
+}
+function toggleMute(room) {
+  if (!room) return
+  const next = new Set(mutedRooms.value)
+  if (next.has(room)) next.delete(room)
+  else next.add(room)
+  mutedRooms.value = next
+  saveMutedRooms()
+}
+function sendTyping(room) {
+  if (network) network.sendTyping(room)
+}
+
 // ---- 房间收藏（手动收藏，持久化到 localStorage 'nchat:favorites'） ----
 const favoriteRooms = ref(loadFavorites())
 function loadFavorites() {
@@ -314,7 +347,7 @@ function describeError(e) {
   return e?.message || '未知错误'
 }
 
-function pushNotification(type, text) {
+function pushNotification(type, text, tag) {
   const id = Date.now() + '-' + Math.random().toString(36).slice(2, 6)
   notifications.value.push({ id, type, text, timestamp: Date.now() })
   // 5 秒后自动移除
@@ -323,10 +356,10 @@ function pushNotification(type, text) {
     if (idx >= 0) notifications.value.splice(idx, 1)
   }, 5000)
 
-  // Phase 3.5: 浏览器通知（需授权且用户开启）
+  // Phase 3.5: 浏览器通知（需授权且用户开启；tag 相同则替换旧通知）
   try {
     if (notificationsEnabled.value && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      new Notification('nchat', { body: text, tag: id })
+      new Notification('nchat', { body: text, tag: tag || id })
     }
   } catch (e) {
     /* ignore */
@@ -577,6 +610,25 @@ function wireEvents(net) {
     }
   })
 
+  // P2-8: 打字状态（3 秒无更新自动清除）
+  net.addEventListener('typing', (e) => {
+    const { room, peerId, name } = e.detail || {}
+    if (!room || !peerId) return
+    const next = new Map(typingByRoom.value)
+    next.set(room, { peerId, name, timestamp: Date.now() })
+    typingByRoom.value = next
+    clearTimeout(typingTimers.get(room))
+    const timer = setTimeout(() => {
+      const cur = typingByRoom.value.get(room)
+      if (cur && cur.peerId === peerId) {
+        const m2 = new Map(typingByRoom.value)
+        m2.delete(room)
+        typingByRoom.value = m2
+      }
+    }, 3000)
+    typingTimers.set(room, timer)
+  })
+
   // Phase 2.2: 群公告
   net.addEventListener('announcement', (e) => {
     const ann = e.detail
@@ -800,6 +852,18 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
     messages.value.push(chatMsg)
     if (!fromHistory) sortMessages()
     stats.value.received++
+  }
+
+  // P2-8: 浏览器通知——他人消息且（不在该房间或页面隐藏）且未免打扰
+  if (chatMsg.from !== state.peerId && !fromHistory) {
+    const inThisRoom = chatMsg.room === currentRoom.value
+    const pageHidden = typeof document !== 'undefined' && document.hidden
+    if (!inThisRoom || pageHidden) {
+      if (!mutedRooms.value.has(chatMsg.room)) {
+        const preview = (chatMsg.text || (chatMsg.file ? '[文件]' : '')).slice(0, 50)
+        pushNotification('info', `${chatMsg.name || chatMsg.from.slice(0, 8)}: ${preview}`, chatMsg.room)
+      }
+    }
   }
 }
 
@@ -1150,6 +1214,25 @@ async function retryMessage(msgId) {
   if (!m || !network || !currentRoom.value) return
   m.delivery = 'sending'
   await network.retryMessage(currentRoom.value, msgId, m.text, m.replyTo || null, m.timestamp)
+}
+
+// P2-9: 导出房间聊天记录（JSON 下载）
+async function exportRoomMessages(room) {
+  try {
+    const all = await getMessages(room, 0, 100000)
+    const blob = new Blob([JSON.stringify({ room, exportedAt: new Date().toISOString(), messages: all }, null, 2)], {
+      type: 'application/json'
+    })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `nchat-${room}-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 5000)
+    return all.length
+  } catch (e) {
+    return 0
+  }
 }
 
 // ---- Phase 3.1: 消息编辑 / 撤回 / 回应 ----
@@ -1683,6 +1766,7 @@ export function useChat() {
     backToRoomList,
     sendRoomMessage,
     retryMessage,
+    exportRoomMessages,
     sendFileMessage,
     downloadFile,
     // Phase 3.1: 消息编辑 / 撤回 / 回应
@@ -1716,6 +1800,11 @@ export function useChat() {
     toggleBlockPeer,
     setMinBlockStars,
     visibleMessages,
+    // P2-8: 打字状态 + 免打扰
+    typingByRoom,
+    mutedRooms,
+    toggleMute,
+    sendTyping,
     // 房间收藏（手动收藏）
     favoriteRooms,
     toggleFavorite,

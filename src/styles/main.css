@@ -469,6 +469,29 @@ input {
   color: var(--c-warning);
 }
 .fav-btn .filled { fill: currentColor; }
+/* 邀请按钮：房间信息右上角（收藏左侧） */
+.invite-btn {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.room-item:hover .invite-btn {
+  opacity: 1;
+}
+.invite-btn:hover {
+  background: var(--bg-hover);
+  color: var(--accent);
+}
 /* 收藏/已加入徽章 */
 .room-badge.faved {
   background: var(--c-warning-soft);
@@ -479,7 +502,7 @@ input {
   font-size: var(--fs-14);
   font-weight: 600;
   color: var(--text);
-  padding-right: 26px;
+  padding-right: 52px;
 }
 .room-meta {
   display: flex;
