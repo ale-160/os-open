@@ -21,9 +21,10 @@ const props = defineProps({
   editing: { type: Boolean, default: false },
   draft: { type: String, default: '' },
   highlight: { type: Boolean, default: false },
+  pinnedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['edit', 'save-edit', 'cancel-edit', 'recall', 'react', 'download'])
+const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download'])
 
 const reactPicker = ref(false)
 const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
@@ -50,6 +51,7 @@ function onClick() {
 onUnmounted(() => clearTimeout(longPressTimer))
 
 const isOwn = computed(() => !!props.msg && props.msg.from === props.myPeerId)
+const isPinned = computed(() => props.pinnedIds.includes(props.msg.id))
 const RECALL_WINDOW = 5 * 60 * 1000
 const canRecall = computed(() => isOwn.value && !props.msg.deleted && (Date.now() - (props.msg.timestamp || 0)) <= RECALL_WINDOW)
 const reactions = computed(() => props.msg.reactions || {})
@@ -165,7 +167,7 @@ function escapeHtml(s) {
       'has-file': !!msg.file,
       'has-reactions': reactionList.length,
       highlight,
-      pinned: msg.pinned,
+      pinned: isPinned,
       'actions-visible': actionsVisible
     }"
     data-msg-id="msg.id"
@@ -186,9 +188,9 @@ function escapeHtml(s) {
         v-if="editing"
         class="edit-input"
         :value="draft"
-        @input="$emit('save-edit', { msg, text: $event.target.value })"
+        @input="$emit('update-draft', $event.target.value)"
         @blur="$emit('cancel-edit')"
-        @keydown.enter="$emit('save-edit', { msg, text: $event.target.value })"
+        @keydown.enter="$emit('save-edit')"
         @keydown.esc="$emit('cancel-edit')"
         autofocus
       />
@@ -301,9 +303,9 @@ function escapeHtml(s) {
 
       <div class="msg-actions-bar">
         <button
-          v-if="msg.pinned"
+          v-if="isPinned"
           class="icon-btn-mini"
-          @click="$emit('recall', { type: 'unpin', msg })"
+          @click="$emit('toggle-pin', msg.id)"
           title="取消置顶"
         >
           <IconPin :size="14" class="filled" />
@@ -311,7 +313,7 @@ function escapeHtml(s) {
         <button
           v-else
           class="icon-btn-mini"
-          @click="$emit('recall', { type: 'pin', msg })"
+          @click="$emit('toggle-pin', msg.id)"
           title="置顶"
         >
           <IconPin :size="14" />
@@ -335,7 +337,7 @@ function escapeHtml(s) {
         <button
           v-if="canRecall"
           class="icon-btn-mini danger"
-          @click="$emit('recall', { type: 'delete', msg })"
+          @click="$emit('recall', msg)"
           title="撤回"
         >
           <IconTrash :size="14" />
@@ -471,11 +473,11 @@ function escapeHtml(s) {
   gap: var(--sp-2);
   margin-top: 2px;
 }
-/* 操作键：默认隐藏，PC 悬停 / 移动端长按显示（浮动于气泡右上角，不撑高气泡） */
+/* 操作键：默认隐藏，PC 悬停 / 移动端长按显示（浮于气泡正上方外部，不遮挡消息内容） */
 .msg-actions-bar {
   position: absolute;
-  top: -16px;
-  right: -8px;
+  bottom: calc(100% + 8px);
+  right: 0;
   display: flex;
   align-items: center;
   gap: 4px;

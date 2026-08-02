@@ -319,8 +319,10 @@ function onLocated(msgId) {
             :messages="messages"
             :my-peer-id="myPeerId"
             :locate-msg-id="locateMsgId"
+            :pinned-ids="pinnedMsgIds"
             @edit="emit('edit-message', $event)"
             @recall="emit('recall-message', $event)"
+            @toggle-pin="emit('toggle-pin', $event)"
             @react="emit('react-message', $event)"
             @download="onDownloadFile"
           />

@@ -6,9 +6,10 @@ const props = defineProps({
   messages: { type: Array, default: () => [] },
   myPeerId: { type: String, default: '' },
   locateMsgId: { type: String, default: '' },
+  pinnedIds: { type: Array, default: () => [] },
 })
 
-const emit = defineEmits(['edit', 'recall', 'react', 'download'])
+const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download'])
 
 const listRef = ref(null)
 const editingId = ref(null)
@@ -29,9 +30,19 @@ function startEdit(m) {
   editDraft.value = m.text
 }
 
-function saveEdit(m) {
+function saveEdit() {
+  if (!editingId.value) return
+  const m = props.messages.find((x) => x.id === editingId.value)
+  if (!m) {
+    editingId.value = null
+    return
+  }
   emit('edit', { msg: m, text: editDraft.value.trim() })
   editingId.value = null
+}
+
+function updateDraft(text) {
+  editDraft.value = text
 }
 
 function cancelEdit() {
@@ -43,8 +54,9 @@ function onRecall(m) {
   emit('recall', m)
 }
 
-function onReact(m, emoji) {
-  emit('react', { msgId: m.id, emoji, action: 'add' })
+function onReact(payload) {
+  // MessageItem 已计算 action(add/remove)，直接透传
+  emit('react', payload)
 }
 
 function onDownload(file) {
@@ -62,10 +74,13 @@ function onDownload(file) {
       :editing="editingId === m.id"
       :draft="editDraft"
       :highlight="locateMsgId === m.id"
+      :pinned-ids="pinnedIds"
       @edit="startEdit"
       @save-edit="saveEdit"
+      @update-draft="updateDraft"
       @cancel-edit="cancelEdit"
       @recall="onRecall"
+      @toggle-pin="emit('toggle-pin', $event)"
       @react="onReact"
       @download="onDownload"
     />
@@ -77,7 +92,7 @@ function onDownload(file) {
 .message-list {
   flex: 1;
   overflow-y: auto;
-  padding: var(--sp-4) var(--sp-4) var(--sp-6);
+  padding: 48px var(--sp-4) var(--sp-6);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
