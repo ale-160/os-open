@@ -1157,11 +1157,17 @@ export class PeerNetwork extends EventTarget {
       if (touched > 0) dbg('lcan:holder removed for offline peer', peerId, touched)
     }
 
-    // 继承制：如果离线者在所有域都断开且是某房间 owner，由星标最高的在线成员继承
+    // 继承制：如果离线者在所有域都断开且是某房间 owner，由星标最高的在线成员继承；
+    // 断连者从所有房间成员中移除（否则 memberCount 虚高）
     if (peerId && !this._hasConnectionForPeerId(peerId)) {
       for (const [roomName, r] of this.knownRooms) {
-        if (r.owner === peerId) {
+        if (!r.members.has(peerId)) continue
+        const isOwner = r.owner === peerId
+        this._removeMember(roomName, peerId)
+        if (isOwner) {
           this._handleInheritance(roomName, peerId)
+        } else {
+          this._recomputeRooms()
         }
       }
     }
@@ -1177,6 +1183,18 @@ export class PeerNetwork extends EventTarget {
       if (entry.peerId === peerId && entry.status !== 'disconnected') return true
     }
     return false
+  }
+
+  /** 房间是否本地保存过（加入/创建过且未退出）：保存过的空房间不销毁，可再次加入 */
+  _isSavedRoom(room) {
+    try {
+      const raw = localStorage.getItem('nchat:rooms')
+      if (!raw) return false
+      const list = JSON.parse(raw)
+      return Array.isArray(list) && list.some((r) => r && r.name === room)
+    } catch (e) {
+      return false
+    }
   }
 
   /**
@@ -1222,7 +1240,11 @@ export class PeerNetwork extends EventTarget {
         return
       }
     }
-    // 本地不在房间（或无人可继）：销毁
+    // 本地不在房间（或无人可继）：保存过的房间保留（空房可再次加入），否则销毁
+    if (this._isSavedRoom(roomName)) {
+      this._recomputeRooms()
+      return
+    }
     this.knownRooms.delete(roomName)
     deleteRoomStars(roomName)
     this._emit('room:removed', { room: roomName })
@@ -1846,11 +1868,15 @@ export class PeerNetwork extends EventTarget {
       // owner 离开：触发继承（无继承者且本地不在房间时销毁）
       this._handleInheritance(room, msg.from)
     } else if (wasLastMember) {
-      // 最后一人离开且本地不在房间：销毁
+      // 最后一人离开且本地不在房间：保存过的房间保留（空房可再次加入），否则销毁
       if (!this._localRoomsSet.has(room)) {
-        this.knownRooms.delete(room)
-        deleteRoomStars(room)
-        this._emit('room:removed', { room })
+        if (this._isSavedRoom(room)) {
+          this._recomputeRooms()
+        } else {
+          this.knownRooms.delete(room)
+          deleteRoomStars(room)
+          this._emit('room:removed', { room })
+        }
       }
     }
     this._recomputeRooms()
@@ -2079,11 +2105,13 @@ export class PeerNetwork extends EventTarget {
   _recomputeRooms() {
     const list = []
     for (const [name, r] of this.knownRooms) {
-      // 清理无成员且本地不在的房间
+      // 清理无成员且本地不在的房间（保存过的空房间保留，可再次加入）
       const localIn = this._localRoomsSet.has(name)
       if (r.members.size === 0 && !localIn) {
-        this.knownRooms.delete(name)
-        this._emit('room:removed', { room: name })
+        if (!this._isSavedRoom(name)) {
+          this.knownRooms.delete(name)
+          this._emit('room:removed', { room: name })
+        }
         continue
       }
       // 合并本地元数据中的别名和规则

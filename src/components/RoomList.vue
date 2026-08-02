@@ -147,7 +147,7 @@ function speakIconName(rules) {
           {{ r.aliases.join(' · ') }}
         </div>
         <div class="room-meta">
-          <span class="members">{{ r.memberCount }}人在线</span>
+          <span class="members">{{ r.memberCount > 0 ? `${r.memberCount}人在线` : '暂无成员' }}</span>
           <span class="ago" v-if="r.lastUpdate">{{ timeAgo(r.lastUpdate) }}</span>
         </div>
       </button>

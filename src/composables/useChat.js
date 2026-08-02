@@ -377,16 +377,18 @@ function wireEvents(net) {
   })
 
   // 房间列表：以各节点广播的活跃房间为准（覆盖/新增），
-  // 本地已加入的房间保留（广播可能未覆盖），其余（含已销毁的空房间缓存）移除
+  // 本地已加入或已保存的房间保留（广播可能未覆盖；保存的房间无人也可再加入），
+  // 其余（含已销毁且未保存的空房间缓存）移除
   net.addEventListener('rooms', (e) => {
     const incoming = e.detail || []
     const localJoined = new Set(network ? network.localRooms() : [])
+    const localSaved = new Set(getSavedRoomNames())
     const incomingMap = new Map(incoming.map((r) => [r.name, r]))
     const next = new Map()
-    // 保留：incoming 未覆盖但本地已加入的房间
+    // 保留：incoming 未覆盖但本地已加入或已保存的房间
     for (const r of rooms.value) {
       if (incomingMap.has(r.name)) continue
-      if (localJoined.has(r.name)) next.set(r.name, r)
+      if (localJoined.has(r.name) || localSaved.has(r.name)) next.set(r.name, r)
     }
     // 合并 incoming（覆盖旧值，别名取并集）
     for (const r of incoming) {
@@ -400,6 +402,18 @@ function wireEvents(net) {
     }
     rooms.value = [...next.values()]
   })
+
+  // 本地保存的房间名（加入/创建过且未退出）
+  function getSavedRoomNames() {
+    try {
+      const raw = localStorage.getItem('nchat:rooms')
+      if (!raw) return new Set()
+      const list = JSON.parse(raw)
+      return new Set(Array.isArray(list) ? list.map((r) => r && r.name).filter(Boolean) : [])
+    } catch {
+      return new Set()
+    }
+  }
 
   // 房间销毁（无成员）：从列表移除，避免残留空房间
   net.addEventListener('room:removed', (e) => {
