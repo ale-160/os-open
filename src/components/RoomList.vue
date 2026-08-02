@@ -1,20 +1,21 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CONFIG } from '../config.js'
-import { IconLock, IconUser, IconChat, IconEdit } from './icons'
+import { IconLock, IconUser, IconChat, IconEdit, IconStar } from './icons'
 
 const props = defineProps({
   rooms: { type: Array, default: () => [] },
   currentRoom: { type: String, default: '' },
   online: { type: Boolean, default: false },
   searching: { type: Boolean, default: false },
-  joinedRooms: { type: Array, default: () => [] }
+  joinedRooms: { type: Array, default: () => [] },
+  favorites: { type: Array, default: () => [] }
 })
 
-const emit = defineEmits(['join'])
+const emit = defineEmits(['join', 'toggle-fav'])
 
-// 筛选标签：all=全部, joined=已加入, saved=已保存
-const filterTab = ref('all')
+// 筛选标签：discover=发现, joined=已加入, faved=收藏
+const filterTab = ref('discover')
 
 // 分页：当前显示的房间数
 const visibleCount = ref(CONFIG.ROOM_PAGE_SIZE)
@@ -29,37 +30,43 @@ watch(
 
 // 已加入房间名集合
 const joinedNames = computed(() => new Set(props.joinedRooms.map((r) => r.name)))
-// 已保存房间名集合（从 localStorage 读取的已加入房间）
-const savedNames = computed(() => {
-  try {
-    const raw = localStorage.getItem('nchat:rooms')
-    if (!raw) return new Set()
-    const list = JSON.parse(raw)
-    return new Set(list.map((r) => r.name))
-  } catch {
-    return new Set()
+// 收藏房间名集合
+const favNames = computed(() => new Set(props.favorites))
+
+// 排序：收藏 > 已加入 > 其他（组内按在线人数/活跃度降序）
+const sortedRooms = computed(() => {
+  const score = (r) => {
+    if (favNames.value.has(r.name)) return 0
+    if (joinedNames.value.has(r.name)) return 1
+    return 2
   }
+  return [...props.rooms].sort((a, b) => {
+    const sa = score(a)
+    const sb = score(b)
+    if (sa !== sb) return sa - sb
+    if ((b.memberCount || 0) !== (a.memberCount || 0)) return (b.memberCount || 0) - (a.memberCount || 0)
+    return (b.lastUpdate || 0) - (a.lastUpdate || 0)
+  })
 })
 
 // 按筛选标签过滤
 const filteredByTab = computed(() => {
-  if (filterTab.value === 'all') return props.rooms
   if (filterTab.value === 'joined') {
-    return props.rooms.filter((r) => joinedNames.value.has(r.name))
+    return sortedRooms.value.filter((r) => joinedNames.value.has(r.name))
   }
-  if (filterTab.value === 'saved') {
-    return props.rooms.filter((r) => savedNames.value.has(r.name))
+  if (filterTab.value === 'faved') {
+    return sortedRooms.value.filter((r) => favNames.value.has(r.name))
   }
-  return props.rooms
+  return sortedRooms.value
 })
 
 const visibleRooms = computed(() => filteredByTab.value.slice(0, visibleCount.value))
 const hasMore = computed(() => visibleCount.value < filteredByTab.value.length)
 
 // 各分类计数
-const allCount = computed(() => props.rooms.length)
-const joinedCount = computed(() => props.rooms.filter((r) => joinedNames.value.has(r.name)).length)
-const savedCount = computed(() => props.rooms.filter((r) => savedNames.value.has(r.name)).length)
+const allCount = computed(() => sortedRooms.value.length)
+const joinedCount = computed(() => sortedRooms.value.filter((r) => joinedNames.value.has(r.name)).length)
+const favedCount = computed(() => sortedRooms.value.filter((r) => favNames.value.has(r.name)).length)
 
 function loadMore() {
   visibleCount.value += CONFIG.ROOM_PAGE_SIZE
@@ -95,10 +102,10 @@ function speakIconName(rules) {
     <div class="room-filter-tabs">
       <button
         class="filter-tab"
-        :class="{ active: filterTab === 'all' }"
-        @click="filterTab = 'all'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
+        :class="{ active: filterTab === 'discover' }"
+        @click="filterTab = 'discover'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        全部 <span class="tab-count">{{ allCount }}</span>
+        发现 <span class="tab-count">{{ allCount }}</span>
       </button>
       <button
         class="filter-tab"
@@ -109,10 +116,10 @@ function speakIconName(rules) {
       </button>
       <button
         class="filter-tab"
-        :class="{ active: filterTab === 'saved' }"
-        @click="filterTab = 'saved'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
+        :class="{ active: filterTab === 'faved' }"
+        @click="filterTab = 'faved'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        已保存 <span class="tab-count">{{ savedCount }}</span>
+        收藏 <span class="tab-count">{{ favedCount }}</span>
       </button>
     </div>
 
@@ -132,6 +139,16 @@ function speakIconName(rules) {
         :class="{ active: r.name === currentRoom }"
         @click="emit('join', r)"
       >
+        <!-- 收藏按钮：房间信息右上角（span 模拟按钮，button 内不可嵌 button） -->
+        <span
+          class="fav-btn"
+          :class="{ faved: favNames.has(r.name) }"
+          :title="favNames.has(r.name) ? '取消收藏' : '收藏'"
+          role="button"
+          @click.stop="emit('toggle-fav', r.name)"
+        >
+          <IconStar :size="14" :class="{ filled: favNames.has(r.name) }" />
+        </span>
         <div class="room-name">
           <span class="room-icons">
             <IconLock v-if="accessIconName(r.rules) === 'lock'" :size="12" :title="'准入: ' + r.rules?.access" />
@@ -142,6 +159,7 @@ function speakIconName(rules) {
           </span>
           {{ r.name }}
           <span v-if="joinedNames.has(r.name)" class="room-badge joined">已加入</span>
+          <span v-if="favNames.has(r.name)" class="room-badge faved">收藏</span>
         </div>
         <div class="room-aliases" v-if="r.aliases && r.aliases.length">
           {{ r.aliases.join(' · ') }}

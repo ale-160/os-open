@@ -35,6 +35,10 @@ const {
   currentRoomPins,
   toggleStar,
   currentRoomStarred,
+  // 房间收藏（手动收藏）
+  favoriteRooms,
+  toggleFavorite,
+  isFavorite,
   // Phase 2.4: 云文档
   currentRoomDocs,
   createDoc,
@@ -309,6 +313,11 @@ function onNotify({ type = 'error', message } = {}) {
   }, 5000)
 }
 
+// 收藏切换
+function onToggleFavorite(room) {
+  toggleFavorite(room)
+}
+
 // Phase 2.4: 当前房间文档列表
 const currentRoomDocsList = computed(() => currentRoomDocs())
 
@@ -482,6 +491,7 @@ function onCloseTopology() {
         :current-room="currentRoom"
         :searching="!!searchKeyword"
         :joined-rooms="joinedRooms"
+        :favorites="favoriteRooms"
         :message-search-results="messageSearchResults"
         :searching-messages="searchingMessages"
         :fullscreen="!inRoom"
@@ -490,6 +500,7 @@ function onCloseTopology() {
         @clear="clearSearch"
         @create="showCreateDialog = true"
         @join="onJoinRoom"
+        @toggle-fav="onToggleFavorite"
         @manage="showRoomManager = true"
         @menu="toggleSideNav"
         @msg-search="onMsgSearch"

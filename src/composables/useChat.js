@@ -93,6 +93,36 @@ function saveStarred() {
     /* 存储满/隐私模式忽略 */
   }
 }
+
+// ---- 房间收藏（手动收藏，持久化到 localStorage 'nchat:favorites'） ----
+const favoriteRooms = ref(loadFavorites())
+function loadFavorites() {
+  try {
+    const raw = localStorage.getItem('nchat:favorites')
+    if (!raw) return []
+    const list = JSON.parse(raw)
+    return Array.isArray(list) ? list.filter((x) => typeof x === 'string') : []
+  } catch {
+    return []
+  }
+}
+function saveFavorites() {
+  try {
+    localStorage.setItem('nchat:favorites', JSON.stringify(favoriteRooms.value))
+  } catch {
+    /* ignore */
+  }
+}
+function toggleFavorite(room) {
+  if (!room) return
+  const idx = favoriteRooms.value.indexOf(room)
+  if (idx >= 0) favoriteRooms.value.splice(idx, 1)
+  else favoriteRooms.value.push(room)
+  saveFavorites()
+}
+function isFavorite(room) {
+  return favoriteRooms.value.includes(room)
+}
 /** 当前房间已标记消息 id 列表 */
 function currentRoomStarred() {
   const room = currentRoom.value
@@ -159,6 +189,7 @@ async function init() {
       window.__nchat = {
         network, state, peers, rooms, messages,
         currentRoom, docs, docConflicts,
+        joinedNames, joinedRooms,
         createRoom, joinRoom, searchRooms, switchToRoom, setOwnName,
     createDoc, updateDoc, renameDoc, deleteDocRemote,
     resolveDocConflictAcceptRemote, resolveDocConflictKeepLocal,
@@ -172,6 +203,10 @@ async function init() {
     state.online = true
     state.activeServer = network.getActiveServer()
     state.error = null
+    // 恢复已加入的房间（页面刷新后保持「已加入」状态）
+    for (const room of network.localRooms()) {
+      markJoined(room)
+    }
   } catch (e) {
     console.error('[nchat] 启动失败：', e)
     state.error = describeError(e)
@@ -401,6 +436,7 @@ function wireEvents(net) {
       }
     }
     rooms.value = [...next.values()]
+    refreshJoinedRooms()
   })
 
   // 本地保存的房间名（加入/创建过且未退出）
@@ -927,8 +963,32 @@ async function joinRoom(name, password) {
   messages.value = []
   await loadLocalMessages(name)
   await network.joinRoom(name, password)
+  // 立即把房间写入列表（不等广播），确保出现在「已加入」；
+  // 即使已存在也替换引用，触发 joinedRooms computed 重算
+  markJoined(name)
+  const knownRoom = network.knownRooms.get(name)
+  const existing = rooms.value.find((r) => r.name === name)
+  if (existing) {
+    existing.memberCount = knownRoom?.members?.size ?? existing.memberCount
+    existing.lastUpdate = Date.now()
+    rooms.value = [...rooms.value]
+  } else {
+    rooms.value = [
+      {
+        name,
+        memberCount: knownRoom?.members?.size ?? 1,
+        activity: knownRoom?.activity ?? 0,
+        lastUpdate: Date.now(),
+        aliases: knownRoom ? [...knownRoom.aliases] : [],
+        rules: knownRoom?.rules || { access: 'open', speak: 'all' },
+        owner: knownRoom?.owner || null,
+      },
+      ...rooms.value,
+    ]
+  }
   refreshMembers()
   refreshPendingRequests()
+  refreshJoinedRooms()
   return 'joined'
 }
 
@@ -953,6 +1013,7 @@ async function loadLocalMessages(name) {
 async function leaveCurrentRoom() {
   if (!network || !currentRoom.value) return
   await network.leaveRoom(currentRoom.value)
+  markLeft(currentRoom.value)
   currentRoom.value = ''
   messages.value = []
   members.value = []
@@ -1212,12 +1273,31 @@ const filteredRooms = computed(() => {
   })
 })
 
-/** 已加入的房间列表 */
-const joinedRooms = computed(() => {
-  if (!network) return []
-  const joined = new Set(network.localRooms())
-  return rooms.value.filter((r) => joined.has(r.name))
-})
+/** 已加入的房间列表（显式维护 joinedNames + 手动刷新，避免 computed 缓存问题） */
+const joinedNames = ref(new Set())
+const joinedRooms = ref([])
+function refreshJoinedRooms() {
+  if (!network) {
+    joinedRooms.value = []
+    return
+  }
+  const joined = joinedNames.value
+  joinedRooms.value = rooms.value.filter((r) => joined.has(r.name))
+}
+function markJoined(name) {
+  if (!name) return
+  const next = new Set(joinedNames.value)
+  next.add(name)
+  joinedNames.value = next
+  refreshJoinedRooms()
+}
+function markLeft(name) {
+  if (!name) return
+  const next = new Set(joinedNames.value)
+  next.delete(name)
+  joinedNames.value = next
+  refreshJoinedRooms()
+}
 
 // ---------------- 房间管理（审核/邀请/星标/规则） ----------------
 async function approveJoin(room, peerId) {
@@ -1491,6 +1571,10 @@ export function useChat() {
     // 消息星标（本地收藏）
     toggleStar,
     currentRoomStarred,
+    // 房间收藏（手动收藏）
+    favoriteRooms,
+    toggleFavorite,
+    isFavorite,
     // Phase 2.4: 云文档
     currentRoomDocs,
     createDoc,

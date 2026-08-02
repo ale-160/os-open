@@ -421,6 +421,7 @@ input {
   font-weight: 500;
 }
 .room-item {
+  position: relative;
   display: block;
   width: 100%;
   text-align: left;
@@ -440,10 +441,45 @@ input {
 .room-item.active .room-name {
   color: var(--accent);
 }
+/* 收藏按钮：房间信息右上角 */
+.fav-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--text-dim);
+  opacity: 0;
+  transition: opacity var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.room-item:hover .fav-btn {
+  opacity: 1;
+}
+.fav-btn:hover {
+  background: var(--bg-hover);
+  color: var(--c-warning);
+}
+.fav-btn.faved {
+  opacity: 1;
+  color: var(--c-warning);
+}
+.fav-btn .filled { fill: currentColor; }
+/* 收藏/已加入徽章 */
+.room-badge.faved {
+  background: var(--c-warning-soft);
+  color: var(--c-warning);
+  border-color: var(--c-warning);
+}
 .room-name {
   font-size: var(--fs-14);
   font-weight: 600;
   color: var(--text);
+  padding-right: 26px;
 }
 .room-meta {
   display: flex;
