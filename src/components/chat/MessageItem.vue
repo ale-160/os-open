@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import {
   IconEdit,
   IconTrash,
@@ -27,6 +27,27 @@ const emit = defineEmits(['edit', 'save-edit', 'cancel-edit', 'recall', 'react',
 
 const reactPicker = ref(false)
 const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
+
+// 移动端长按显示操作键（PC 走 CSS :hover）
+const actionsVisible = ref(false)
+let longPressTimer = null
+let longPressFired = false
+function onTouchStart() {
+  clearTimeout(longPressTimer)
+  longPressFired = false
+  longPressTimer = setTimeout(() => {
+    actionsVisible.value = true
+    longPressFired = true
+  }, 500)
+}
+function onTouchEnd() { clearTimeout(longPressTimer) }
+function onTouchMove() { clearTimeout(longPressTimer) }
+function onClick() {
+  // 短按消息任意处：若操作键已显示则收起（长按引发的 click 不收起）
+  if (actionsVisible.value && !longPressFired) actionsVisible.value = false
+  longPressFired = false
+}
+onUnmounted(() => clearTimeout(longPressTimer))
 
 const isOwn = computed(() => !!props.msg && props.msg.from === props.myPeerId)
 const RECALL_WINDOW = 5 * 60 * 1000
@@ -144,9 +165,14 @@ function escapeHtml(s) {
       'has-file': !!msg.file,
       'has-reactions': reactionList.length,
       highlight,
-      pinned: msg.pinned
+      pinned: msg.pinned,
+      'actions-visible': actionsVisible
     }"
     data-msg-id="msg.id"
+    @touchstart="onTouchStart"
+    @touchend="onTouchEnd"
+    @touchmove="onTouchMove"
+    @click="onClick"
   >
     <div class="msg-header">
       <span class="msg-name" v-if="!isOwn">{{ msg.name || msg.from.slice(0, 8) }}</span>
@@ -261,37 +287,8 @@ function escapeHtml(s) {
       </div>
     </div>
 
-    <!-- 底部：Pin/回应/下载/更多 -->
-    <div class="msg-footer">
-      <button
-        v-if="msg.pinned"
-        class="icon-btn-mini"
-        @click="$emit('recall', { type: 'unpin', msg })"
-        title="取消置顶"
-      >
-        <IconPin :size="14" class="filled" />
-      </button>
-      <button
-        v-else
-        class="icon-btn-mini"
-        @click="$emit('recall', { type: 'pin', msg })"
-        title="置顶"
-      >
-        <IconPin :size="14" />
-      </button>
-
-      <div class="react-picker" v-if="reactPicker">
-        <button
-          v-for="e in presetEmojis"
-          :key="e"
-          class="emoji-btn"
-          @click="onEmojiClick(e)"
-        >{{ e }}</button>
-      </div>
-      <button class="icon-btn-mini" @click="reactPicker = !reactPicker" title="回应">
-        <IconReact :size="14" />
-      </button>
-
+    <!-- 底部：回应徽章常显；操作键 PC 悬停 / 移动端长按显示 -->
+    <div class="msg-footer" @click.stop>
       <div class="reactions" v-if="reactionList.length">
         <span
           v-for="r in reactionList"
@@ -302,8 +299,37 @@ function escapeHtml(s) {
         >{{ r.emoji }} {{ r.count }}</span>
       </div>
 
-      <div class="msg-actions" v-if="isOwn && !msg.deleted">
-        <button class="icon-btn-mini" @click="$emit('edit', msg)" title="编辑">
+      <div class="msg-actions-bar">
+        <button
+          v-if="msg.pinned"
+          class="icon-btn-mini"
+          @click="$emit('recall', { type: 'unpin', msg })"
+          title="取消置顶"
+        >
+          <IconPin :size="14" class="filled" />
+        </button>
+        <button
+          v-else
+          class="icon-btn-mini"
+          @click="$emit('recall', { type: 'pin', msg })"
+          title="置顶"
+        >
+          <IconPin :size="14" />
+        </button>
+
+        <div class="react-picker" v-if="reactPicker">
+          <button
+            v-for="e in presetEmojis"
+            :key="e"
+            class="emoji-btn"
+            @click="onEmojiClick(e)"
+          >{{ e }}</button>
+        </div>
+        <button class="icon-btn-mini" @click="reactPicker = !reactPicker" title="回应">
+          <IconReact :size="14" />
+        </button>
+
+        <button v-if="isOwn && !msg.deleted" class="icon-btn-mini" @click="$emit('edit', msg)" title="编辑">
           <IconEdit :size="14" />
         </button>
         <button
@@ -439,12 +465,51 @@ function escapeHtml(s) {
   font-style: italic;
 }
 .msg-footer {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: var(--sp-1);
-  padding-top: var(--sp-1);
-  border-top: 1px solid var(--border-soft);
-  margin-top: var(--sp-1);
+  gap: var(--sp-2);
+  margin-top: 2px;
+}
+/* 操作键：默认隐藏，PC 悬停 / 移动端长按显示（浮动于气泡右上角，不撑高气泡） */
+.msg-actions-bar {
+  position: absolute;
+  top: -16px;
+  right: -8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity var(--t-fast), transform var(--t-fast);
+  z-index: 2;
+}
+@media (hover: hover) {
+  .message:hover .msg-actions-bar {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+}
+@media (hover: none) {
+  /* 移动端：长按由 JS 控制，阻止系统菜单干扰 */
+  .message {
+    -webkit-touch-callout: none;
+    user-select: none;
+  }
+}
+.message.actions-visible .msg-actions-bar {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 .react-picker { display: flex; gap: 4px; padding: 2px; background: var(--bg-input); border-radius: var(--r-sm); }
 .emoji-btn { font-size: 16px; line-height: 1; padding: 4px 8px; border-radius: var(--r-sm); background: transparent; border: none; cursor: pointer; }
@@ -464,7 +529,6 @@ function escapeHtml(s) {
 }
 .reaction-badge.mine { background: var(--c-primary-soft); color: var(--c-primary); }
 .reaction-badge:hover { background: var(--bg-hover); }
-.msg-actions { margin-left: auto; display: flex; gap: var(--sp-1); }
 .icon-btn-mini {
   width: 24px; height: 24px;
   border-radius: var(--r-sm);
