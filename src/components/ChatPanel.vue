@@ -39,6 +39,7 @@ const props = defineProps({
   canSetAnnouncement: { type: Boolean, default: false },
   pinnedMsgIds: { type: Array, default: () => [] },
   starredMsgIds: { type: Array, default: () => [] },
+  memberOpen: { type: Boolean, default: true },
   // Phase 2.4: 云文档
   docs: { type: Array, default: () => [] },
   docConflicts: { type: Map, default: () => new Map() },
@@ -59,7 +60,7 @@ const emit = defineEmits([
   // Phase 3.1: 消息编辑 / 撤回 / 回应
   'edit-message', 'recall-message', 'react-message',
   // 通知（多选批量删除无可用项时提示）
-  'notify', 'toggle-star'
+  'notify', 'toggle-star', 'toggle-member'
 ])
 
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
@@ -306,8 +307,10 @@ function onLocated(msgId) {
       :online="online"
       :member-count="members.length"
       :in-room="inRoom"
+      :member-open="memberOpen"
       @back="emit('back')"
       @leave="emit('leave')"
+      @toggle-member="emit('toggle-member')"
       @set-announcement="emit('set-announcement', $event)"
       @toggle-pin="emit('toggle-pin', $event)"
       @more="() => {}"

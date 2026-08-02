@@ -43,6 +43,23 @@ const { isDesktop, memberOpen, toggleMember } = useLayout()
 // 本地排序覆盖：peerId -> 手动顺序（仅 owner 操作，本地生效）
 const orderOverride = ref(new Map())
 const orderedMembers = ref([])
+
+/** 从 props.members 构建有序列表（应用手动排序覆盖） */
+function rebuild() {
+  const arr = [...props.members]
+  if (orderOverride.value.size) {
+    arr.sort((a, b) => {
+      const ia = orderOverride.value.get(a.peerId)
+      const ib = orderOverride.value.get(b.peerId)
+      if (ia === undefined && ib === undefined) return 0
+      if (ia === undefined) return 1
+      if (ib === undefined) return -1
+      return ia - ib
+    })
+  }
+  orderedMembers.value = arr
+}
+watch(() => props.members, rebuild, { deep: true, immediate: true })
 const starsEditing = ref(null) // peerId 正在编辑星标
 const starsInput = ref(1)
 const searchKeyword = ref('')
@@ -195,13 +212,29 @@ function cancelBan() {
           <div class="member-avatar">{{ initial(m.name) }}</div>
           <div class="member-info">
             <span class="member-name">{{ m.name || initial(m.peerId) }}{{ m.self ? ' (你)' : '' }}</span>
-            <span class="member-meta">{{ roleLabel(m.role) }} · {{ starsLabel(m.stars) }}</span>
+            <span class="member-meta">{{ roleLabel(m.isOwner ? 'owner' : 'member') }} · {{ starsLabel(m.stars) }}</span>
           </div>
           <div class="member-actions" v-if="!m.self">
             <button class="icon-btn-mini" @click="inviteMember(m)" title="邀请"><IconUserPlus :size="16" /></button>
             <button class="icon-btn-mini" @click="setStars(m)" title="星标"><IconStar :size="16" :class="{ filled: m.stars > 1 }" /></button>
             <button class="icon-btn-mini" @click="banMember(m)" title="禁言"><IconMicOff :size="16" /></button>
             <button class="icon-btn-mini danger" @click="kickMember(m)" title="踢出"><IconUserX :size="16" /></button>
+          </div>
+          <!-- 星标编辑（owner 操作） -->
+          <div v-if="starsEditing === m.peerId" class="stars-editor" @click.stop>
+            <input
+              type="number"
+              v-model.number="starsInput"
+              min="1"
+              max="99"
+              class="stars-input"
+              placeholder="1-99"
+              @keydown.enter="commitStars"
+              @keydown.esc="cancelEditStars"
+              autofocus
+            />
+            <button class="icon-btn-mini primary" @click="commitStars" title="确认"><IconCheck :size="14" /></button>
+            <button class="icon-btn-mini" @click="cancelEditStars" title="取消"><IconClose :size="14" /></button>
           </div>
         </li>
       </ul>
@@ -312,13 +345,30 @@ import {
 }
 
 .member-items { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--sp-1); }
-.member-item { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border-radius: var(--r-md); transition: background var(--t-fast); }
+.member-item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-2); border-radius: var(--r-md); transition: background var(--t-fast); }
 .member-item:hover { background: var(--bg-hover); }
 .member-avatar { width: 32px; height: 32px; border-radius: var(--r-full); background: var(--c-primary-soft); color: var(--c-primary); display: flex; align-items: center; justify-content: center; font-weight: var(--fw-bold); font-size: var(--fs-13); flex-shrink: 0; }
 .member-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .member-name { font-size: var(--fs-13); font-weight: var(--fw-medium); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .member-meta { font-size: var(--fs-11); color: var(--text-muted); }
 .member-actions { display: flex; gap: var(--sp-1); }
+/* 星标编辑器（成员列表内联，独占一行） */
+.stars-editor {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+  margin-top: var(--sp-1);
+}
+.stars-input {
+  width: 64px;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+  border: 1px solid var(--accent);
+  background: var(--bg-input);
+  color: var(--text);
+  font-size: var(--fs-12);
+}
 .icon-btn-mini { width: 28px; height: 28px; border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim); transition: background var(--t-fast), color var(--t-fast); }
 .icon-btn-mini:hover { background: var(--bg-hover); color: var(--text); }
 .icon-btn-mini.danger:hover { background: var(--c-danger-soft); color: var(--c-danger); border-color: var(--c-danger); }

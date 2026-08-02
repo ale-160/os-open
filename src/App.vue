@@ -502,6 +502,7 @@ function onCloseTopology() {
           :can-set-announcement="canSetAnnouncement()"
           :pinned-msg-ids="currentRoomPinnedIds"
           :starred-msg-ids="currentRoomStarredIds"
+          :member-open="memberOpen"
           :docs="currentRoomDocsList"
           :doc-conflicts="docConflicts"
           :locate-msg-id="pendingLocateMsgId"
@@ -514,6 +515,7 @@ function onCloseTopology() {
           @set-announcement="onSetAnnouncement"
           @toggle-pin="onTogglePin"
           @toggle-star="onToggleStar"
+          @toggle-member="toggleMember"
           @notify="onNotify"
           @create-doc="onCreateDoc"
           @update-doc="onUpdateDoc"
@@ -591,7 +593,7 @@ function onCloseTopology() {
 
       <!-- MemberList: Desktop right column, Mobile right drawer -->
       <aside
-        v-if="inRoom && (isDesktop || memberOpen)"
+        v-if="inRoom && memberOpen"
         class="content-aside"
         :class="{ drawer: !isDesktop && memberOpen, open: memberOpen }"
       >

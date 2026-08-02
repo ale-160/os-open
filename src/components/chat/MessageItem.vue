@@ -216,7 +216,7 @@ function escapeHtml(s) {
     <template v-if="msg.deleted">
       <div class="msg-deleted-line">
         <IconTrash :size="12" />
-        <span>消息已撤回</span>
+        <span>{{ isOwn ? '你' : (msg.name || '对方') }}撤回了一条消息</span>
       </div>
     </template>
 

@@ -8,7 +8,8 @@ import {
   IconMenu,
   IconEdit,
   IconCheck,
-  IconClose
+  IconClose,
+  IconUser
 } from '../icons'
 
 const props = defineProps({
@@ -19,9 +20,10 @@ const props = defineProps({
   online: { type: Boolean, default: false },
   memberCount: { type: Number, default: 0 },
   inRoom: { type: Boolean, default: false },
+  memberOpen: { type: Boolean, default: true },
 })
 
-const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more'])
+const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member'])
 
 const showAnnouncement = computed(() => !!props.announcement?.text)
 const editingAnnouncement = ref(false)
@@ -83,6 +85,9 @@ function clearAnn() {
       </button>
       <button class="icon-btn" @click="emit('more')" title="更多">
         <IconMenu :size="20" />
+      </button>
+      <button v-if="inRoom" class="icon-btn" :class="{ active: memberOpen }" @click="emit('toggle-member')" :title="memberOpen ? '收起成员列表' : '展开成员列表'">
+        <IconUser :size="18" />
       </button>
     </div>
   </header>
@@ -183,6 +188,11 @@ function clearAnn() {
   background: var(--c-danger-soft);
   color: var(--c-danger);
   border-color: var(--c-danger);
+}
+.icon-btn.active {
+  background: var(--c-primary-soft);
+  color: var(--c-primary);
+  border-color: var(--c-primary);
 }
 .icon-btn-mini {
   width: 24px;
