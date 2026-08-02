@@ -50,10 +50,10 @@ function clearAnn() {
 <template>
   <header class="chat-header" :class="{ 'has-announcement': showAnnouncement }">
     <div class="header-left">
-      <button v-if="!inRoom" class="icon-btn" @click="emit('back')" title="返回">
+      <button class="icon-btn back-btn" @click="emit('back')" title="返回房间列表">
         <IconBack :size="20" />
       </button>
-      <div class="room-title" v-else>
+      <div class="room-title">
         <span class="room-name"># {{ currentRoom }}</span>
         <span class="room-meta">{{ memberCount }} 人 · {{ online ? '在线' : '离线' }}</span>
       </div>

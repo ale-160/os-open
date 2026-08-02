@@ -457,7 +457,7 @@ input {
   font-size: var(--fs-18);
 }
 /* 返回房间列表按钮：默认隐藏，仅移动端（in-room 时侧边栏收起）显示 */
-.back-btn {
+.chat-header .back-btn {
   display: none;
 }
 .room-title {
@@ -956,7 +956,7 @@ select.input {
   .app.in-room .content-aside {
     display: none;
   }
-  .back-btn {
+  .chat-header .back-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;

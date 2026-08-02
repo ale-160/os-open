@@ -399,7 +399,7 @@ function onCloseTopology() {
   <div
     class="app"
     :class="{
-      'has-member': inRoom && memberOpen && !isDesktop,
+      'in-room': inRoom,
       'sidenav-open': sideNavOpen,
       'listbar-open': listBarOpen,
       'member-open': memberOpen
@@ -428,9 +428,9 @@ function onCloseTopology() {
       />
     </aside>
 
-    <!-- ListBar: Desktop fixed, Mobile bottom sheet -->
+    <!-- ListBar: Desktop fixed, Mobile bottom sheet（移动端首页也显示，进房后由 CSS 隐藏） -->
     <aside
-      v-if="isDesktop || listBarOpen"
+      v-if="isDesktop || listBarOpen || !inRoom"
       class="list-bar"
       :class="{ sheet: !isDesktop && listBarOpen, open: listBarOpen }"
     >
@@ -447,12 +447,14 @@ function onCloseTopology() {
         :joined-rooms="joinedRooms"
         :message-search-results="messageSearchResults"
         :searching-messages="searchingMessages"
+        :fullscreen="!inRoom"
         @rename="setOwnName"
         @search="searchRooms"
         @clear="clearSearch"
         @create="showCreateDialog = true"
         @join="onJoinRoom"
         @manage="showRoomManager = true"
+        @menu="toggleSideNav"
         @msg-search="onMsgSearch"
         @msg-clear="onMsgClear"
         @msg-locate="onMsgLocate"
@@ -462,7 +464,7 @@ function onCloseTopology() {
     <!-- Main Content Area -->
     <main
       class="content-area"
-      :class="{ 'has-member': inRoom && memberOpen && isDesktop }"
+      :class="{ 'has-aside': inRoom && memberOpen && isDesktop }"
     >
       <div class="content-main">
         <!-- ChatPanel / RoomList / Settings / Topology -->

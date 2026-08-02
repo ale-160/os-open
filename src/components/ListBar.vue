@@ -10,7 +10,7 @@ import PeerInfo from './PeerInfo.vue'
 import RoomSearch from './RoomSearch.vue'
 import RoomList from './RoomList.vue'
 import MessageSearch from './MessageSearch.vue'
-import { IconPlus, IconSettings, IconX } from './icons'
+import { IconPlus, IconSettings, IconX, IconMenu } from './icons'
 
 const props = defineProps({
   activeNav: { type: String, default: 'chat' },
@@ -27,7 +27,9 @@ const props = defineProps({
   joinedRooms: { type: Array, default: () => [] },
   // Phase 2.5: 消息搜索
   messageSearchResults: { type: Array, default: () => [] },
-  searchingMessages: { type: Boolean, default: false }
+  searchingMessages: { type: Boolean, default: false },
+  // 移动端首页全屏模式（未进房时 ListBar 全屏显示房间列表）
+  fullscreen: { type: Boolean, default: false }
 })
 
 const emit = defineEmits([
@@ -37,6 +39,7 @@ const emit = defineEmits([
   'create',
   'join',
   'manage',
+  'menu',
   // Phase 2.5: 消息搜索
   'msg-search',
   'msg-clear',
@@ -62,7 +65,10 @@ const showManage = computed(() => props.activeNav === 'chat')
 </script>
 
 <template>
-  <aside class="list-bar" :class="{ sheet: !isDesktop, open: listBarOpen }">
+  <aside
+    class="list-bar"
+    :class="{ sheet: !isDesktop && !fullscreen, open: listBarOpen || (!isDesktop && fullscreen), fullscreen }"
+  >
     <!-- Sheet 拖拽手柄（仅移动端） -->
     <div class="sheet-handle" v-if="!isDesktop" @click="toggleListBar">
       <div class="handle-bar"></div>
@@ -70,6 +76,7 @@ const showManage = computed(() => props.activeNav === 'chat')
 
     <!-- Sheet 头部（仅移动端） -->
     <header class="sheet-header" v-if="!isDesktop">
+      <button class="icon-btn" @click="emit('menu')" title="菜单"><IconMenu :size="20" /></button>
       <h2 class="sheet-title">{{ navTitle }}</h2>
       <div class="sheet-actions">
         <button v-if="showManage" class="icon-btn" @click="emit('manage'); toggleListBar()" title="管理"><IconSettings :size="20" /></button>
@@ -135,6 +142,17 @@ const showManage = computed(() => props.activeNav === 'chat')
 }
 
 .list-bar.sheet.open { transform: translateY(0); }
+
+/* 移动端首页：全屏显示房间列表（非 Sheet） */
+.list-bar.fullscreen {
+  position: static;
+  width: 100%;
+  height: 100%;
+  transform: none;
+  border-radius: 0;
+  border-top: none;
+  box-shadow: none;
+}
 
 .sheet-handle {
   display: none;

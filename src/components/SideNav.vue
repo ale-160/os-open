@@ -142,6 +142,8 @@ function initial(name) {
   width: 280px;
   padding: var(--sp-4) var(--sp-3);
   align-items: flex-start;
+  z-index: var(--z-modal);
+  box-shadow: var(--shadow-3);
 }
 
 .nav-brand {
