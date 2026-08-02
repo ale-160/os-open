@@ -97,6 +97,9 @@ function clearAnnouncement() {
 const pinListExpanded = ref(false)
 const highlightMsgId = ref(null)
 
+// 公告编辑模式（标题栏公告按钮触发，编辑区在公告栏）
+const announcementEditOpen = ref(false)
+
 // 回复引用：{ msgId, name, text }，设置后输入框显示引用条
 const replyingTo = ref(null)
 function startReply(msg) {
@@ -317,6 +320,7 @@ function onLocated(msgId) {
       @toggle-member="emit('toggle-member')"
       @toggle-call="callOpen = !callOpen"
       @open-settings="emit('open-settings')"
+      @edit-announcement="announcementEditOpen = true"
       @set-announcement="emit('set-announcement', $event)"
       @toggle-pin="emit('toggle-pin', $event)"
       @more="() => {}"
@@ -341,11 +345,13 @@ function onLocated(msgId) {
 
     <!-- ===== 聊天视图（群内 tab） ===== -->
     <template v-if="!inRoom || activeTab === 'chat'">
-      <!-- Phase 2.2: 群公告条 -->
+      <!-- Phase 2.2: 群公告条（显示+编辑；无公告且非编辑时不渲染） -->
       <AnnouncementBar
         :announcement="announcement"
         :can-set-announcement="canSetAnnouncement"
+        :edit-mode="announcementEditOpen"
         @set-announcement="emit('set-announcement', $event)"
+        @close-edit="announcementEditOpen = false"
       />
 
       <!-- Phase 2.3: Pin 置顶列表条 -->

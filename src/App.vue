@@ -252,7 +252,7 @@ async function onSwitchRoom(room) {
 }
 
 async function onClearStorage(room) {
-  if (!confirm(`确定清空「${room}」的本地数据并退出房间？消息历史将被删除，房间可再次加入。`)) return
+  if (!confirm(`确定删除并退出「${room}」？将清空该房间的所有本地数据（消息/记录），房间可再次加入。`)) return
   // 与退出房间一致：清数据 + 广播离开 + 移除已加入标记
   await clearRoomStorage(room)
   await leaveRoomByName(room)
@@ -667,11 +667,8 @@ function onCloseTopology() {
       v-if="showRoomManager"
       :rooms="rooms"
       :current-room="currentRoom"
-      :own-peer-id="state.peerId"
-      :is-owner="isCurrentUserOwner"
-      @switch="onSwitchRoom"
-      @clear="onClearStorage"
-      @delete="onDeleteRoom"
+      :storage-stats="storageStats"
+      @clear-storage="onClearStorage"
       @close="showRoomManager = false"
     />
 

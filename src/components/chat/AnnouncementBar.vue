@@ -1,21 +1,31 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { IconAnnounce, IconEdit, IconClose, IconCheck } from '../icons'
 
 const props = defineProps({
   announcement: { type: Object, default: null },
   canSetAnnouncement: { type: Boolean, default: false },
+  editMode: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['set-announcement'])
+const emit = defineEmits(['set-announcement', 'close-edit'])
 
 const showAnnouncement = computed(() => !!props.announcement?.text)
 const editingAnnouncement = ref(false)
 const announcementDraft = ref('')
 
+// 标题栏公告按钮触发编辑模式
+watch(
+  () => props.editMode,
+  (v) => {
+    if (v) startEditAnnouncement()
+  }
+)
+
 function startEditAnnouncement() {
   announcementDraft.value = props.announcement?.text || ''
   editingAnnouncement.value = true
+  emit('close-edit')
 }
 
 function saveAnnouncement() {
@@ -37,7 +47,8 @@ function clearAnnouncement() {
 </script>
 
 <template>
-  <div v-if="showAnnouncement || (canSetAnnouncement && !announcement?.text)" class="announcement-bar">
+  <!-- 无公告且非编辑模式时不渲染 -->
+  <div v-if="showAnnouncement || editingAnnouncement" class="announcement-bar">
     <div v-if="showAnnouncement && !editingAnnouncement" class="announcement-display">
       <span class="announcement-icon"><IconAnnounce :size="16" /></span>
       <span class="announcement-text">{{ announcement.text }}</span>
@@ -52,9 +63,6 @@ function clearAnnouncement() {
       <button class="btn-mini primary" title="保存" @click="saveAnnouncement">保存</button>
       <button v-if="announcement?.text" class="btn-mini danger" title="清除公告" @click="clearAnnouncement">清除</button>
       <button class="btn-mini icon-only-btn" title="取消" @click="cancelEditAnnouncement"><IconClose :size="14" /></button>
-    </div>
-    <div v-else-if="canSetAnnouncement && !announcement?.text" class="announcement-empty-hint">
-      <button class="btn-mini icon-only-btn" title="发布公告" @click="startEditAnnouncement"><IconAnnounce :size="14" /></button>
     </div>
   </div>
 </template>

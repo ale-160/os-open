@@ -6,9 +6,6 @@ import {
   IconAnnounce,
   IconPin,
   IconMenu,
-  IconEdit,
-  IconCheck,
-  IconClose,
   IconUser,
   IconVoice,
   IconSettings
@@ -26,34 +23,14 @@ const props = defineProps({
   callOpen: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member', 'toggle-call', 'open-settings'])
+const emit = defineEmits(['back', 'leave', 'set-announcement', 'toggle-pin', 'more', 'toggle-member', 'toggle-call', 'open-settings', 'edit-announcement'])
 
+// 是否有公告（用于公告按钮高亮）
 const showAnnouncement = computed(() => !!props.announcement?.text)
-const editingAnnouncement = ref(false)
-const announcementDraft = ref('')
-
-function startEditAnn() {
-  editingAnnouncement.value = true
-  announcementDraft.value = props.announcement?.text || ''
-}
-
-function saveAnn() {
-  emit('set-announcement', announcementDraft.value.trim())
-  editingAnnouncement.value = false
-}
-
-function cancelAnn() {
-  editingAnnouncement.value = false
-}
-
-function clearAnn() {
-  emit('set-announcement', '')
-  editingAnnouncement.value = false
-}
 </script>
 
 <template>
-  <header class="chat-header" :class="{ 'has-announcement': showAnnouncement }">
+  <header class="chat-header">
     <div class="header-left">
       <button class="icon-btn back-btn" @click="emit('back')" title="返回房间列表">
         <IconBack :size="20" />
@@ -64,21 +41,6 @@ function clearAnn() {
       </div>
     </div>
 
-    <div class="header-center" v-if="showAnnouncement || editingAnnouncement">
-      <div class="announcement" v-if="!editingAnnouncement">
-        <IconAnnounce :size="14" class="announce-icon" />
-        <span class="announce-text">{{ announcement.text }}</span>
-        <button v-if="canSetAnnouncement" class="icon-btn-mini" @click="startEditAnn" title="编辑">
-          <IconEdit :size="12" />
-        </button>
-      </div>
-      <div class="announcement-editor" v-else>
-        <input v-model="announcementDraft" class="announce-input" @keydown.enter="saveAnn" @keydown.esc="cancelAnn" autofocus />
-        <button class="icon-btn-mini primary" @click="saveAnn"><IconCheck :size="12" /></button>
-        <button class="icon-btn-mini" @click="cancelAnn"><IconClose :size="12" /></button>
-      </div>
-    </div>
-
     <div class="header-right">
       <button v-if="pinnedMsgIds.length" class="icon-btn" @click="emit('toggle-pin', pinnedMsgIds[0])" title="置顶消息">
         <IconPin :size="18" class="filled" />
@@ -86,8 +48,8 @@ function clearAnn() {
       <button v-if="inRoom" class="icon-btn danger" @click="emit('leave')" title="退出房间（清除所有聊天记录）">
         <IconLeave :size="18" />
       </button>
-      <!-- 发布公告（创建者/高星成员）：点开公告编辑器 -->
-      <button v-if="canSetAnnouncement" class="icon-btn" :class="{ active: editingAnnouncement || showAnnouncement }" @click="editingAnnouncement = !editingAnnouncement" :title="editingAnnouncement ? '收起公告编辑' : '发布公告'">
+      <!-- 发布公告（创建者/高星成员）：点击在公告栏打开编辑器 -->
+      <button v-if="canSetAnnouncement" class="icon-btn" :class="{ active: showAnnouncement }" @click="emit('edit-announcement')" title="发布公告">
         <IconAnnounce :size="18" />
       </button>
       <button v-if="inRoom" class="icon-btn" :class="{ active: callOpen }" @click="emit('toggle-call')" :title="callOpen ? '收起音视频通话' : '音视频通话'">
@@ -141,40 +103,6 @@ function clearAnn() {
 .room-meta {
   font-size: var(--fs-11);
   color: var(--text-muted);
-}
-.header-center {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-}
-.announcement {
-  display: flex;
-  align-items: center;
-  gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--c-warning-soft);
-  border: 1px solid var(--c-warning);
-  border-radius: var(--r-md);
-  color: var(--c-warning);
-  font-size: var(--fs-12);
-  max-width: 400px;
-}
-.announce-icon { flex-shrink: 0; }
-.announce-text { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.announcement-editor {
-  display: flex;
-  gap: var(--sp-2);
-  max-width: 400px;
-}
-.announce-input {
-  flex: 1;
-  padding: var(--sp-1) var(--sp-2);
-  border-radius: var(--r-sm);
-  border: 1px solid var(--accent);
-  background: var(--bg-input);
-  color: var(--text);
-  font-size: var(--fs-12);
 }
 .header-right {
   display: flex;
