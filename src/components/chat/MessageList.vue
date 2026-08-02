@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import MessageItem from './MessageItem.vue'
 
 const props = defineProps({
@@ -14,6 +14,34 @@ const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download'])
 const listRef = ref(null)
 const editingId = ref(null)
 const editDraft = ref('')
+
+// ---- 智能自动滚动：用户手动向上翻看历史时，新消息不再强制拉回底部 ----
+let userScrolledUp = false
+function onListScroll() {
+  const el = listRef.value
+  if (!el) return
+  userScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > 80
+  // 滚动条：滚动时短暂显示，2s 无滚动后隐藏
+  el.classList.add('show-scrollbar')
+  clearTimeout(scrollbarTimer)
+  scrollbarTimer = setTimeout(() => el.classList.remove('show-scrollbar'), 2000)
+}
+let scrollbarTimer = null
+onUnmounted(() => clearTimeout(scrollbarTimer))
+
+/** 强制滚到底部（切换房间/定位时调用） */
+function scrollToBottom() {
+  const el = listRef.value
+  if (!el) return
+  el.scrollTop = el.scrollHeight
+}
+
+watch(() => props.messages.length, async () => {
+  await nextTick()
+  if (!userScrolledUp) scrollToBottom()
+})
+
+defineExpose({ scrollToBottom })
 
 watch(() => props.locateMsgId, async (id) => {
   if (id) {
@@ -65,7 +93,7 @@ function onDownload(file) {
 </script>
 
 <template>
-  <div ref="listRef" class="message-list" role="log" aria-live="polite">
+  <div ref="listRef" class="message-list" role="log" aria-live="polite" @scroll="onListScroll">
     <MessageItem
       v-for="m in messages"
       :key="m.id"
@@ -93,12 +121,28 @@ function onDownload(file) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--sp-4) var(--sp-4) var(--sp-6);
   display: flex;
   flex-direction: column;
   gap: var(--sp-3);
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s;
+}
+/* 滚动条：默认隐藏（保持极简），用户滚动时短暂显示 2s */
+.message-list::-webkit-scrollbar { width: 6px; }
+.message-list::-webkit-scrollbar-track { background: transparent; }
+.message-list::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+.message-list.show-scrollbar {
   scrollbar-color: var(--bg-elev3) transparent;
+}
+.message-list.show-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--bg-elev3);
 }
 .scroll-anchor { height: 1px; }
 </style>

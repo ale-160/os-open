@@ -136,11 +136,11 @@ async function scrollToBottom() {
   if (list) list.scrollTop = list.scrollHeight
 }
 
-watch(() => props.messages.length, scrollToBottom)
 watch(() => props.currentRoom, () => {
   pinListExpanded.value = false
   highlightMsgId.value = null
   activeTab.value = 'chat'
+  // 切换房间强制滚到底（由 MessageList 的智能滚动接管新消息场景）
   scrollToBottom()
 })
 

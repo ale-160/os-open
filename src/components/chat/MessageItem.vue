@@ -29,10 +29,14 @@ const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'r
 const reactPicker = ref(false)
 const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
 
-// 移动端长按显示操作键（PC 走 CSS :hover）
+// 操作键显隐：PC 用 hover(带 400ms 消失延时，鼠标移到操作条上不消失)，
+// 移动端长按显示
 const actionsVisible = ref(false)
+const showActions = ref(false)
 let longPressTimer = null
 let longPressFired = false
+let hideTimer = null
+
 function onTouchStart() {
   clearTimeout(longPressTimer)
   longPressFired = false
@@ -48,7 +52,20 @@ function onClick() {
   if (actionsVisible.value && !longPressFired) actionsVisible.value = false
   longPressFired = false
 }
-onUnmounted(() => clearTimeout(longPressTimer))
+
+// PC hover：进入立即显示，离开 400ms 后才隐藏（给用户留出移动到操作条的时间）
+function onMouseEnter() {
+  clearTimeout(hideTimer)
+  showActions.value = true
+}
+function onMouseLeave() {
+  clearTimeout(hideTimer)
+  hideTimer = setTimeout(() => { showActions.value = false }, 400)
+}
+onUnmounted(() => {
+  clearTimeout(longPressTimer)
+  clearTimeout(hideTimer)
+})
 
 const isOwn = computed(() => !!props.msg && props.msg.from === props.myPeerId)
 const isPinned = computed(() => props.pinnedIds.includes(props.msg.id))
@@ -168,13 +185,15 @@ function escapeHtml(s) {
       'has-reactions': reactionList.length,
       highlight,
       pinned: isPinned,
-      'actions-visible': actionsVisible
+      'actions-visible': actionsVisible || showActions
     }"
     data-msg-id="msg.id"
     @touchstart="onTouchStart"
     @touchend="onTouchEnd"
     @touchmove="onTouchMove"
     @click="onClick"
+    @mouseenter="onMouseEnter"
+    @mouseleave="onMouseLeave"
   >
     <div class="msg-header">
       <span class="msg-name" v-if="!isOwn">{{ msg.name || msg.from.slice(0, 8) }}</span>
@@ -301,7 +320,7 @@ function escapeHtml(s) {
         >{{ r.emoji }} {{ r.count }}</span>
       </div>
 
-      <div class="msg-actions-bar">
+      <div class="msg-actions-bar" @mouseenter="onMouseEnter" @mouseleave="onMouseLeave">
         <button
           v-if="isPinned"
           class="icon-btn-mini"
@@ -501,13 +520,6 @@ function escapeHtml(s) {
   left: auto;
   right: calc(100% + 10px);
   transform: translateX(-4px);
-}
-@media (hover: hover) {
-  .message:hover .msg-actions-bar {
-    opacity: 1;
-    pointer-events: auto;
-    transform: translateX(0);
-  }
 }
 @media (hover: none) {
   /* 移动端：长按由 JS 控制，阻止系统菜单干扰 */
