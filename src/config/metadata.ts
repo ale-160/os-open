@@ -51,7 +51,8 @@ export const METADATA_ZH = {
     canonical: "https://web-img.ale160.com/zh/",
     languages: {
       "en": "https://web-img.ale160.com/",
-      "zh-CN": "https://web-img.ale160.com/zh/"
+      "zh-CN": "https://web-img.ale160.com/zh/",
+      "x-default": "https://web-img.ale160.com/"
     }
   }
 };
@@ -107,7 +108,8 @@ export const METADATA_EN = {
     canonical: "https://web-img.ale160.com/",
     languages: {
       "en": "https://web-img.ale160.com/",
-      "zh-CN": "https://web-img.ale160.com/zh/"
+      "zh-CN": "https://web-img.ale160.com/zh/",
+      "x-default": "https://web-img.ale160.com/"
     }
   }
 };
@@ -151,7 +153,7 @@ export function getMetadata(lang: string = "en"): Metadata {
     creator: metadata.creator,
     publisher: metadata.publisher,
     icons: {
-      icon: "https://ale160.com/favicon.png",
+      icon: "/favicon.png",
     },
     formatDetection: {
       email: false,
@@ -182,7 +184,7 @@ export function getPdfMetadata(lang: string = "en"): Metadata {
     creator: base.creator,
     publisher: base.publisher,
     icons: {
-      icon: "https://ale160.com/favicon.png",
+      icon: "/favicon.png",
     },
     formatDetection: {
       email: false,

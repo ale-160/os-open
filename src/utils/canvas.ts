@@ -91,8 +91,8 @@ export async function compressImage(
       return prepareAndSaveImage(img, width, height, format, quality);
     } else {
       // 裁剪模式
-      let finalWidth = maxWidth || width;
-      let finalHeight = maxHeight || height;
+      const finalWidth = maxWidth || width;
+      const finalHeight = maxHeight || height;
 
       // 使用用户提供的裁剪位置，或者默认居中
       let offsetX = cropX !== undefined ? cropX : (width - finalWidth) / 2;
