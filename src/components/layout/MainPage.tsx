@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart, ArrowLeftRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage, zhStrings, enStrings } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
@@ -340,6 +340,13 @@ export default function MainPage({ lang }: MainPageProps) {
           </a>
         </div>
         <div className="flex items-center gap-1">
+          <a
+            href={lang === 'zh' ? '/zh/convert' : '/convert'}
+            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title={t('convert')}
+          >
+            <ArrowLeftRight className="w-4.5 h-4.5" />
+          </a>
           <button
             onClick={handleToggleLanguage}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"

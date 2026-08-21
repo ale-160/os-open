@@ -142,6 +142,38 @@ export const PDF_METADATA_EN = {
   ],
 };
 
+// 图片格式转换页元数据
+export const CONVERT_METADATA_ZH = {
+  title: "web-img · 图片格式转换 - 批量转换 JPG PNG WebP BMP ICO",
+  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF 输入。纯前端本地处理，图片不会上传服务器。",
+  keywords: [
+    "图片格式转换",
+    "格式转换器",
+    "PNG转JPG",
+    "JPG转WebP",
+    "HEIC转JPG",
+    "图片转ICO",
+    "批量转换",
+    "在线转换工具",
+    "web-img",
+  ],
+};
+
+export const CONVERT_METADATA_EN = {
+  title: "web-img · Image Converter - Batch Convert JPG PNG WebP BMP ICO",
+  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF input. All processed locally — files never leave your device.",
+  keywords: [
+    "image converter",
+    "format converter",
+    "PNG to JPG",
+    "JPG to WebP",
+    "image to ICO",
+    "batch convert",
+    "online converter",
+    "web-img",
+  ],
+};
+
 export function getMetadata(lang: string = "en"): Metadata {
   const metadata = lang === "en" ? METADATA_EN : METADATA_ZH;
 
@@ -214,6 +246,54 @@ export function getPdfMetadata(lang: string = "en"): Metadata {
       languages: {
         "en": "https://web-img.ale160.com/pdf/",
         "zh-CN": "https://web-img.ale160.com/zh/pdf/",
+      },
+    },
+  };
+}
+
+export function getConvertMetadata(lang: string = "en"): Metadata {
+  const convertMeta = lang === "en" ? CONVERT_METADATA_EN : CONVERT_METADATA_ZH;
+  const base = lang === "en" ? METADATA_EN : METADATA_ZH;
+  const url = lang === "en" ? "https://web-img.ale160.com/convert/" : "https://web-img.ale160.com/zh/convert/";
+
+  return {
+    title: convertMeta.title,
+    description: convertMeta.description,
+    keywords: convertMeta.keywords,
+    authors: base.authors,
+    creator: base.creator,
+    publisher: base.publisher,
+    icons: {
+      icon: "/favicon.png",
+    },
+    formatDetection: {
+      email: false,
+      telephone: false,
+    },
+    openGraph: {
+      ...base.openGraph,
+      title: convertMeta.title,
+      description: convertMeta.description,
+      url,
+      locale: lang === "en" ? "en_US" : "zh_CN",
+    },
+    twitter: {
+      ...base.twitter,
+      title: convertMeta.title,
+      description: convertMeta.description,
+    },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+    alternates: {
+      canonical: url,
+      languages: {
+        "en": "https://web-img.ale160.com/convert/",
+        "zh-CN": "https://web-img.ale160.com/zh/convert/",
       },
     },
   };

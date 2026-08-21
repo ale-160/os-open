@@ -6,6 +6,12 @@
 
 ### 新增
 
+- **批量格式转换页**（参考 convertio.co 的核心流程）：新增 `/convert` 与 `/zh/convert` 路由，支持多文件拖入/选择 → 选择目标格式 → 批量转换 → 单个下载或打包 ZIP
+  - 输出格式扩展为 5 种：JPEG、PNG、WebP（Canvas 原生）+ **BMP**（自研 24 位编码器）+ **ICO**（自研多尺寸图标封装器，16-256px 内嵌 PNG），均零依赖
+  - 输入支持浏览器可解码的全部格式：JPG / PNG / WebP / GIF / BMP / SVG / ICO / AVIF
+  - 可调质量（JPEG/WebP）、可选最大尺寸限制（等比缩小）
+  - 文件列表展示缩略图、尺寸，转换后显示结果体积与前后对比；主界面头部新增入口
+- **SEO**：转换页独立 metadata（title/description/keywords/OG/hreflang）与 sitemap 条目
 - **预设持久化**：自定义尺寸预设、固定状态、导出格式排序与自定义分组现在保存到 localStorage，刷新页面不再丢失；存储带版本号，未来内置数据结构变更时旧缓存自动失效回退默认值
 
 ### 修复

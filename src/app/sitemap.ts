@@ -62,5 +62,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       },
     },
+    {
+      url: `${BASE_URL}/convert/`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
+      alternates: {
+        languages: {
+          en: `${BASE_URL}/convert/`,
+          zh: `${BASE_URL}/zh/convert/`,
+          "x-default": `${BASE_URL}/convert/`,
+        },
+      },
+    },
+    {
+      url: `${BASE_URL}/zh/convert/`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: {
+        languages: {
+          en: `${BASE_URL}/convert/`,
+          zh: `${BASE_URL}/zh/convert/`,
+          "x-default": `${BASE_URL}/convert/`,
+        },
+      },
+    },
   ];
 }
