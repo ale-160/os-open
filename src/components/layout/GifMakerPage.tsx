@@ -6,8 +6,11 @@ import { useDragDrop } from '@/hooks/useDragDrop';
 import { loadImage } from '@/utils/canvas';
 import { encodeAnimatedGIF } from '@/utils/gifEncoder';
 import { downloadFile, formatFileSize } from '@/utils/file';
+import { normalizeImageFiles } from '@/utils/heicDecode';
 import { UploadZone } from '@/components/ui/UploadZone';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DragOverlay } from '@/components/ui/DragOverlay';
 import {
   FileImage, ArrowLeft, X, Loader2, Download, Trash2,
   ChevronUp, ChevronDown, Play,
@@ -71,8 +74,10 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
       const room = MAX_FRAMES - frames.length;
       if (room <= 0) return;
       const accepted = files.slice(0, room);
+      // HEIC 先解码为浏览器可处理的 JPEG
+      const normalized = await normalizeImageFiles(accepted, lang);
       const items: FrameItem[] = [];
-      for (const file of accepted) {
+      for (const file of normalized) {
         try {
           const img = await loadImage(file);
           items.push({
@@ -91,7 +96,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
         setError(null);
       }
     })();
-  }, [frames.length, trackUrl]);
+  }, [frames.length, trackUrl, lang]);
 
   const removeFrame = useCallback((id: string) => {
     setFrames(prev => {
@@ -228,14 +233,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
       {...dragHandlers}
     >
       {/* 拖拽指示器 */}
-      {isDragging && !isEncoding && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 pointer-events-none">
-          <div className="bg-card p-8 rounded-xl shadow-2xl border-2 border-dashed border-primary flex flex-col items-center gap-4">
-            <FileImage className="w-16 h-16 text-primary" />
-            <p className="text-lg font-semibold">{t.frames}</p>
-          </div>
-        </div>
-      )}
+      {isDragging && !isEncoding && <DragOverlay icon={<FileImage className="w-14 h-14" />} label={t.frames} />}
 
       {/* 顶部导航 */}
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0 z-10">
@@ -338,9 +336,10 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
                 </p>
               )}
               <img
+                key={settingsStale ? 'stale' : 'fresh'}
                 src={frames.length >= 2 ? frames[previewIdx]?.url ?? result.url : result.url}
                 alt="GIF preview"
-                className="w-full rounded-lg border border-border bg-[repeating-conic-gradient(#8882_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]"
+                className="w-full rounded-lg border border-border bg-[repeating-conic-gradient(#8882_0%_25%,transparent_0%_50%)] bg-[length:16px_16px] animate-in fade-in slide-in-from-bottom-1 duration-300"
               />
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>{result.width}×{result.height}</span>
@@ -367,8 +366,8 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
           </div>
 
           {frames.length === 0 ? (
-            <div className="h-40 rounded-lg border border-dashed border-border/60 flex items-center justify-center text-sm text-muted-foreground">
-              {lang === 'zh' ? '尚未添加帧' : 'No frames yet'}
+            <div className="h-48 rounded-lg border border-dashed border-border/60 flex items-center justify-center">
+              <EmptyState variant="frames" size="sm" title={lang === 'zh' ? '尚未添加帧' : 'No frames yet'} />
             </div>
           ) : (
             <ol className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 list-none">
@@ -377,6 +376,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
                   key={frame.id}
                   className={cn(
                     'relative group rounded-lg border overflow-hidden bg-card transition-all',
+                    'animate-in fade-in zoom-in-95 duration-200',
                     result && previewIdx === i && frames.length >= 2
                       ? 'border-primary ring-2 ring-primary/40'
                       : 'border-border'

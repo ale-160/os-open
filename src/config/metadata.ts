@@ -116,27 +116,31 @@ export const METADATA_EN = {
 
 // PDF 页面元数据
 export const PDF_METADATA_ZH = {
-  title: "web-img · PDF 转图片 - 在线 PDF 转换工具",
-  description: "免费在线 PDF 转图片工具，支持将 PDF 页面转换为 PNG、JPEG、WebP 格式。多页批量转换，高分辨率渲染，纯前端本地处理，保护隐私。",
+  title: "web-img · PDF 转换工具 - PDF 转图片 / 图片转 PDF",
+  description: "免费在线双向 PDF 转换工具：PDF 页面转 PNG、JPEG、WebP 图片，或多张图片合成一个 PDF 文件（支持排序、页面尺寸与边距设置）。多页批量处理，纯前端本地转换，保护隐私。",
   keywords: [
     "PDF转图片",
+    "图片转PDF",
     "PDF转换",
+    "JPG合成PDF",
     "PDF to Image",
-    "PDF to PNG",
-    "PDF to JPEG",
+    "Image to PDF",
+    "PNG to PDF",
     "在线PDF工具",
     "web-img",
   ],
 };
 
 export const PDF_METADATA_EN = {
-  title: "web-img · PDF to Image - Online PDF Converter",
-  description: "Free online PDF to image converter. Convert PDF pages to PNG, JPEG, or WebP format. Batch conversion, high resolution rendering, all processed locally for privacy.",
+  title: "web-img · PDF Converter - PDF to Image & Image to PDF",
+  description: "Free online two-way PDF converter: turn PDF pages into PNG, JPEG, or WebP images, or combine multiple images into a single PDF with ordering, page size, and margin options. Batch processing, all local in your browser.",
   keywords: [
     "PDF to image",
+    "image to PDF",
     "PDF converter",
-    "PDF to PNG",
-    "PDF to JPEG",
+    "JPG to PDF",
+    "PNG to PDF",
+    "combine images to PDF",
     "online PDF tool",
     "web-img",
   ],
@@ -145,7 +149,7 @@ export const PDF_METADATA_EN = {
 // 图片格式转换页元数据
 export const CONVERT_METADATA_ZH = {
   title: "web-img · 图片格式转换 - 批量转换 JPG PNG WebP GIF BMP ICO",
-  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、GIF、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF 输入。纯前端本地处理，图片不会上传服务器。",
+  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、GIF、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF 及 iPhone HEIC 输入。纯前端本地处理，图片不会上传服务器。",
   keywords: [
     "图片格式转换",
     "格式转换器",
@@ -154,6 +158,8 @@ export const CONVERT_METADATA_ZH = {
     "图片转GIF",
     "GIF转换",
     "图片转ICO",
+    "HEIC转JPG",
+    "HEIC转换",
     "批量转换",
     "在线转换工具",
     "web-img",
@@ -162,7 +168,7 @@ export const CONVERT_METADATA_ZH = {
 
 export const CONVERT_METADATA_EN = {
   title: "web-img · Image Converter - Batch Convert JPG PNG WebP GIF BMP ICO",
-  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, GIF, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF input. All processed locally — files never leave your device.",
+  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, GIF, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF and iPhone HEIC input. All processed locally — files never leave your device.",
   keywords: [
     "image converter",
     "format converter",
@@ -170,6 +176,8 @@ export const CONVERT_METADATA_EN = {
     "JPG to WebP",
     "image to GIF",
     "image to ICO",
+    "HEIC to JPG",
+    "HEIC converter",
     "batch convert",
     "online converter",
     "web-img",

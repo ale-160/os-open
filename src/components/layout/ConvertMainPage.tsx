@@ -9,7 +9,10 @@ import { canvasToBMP, encodeICO } from '@/utils/imageEncoders';
 import { encodeGIF } from '@/utils/gifEncoder';
 import type { ConvertRequest, ConvertSuccess } from '@/workers/protocol';
 import { downloadFile, formatFileSize } from '@/utils/file';
+import { normalizeImageFiles } from '@/utils/heicDecode';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DragOverlay } from '@/components/ui/DragOverlay';
 import {
   FileImage, ArrowLeft, X, Loader2, Download, Trash2,
   PackageCheck, CheckCircle2, XCircle, Circle, Repeat, Film,
@@ -50,10 +53,10 @@ const FORMATS: { id: TargetFormat; ext: string; quality: boolean; note: { zh: st
   { id: 'ico', ext: '.ico', quality: false, note: { zh: '多尺寸图标（16-256px）', en: 'Multi-size icon (16-256px)' } },
 ];
 
-/** 浏览器可解码的图片扩展名（含原生解码的 avif/svg） */
+/** 浏览器可解码的图片扩展名（含原生解码的 avif/svg；heic 由归一化层转换） */
 const SUPPORTED_EXTENSIONS = [
   '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp',
-  '.svg', '.ico', '.avif', '.tif', '.tiff',
+  '.svg', '.ico', '.avif', '.tif', '.tiff', '.heic', '.heif',
 ];
 
 const isSupportedImage = (file: File): boolean => {
@@ -116,7 +119,10 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     }
     setError(null);
 
-    for (const file of valid) {
+    // HEIC 先解码为 JPEG，保证后续 Worker 转换路径可用
+    const normalized = await normalizeImageFiles(valid, lang);
+
+    for (const file of normalized) {
       try {
         const { width, height } = await measureImage(file);
         const url = URL.createObjectURL(file);
@@ -341,14 +347,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
       {...dragHandlers}
     >
       {/* 拖拽指示器 */}
-      {isDragging && !isConverting && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 pointer-events-none">
-          <div className="bg-card p-8 rounded-xl shadow-2xl border-2 border-dashed border-primary flex flex-col items-center gap-4">
-            <FileImage className="w-16 h-16 text-primary" />
-            <p className="text-lg font-semibold">{t.uploadTitle}</p>
-          </div>
-        </div>
-      )}
+      {isDragging && !isConverting && <DragOverlay icon={<FileImage className="w-14 h-14" />} label={t.uploadTitle} />}
 
       {/* 顶部导航 */}
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0 z-10">
@@ -501,19 +500,15 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
             <div className="h-full flex items-center justify-center p-8">
               <div className="w-full max-w-xl">
                 <div
-                  className="relative flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl cursor-pointer transition-colors duration-200 py-14 hover:border-primary/50 hover:bg-muted/50"
+                  className="relative flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 py-14 hover:border-primary/50 hover:bg-muted/50"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                    <FileImage className="w-8 h-8 text-primary" />
-                  </div>
-                  <p className="text-lg font-semibold mb-1">{t.uploadTitle}</p>
-                  <p className="text-sm text-muted-foreground">{t.uploadHint}</p>
+                  <EmptyState variant="convert" title={t.uploadTitle} description={t.uploadHint} />
                   <div className="flex flex-wrap justify-center gap-1.5 mt-5 px-4">
                     {['JPG', 'PNG', 'WebP', 'GIF', 'BMP', 'SVG', 'ICO', 'AVIF'].map((ext) => (
                       <span
                         key={ext}
-                        className="px-2 py-0.5 text-xs font-mono rounded-md bg-muted text-muted-foreground"
+                        className="px-2 py-0.5 text-xs font-mono rounded-md bg-muted text-muted-foreground transition-colors hover:text-foreground"
                       >
                         {ext}
                       </span>
@@ -525,11 +520,14 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
             </div>
           ) : (
             <div className="p-4 space-y-2">
-              {items.map((item) => (
+              {items.map((item, idx) => (
                 <div
                   key={item.id}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-card border border-border"
+                  style={{ animationDelay: `${Math.min(idx * 35, 280)}ms` }}
+                  className="relative overflow-hidden flex items-center gap-3 p-3 rounded-lg bg-card border border-border animate-in fade-in slide-in-from-bottom-1 anim-fill-backwards duration-300"
                 >
+                  {/* 转换中：行内不确定进度条 */}
+                  {item.status === 'converting' && <span aria-hidden="true" className="progress-indeterminate" />}
                   {/* 缩略图 */}
                   <img
                     src={item.url}
@@ -557,12 +555,20 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
                       )}
                     </div>
                   </div>
-                  {/* 状态 */}
+                  {/* 状态（不同图标类型切换时重挂载，入场动画自动重放） */}
                   <div className="shrink-0">
                     {item.status === 'pending' && <Circle className="w-4 h-4 text-muted-foreground/40" />}
                     {item.status === 'converting' && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                    {item.status === 'done' && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-                    {item.status === 'error' && <XCircle className="w-4 h-4 text-destructive" />}
+                    {item.status === 'done' && (
+                      <span className="inline-flex animate-in zoom-in-95 fade-in duration-200">
+                        <CheckCircle2 className="w-4 h-4 text-green-500" />
+                      </span>
+                    )}
+                    {item.status === 'error' && (
+                      <span className="inline-flex animate-shake">
+                        <XCircle className="w-4 h-4 text-destructive" />
+                      </span>
+                    )}
                   </div>
                   {/* 操作 */}
                   <div className="flex items-center gap-1 shrink-0">

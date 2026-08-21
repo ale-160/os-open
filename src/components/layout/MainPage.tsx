@@ -12,11 +12,14 @@ import { UploadZone } from '@/components/ui/UploadZone';
 import { ToolPanel } from '@/components/ui/ToolPanel';
 import { SmallSidebar } from '@/components/ui/SmallSidebar';
 import { UnderDevelopmentModal } from '@/components/ui/UnderDevelopmentModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DragOverlay } from '@/components/ui/DragOverlay';
 import { AdjustPanel } from '@/components/features/CompressPanel';
 import { WatermarkPanel } from '@/components/features/WatermarkPanel';
 import { MergePanel } from '@/components/features/MergePanel';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { isPdfFile } from '@/utils/pdfToImage';
+import { normalizeImageFiles } from '@/utils/heicDecode';
 import type { ToolTab } from '@/data/presets';
 import { cn } from '@/lib/utils';
 
@@ -78,8 +81,9 @@ export default function MainPage({ lang }: MainPageProps) {
       const pdfPath = lang === 'zh' ? '/zh/pdf' : '/pdf';
       router.push(pdfPath);
     } else {
-      // 普通图片文件，直接添加
-      addImages(fileArray);
+      // 普通图片文件；HEIC 先解码为浏览器可处理的 JPEG
+      const normalized = await normalizeImageFiles(fileArray, lang);
+      addImages(normalized);
       setActiveTab('adjust');
     }
   }, [addImages, router, lang]);
@@ -352,14 +356,7 @@ export default function MainPage({ lang }: MainPageProps) {
       {...dragHandlers}
     >
       {/* 拖拽指示覆盖层 */}
-      {isDragging && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 pointer-events-none">
-          <div className="bg-card p-8 rounded-xl shadow-2xl border-2 border-dashed border-primary flex flex-col items-center gap-4">
-            <Upload className="w-16 h-16 text-primary" />
-            <p className="text-lg font-semibold">{t('dropHere')}</p>
-          </div>
-        </div>
-      )}
+      {isDragging && <DragOverlay icon={<Upload className="w-14 h-14" />} label={t('dropHere')} />}
 
       {/* 顶部导航栏 */}
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0 z-10">
@@ -412,7 +409,7 @@ export default function MainPage({ lang }: MainPageProps) {
 
         {/* 工具面板侧边栏 */}
         {sidebarOpen && (
-          <aside className="w-56 shrink-0 border-r border-border bg-card flex flex-col transition-all duration-200 ease-out">
+          <aside className="w-56 shrink-0 border-r border-border bg-card flex flex-col animate-in fade-in slide-in-from-left-2 duration-200 ease-out">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30 shrink-0">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {panelTitle}
@@ -625,7 +622,7 @@ export default function MainPage({ lang }: MainPageProps) {
                         {sizeDeltaPct !== null && sizeDeltaPct !== 0 && (
                           <span
                             className={cn(
-                              'text-xs font-medium px-1.5 py-0.5 rounded-full',
+                              'text-xs font-medium px-1.5 py-0.5 rounded-full animate-in zoom-in-95 fade-in duration-200',
                               sizeDeltaPct > 0
                                 ? 'bg-green-500/10 text-green-600 dark:text-green-400'
                                 : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
@@ -685,8 +682,8 @@ export default function MainPage({ lang }: MainPageProps) {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                  {t('noImage')}
+                <div className="flex items-center justify-center h-full p-4">
+                  <EmptyState variant="image" title={t('noImage')} description={t('uploadHint')} />
                 </div>
               )}
             </div>
@@ -730,8 +727,8 @@ export default function MainPage({ lang }: MainPageProps) {
 
       {/* 确认弹窗 */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-xl animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold mb-2">{t('confirmReplace')}</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {t('confirmReplaceDesc')}
@@ -757,13 +754,13 @@ export default function MainPage({ lang }: MainPageProps) {
       {/* 全屏图片预览 */}
       {showFullscreenImage && previewImage && (
         <div
-          className="fixed inset-0 z-1000 bg-black/95 flex items-center justify-center cursor-pointer"
+          className="fixed inset-0 z-1000 bg-black/95 flex items-center justify-center cursor-pointer animate-in fade-in duration-200"
           onClick={() => setShowFullscreenImage(false)}
         >
           <img
             src={previewImage.url}
             alt="Fullscreen Preview"
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain animate-in fade-in zoom-in-95 duration-200"
           />
           <button
             onClick={() => setShowFullscreenImage(false)}
