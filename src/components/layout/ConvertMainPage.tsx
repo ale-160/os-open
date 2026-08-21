@@ -6,6 +6,7 @@ import { useDragDrop } from '@/hooks/useDragDrop';
 import { loadImage } from '@/utils/canvas';
 import { canvasToBMP, encodeICO } from '@/utils/imageEncoders';
 import { downloadFile, formatFileSize } from '@/utils/file';
+import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import {
   FileImage, ArrowLeft, X, Loader2, Download, Trash2,
   PackageCheck, CheckCircle2, XCircle, Circle, Repeat,
@@ -71,7 +72,14 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
   const [maxHeight, setMaxHeight] = useState('1080');
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastConvertSettings, setLastConvertSettings] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 转换设置快照，用于判断已有结果是否过期
+  const settingsKey = `${format}|${quality}|${limitSize}|${maxWidth}|${maxHeight}`;
+
+  // SliderWithInput 要求 onChangeEnd；转换页为手动触发，无需回调
+  const noop = useCallback(() => {}, []);
 
   // 追踪缩略图 ObjectURL，卸载时统一释放
   const urlsRef = useRef<Set<string>>(new Set());
@@ -207,6 +215,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
 
     setIsConverting(true);
     setError(null);
+    setLastConvertSettings(settingsKey);
     const ids = new Set(pending.map(i => i.id));
     setItems(prev => prev.map(i => (ids.has(i.id) ? { ...i, status: 'converting', result: undefined } : i)));
 
@@ -220,9 +229,12 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     }
 
     setIsConverting(false);
-  }, [items, convertOne]);
+  }, [items, convertOne, settingsKey]);
 
   const doneItems = items.filter(i => i.status === 'done' && i.result);
+
+  // 设置在转换后发生变更 → 已有结果视为过期
+  const hasStaleResults = doneItems.length > 0 && settingsKey !== lastConvertSettings;
 
   const handleDownloadAll = useCallback(async () => {
     if (doneItems.length === 0) return;
@@ -262,9 +274,6 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     title: lang === 'zh' ? '图片格式转换' : 'Image Converter',
     uploadTitle: lang === 'zh' ? '拖拽图片到此处' : 'Drag images here',
     uploadHint: lang === 'zh' ? '或点击选择文件 · 支持批量' : 'Or click to select files · batch supported',
-    supported: lang === 'zh'
-      ? '支持 JPG / PNG / WebP / GIF / BMP / SVG / ICO / AVIF 输入'
-      : 'Accepts JPG / PNG / WebP / GIF / BMP / SVG / ICO / AVIF input',
     targetFormat: lang === 'zh' ? '目标格式' : 'Target Format',
     quality: lang === 'zh' ? '质量' : 'Quality',
     limitSize: lang === 'zh' ? '限制最大尺寸（等比缩小）' : 'Limit max size (downscale)',
@@ -279,6 +288,9 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     result: lang === 'zh' ? '结果' : 'Result',
     pending: lang === 'zh' ? '待转换' : 'Pending',
     failed: lang === 'zh' ? '转换失败' : 'Failed',
+    staleHint: lang === 'zh'
+      ? '设置已更改，重新转换以更新结果'
+      : 'Settings changed — convert again to update results',
     privacyNote: lang === 'zh'
       ? '所有转换在浏览器本地完成，文件不会上传到服务器'
       : 'All conversions run locally in your browser — files never leave your device',
@@ -328,32 +340,32 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
         )}
       </header>
 
-      {/* 主内容 */}
-      <main className="flex-1 flex min-h-0">
-        {/* 左侧：设置面板 */}
-        <aside className="w-64 shrink-0 border-r border-border bg-card p-4 space-y-5 overflow-y-auto scrollbar-thin">
+      {/* 主内容：移动端上下堆叠，桌面端左右分栏 */}
+      <main className="flex-1 flex flex-col lg:flex-row min-h-0">
+        {/* 设置面板 */}
+        <aside className="w-full lg:w-64 shrink-0 border-b lg:border-b-0 lg:border-r border-border bg-card p-4 space-y-5 overflow-y-auto scrollbar-thin">
           {/* 目标格式 */}
           <div>
             <label className="block text-sm font-medium mb-2">{t.targetFormat}</label>
-            <div className="space-y-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {FORMATS.map((f) => (
                 <button
                   key={f.id}
                   onClick={() => setFormat(f.id)}
                   disabled={isConverting}
                   className={cn(
-                    'w-full text-left px-3 py-2 rounded-lg transition-all',
+                    'text-left px-3 py-2 rounded-lg transition-all',
                     format === f.id
                       ? 'bg-primary text-primary-foreground ring-2 ring-primary/50'
                       : 'bg-muted hover:bg-muted/80',
                     isConverting && 'opacity-60 cursor-not-allowed'
                   )}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-1">
                     <span className="text-sm font-medium uppercase">{f.id}</span>
                     <span className="text-xs opacity-70 font-mono">{f.ext}</span>
                   </div>
-                  <div className="text-xs opacity-70">
+                  <div className="text-xs opacity-70 leading-tight mt-0.5">
                     {lang === 'zh' ? f.note.zh : f.note.en}
                   </div>
                 </button>
@@ -363,20 +375,15 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
 
           {/* 质量（仅 jpeg/webp） */}
           {FORMATS.find(f => f.id === format)?.quality && (
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                {t.quality}: {quality}%
-              </label>
-              <input
-                type="range"
-                min={1}
-                max={100}
-                value={quality}
-                onChange={(e) => setQuality(Number(e.target.value))}
-                disabled={isConverting}
-                className="w-full"
-              />
-            </div>
+            <SliderWithInput
+              label={t.quality}
+              value={quality}
+              onChange={setQuality}
+              onChangeEnd={noop}
+              min={1}
+              max={100}
+              suffix="%"
+            />
           )}
 
           {/* 尺寸限制 */}
@@ -430,8 +437,11 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
             >
               {doneCount > 1 ? <PackageCheck className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-              <span>{doneCount > 1 ? t.downloadAll : t.downloadAll}( {doneCount} )</span>
+              <span>{t.downloadAll}{doneCount > 0 ? ` (${doneCount})` : ''}</span>
             </button>
+            {hasStaleResults && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 text-center">⚠ {t.staleHint}</p>
+            )}
           </div>
 
           {error && (
@@ -441,32 +451,30 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
           )}
         </aside>
 
-        {/* 右侧：文件列表 */}
-        <main className="flex-1 overflow-y-auto scrollbar-thin">
+        {/* 文件列表 */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
           {items.length === 0 ? (
             <div className="h-full flex items-center justify-center p-8">
               <div className="w-full max-w-xl">
                 <div
-                  className="relative flex flex-col items-center justify-center w-full border-2 border-dashed rounded-lg cursor-pointer transition-colors duration-200 h-56 hover:border-primary/50 hover:bg-muted/50"
+                  className="relative flex flex-col items-center justify-center w-full border-2 border-dashed rounded-xl cursor-pointer transition-colors duration-200 py-14 hover:border-primary/50 hover:bg-muted/50"
                   onClick={() => fileInputRef.current?.click()}
                 >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        void addFiles(Array.from(e.target.files));
-                      }
-                      e.target.value = '';
-                    }}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <FileImage className="w-14 h-14 mb-4 text-muted-foreground" />
+                  <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                    <FileImage className="w-8 h-8 text-primary" />
+                  </div>
                   <p className="text-lg font-semibold mb-1">{t.uploadTitle}</p>
                   <p className="text-sm text-muted-foreground">{t.uploadHint}</p>
-                  <p className="text-xs text-muted-foreground/70 mt-3">{t.supported}</p>
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-5 px-4">
+                    {['JPG', 'PNG', 'WebP', 'GIF', 'BMP', 'SVG', 'ICO', 'AVIF'].map((ext) => (
+                      <span
+                        key={ext}
+                        className="px-2 py-0.5 text-xs font-mono rounded-md bg-muted text-muted-foreground"
+                      >
+                        {ext}
+                      </span>
+                    ))}
+                  </div>
                 </div>
                 <p className="text-center text-xs text-muted-foreground mt-6">🔒 {t.privacyNote}</p>
               </div>
@@ -543,23 +551,25 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
                   + {t.uploadHint}
                 </button>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={(e) => {
-                  if (e.target.files && e.target.files.length > 0) {
-                    void addFiles(Array.from(e.target.files));
-                  }
-                  e.target.value = '';
-                }}
-                className="hidden"
-              />
             </div>
           )}
-        </main>
+        </div>
       </main>
+
+      {/* 共享文件选择器（空状态与追加按钮共用） */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            void addFiles(Array.from(e.target.files));
+          }
+          e.target.value = '';
+        }}
+        className="hidden"
+      />
 
       {/* 底部说明 */}
       <footer className="px-4 py-2 border-t border-border bg-muted/10 text-xs text-muted-foreground text-center shrink-0">

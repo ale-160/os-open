@@ -108,6 +108,26 @@ export default function MainPage({ lang }: MainPageProps) {
     setPendingFiles(null);
   }, []);
 
+  // ESC 关闭全屏预览
+  useEffect(() => {
+    if (!showFullscreenImage) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowFullscreenImage(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showFullscreenImage]);
+
+  // ESC 取消替换确认弹窗
+  useEffect(() => {
+    if (!showConfirmDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleCancelUpload();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showConfirmDialog, handleCancelUpload]);
+
   const handleClearAll = useCallback(() => {
     clearImages();
     setIsFlipped(false);
@@ -304,6 +324,16 @@ export default function MainPage({ lang }: MainPageProps) {
   const currentOriginal = originalImages[0];
   const hasImages = !!previewImage;
 
+  // 预览与原图的体积变化（正数=更小，负数=更大）；未处理时不显示
+  const sizeDeltaPct = (() => {
+    if (!currentOriginal || !previewImage) return null;
+    if (previewImage.url === currentOriginal.url) return null;
+    const origSize = currentOriginal.size;
+    const prevSize = getDataUrlSize(previewImage.url);
+    if (origSize <= 0 || prevSize <= 0) return null;
+    return Math.round((1 - prevSize / origSize) * 100);
+  })();
+
   // 面板标题
   const panelTitle = activeTab === 'adjust'
     ? t('imageAdjust')
@@ -344,6 +374,7 @@ export default function MainPage({ lang }: MainPageProps) {
             href={lang === 'zh' ? '/zh/convert' : '/convert'}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('convert')}
+            aria-label={t('convert')}
           >
             <ArrowLeftRight className="w-4.5 h-4.5" />
           </a>
@@ -351,6 +382,7 @@ export default function MainPage({ lang }: MainPageProps) {
             onClick={handleToggleLanguage}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('language')}
+            aria-label={t('language')}
           >
             <Globe className="w-4.5 h-4.5" />
           </button>
@@ -358,6 +390,7 @@ export default function MainPage({ lang }: MainPageProps) {
             onClick={toggleTheme}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('theme')}
+            aria-label={t('theme')}
           >
             {theme === 'dark' ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
           </button>
@@ -437,12 +470,12 @@ export default function MainPage({ lang }: MainPageProps) {
           </aside>
         )}
 
-        {/* 主内容区 */}
-        <main className="flex-1 flex min-h-0">
+        {/* 主内容区：移动端上下堆叠，桌面端左右分栏 */}
+        <main className="flex-1 flex flex-col md:flex-row min-h-0">
           {/* 原图区域 */}
           {!hideOriginal && (
             <>
-              <div className="flex-1 flex flex-col border-r border-border min-w-0">
+              <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-border min-w-0">
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20 shrink-0">
                   <span className="text-sm font-semibold tracking-tight">{t('original')}</span>
                 </div>
@@ -491,7 +524,7 @@ export default function MainPage({ lang }: MainPageProps) {
                 </div>
               </div>
 
-              <div className="w-px bg-border self-stretch" />
+              <div className="hidden md:block w-px bg-border self-stretch" />
             </>
           )}
 
@@ -577,8 +610,27 @@ export default function MainPage({ lang }: MainPageProps) {
                           </button>
                         </div>
                       )}
-                      <div className="text-sm text-muted-foreground">
-                        {t('previewSize')}：{formatFileSize(getDataUrlSize(previewImage.url))}
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <span>
+                          {t('previewSize')}：{formatFileSize(getDataUrlSize(previewImage.url))}
+                        </span>
+                        {sizeDeltaPct !== null && sizeDeltaPct !== 0 && (
+                          <span
+                            className={cn(
+                              'text-xs font-medium px-1.5 py-0.5 rounded-full',
+                              sizeDeltaPct > 0
+                                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            )}
+                            title={
+                              sizeDeltaPct > 0
+                                ? lang === 'zh' ? '相比原图更小' : 'Smaller than original'
+                                : lang === 'zh' ? '相比原图更大' : 'Larger than original'
+                            }
+                          >
+                            {sizeDeltaPct > 0 ? '-' : '+'}{Math.abs(sizeDeltaPct)}%
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {t('previewDimensions')}：{previewImage.width} × {previewImage.height}

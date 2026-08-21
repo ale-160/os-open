@@ -69,6 +69,16 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     };
   }, [pdfObjectUrl]);
 
+  // ESC 关闭下载弹窗（转换进行中不允许关闭）
+  useEffect(() => {
+    if (!showDownloadModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !converting) setShowDownloadModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showDownloadModal, converting]);
+
   // 渲染指定页面
   const renderPage = useCallback(async (pageNum: number, doc: PDFDocumentProxy | null = pdfDoc) => {
     if (!doc || !canvasRef.current) return;
@@ -395,18 +405,18 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
         ) : (
           // PDF 预览区域
           <div className="flex-1 flex flex-col">
-            {/* 工具栏 */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30 shrink-0">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-primary" />
-                <span className="font-semibold truncate max-w-md">
+            {/* 工具栏：窄屏自动换行 */}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <FileText className="w-5 h-5 text-primary shrink-0" />
+                <span className="font-semibold truncate max-w-48 sm:max-w-md">
                   {currentPdfFile.name}
                 </span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground shrink-0">
                   ({totalPages} {t.pages})
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {pdfDoc && (
                   <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
                     <button
