@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import assert from 'node:assert';
 
 const require_ = createRequire(process.cwd() + '/package.json');
-const { encodeGIF } = require_('./.test-tmp/gifEncoder.js');
+const { encodeGIF, encodeAnimatedGIF } = require_('./.test-tmp/gifEncoder.js');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 参考解码器（独立实现，不与编码器共享任何代码）
@@ -90,25 +90,54 @@ function decodeGIF(buffer) {
   const gct = [];
   for (let i = 0; i < gctEntries; i++) gct.push([b[p++], b[p++], b[p++]]);
 
-  let transparentIndex = -1;
+  const frames = [];
+  let hasLoop = false;
+  let pendingGce = null; // { transparentIndex, delayCs }
   for (;;) {
     const block = b[p++];
-    if (block === 0x3b) throw new Error('no image block found');
+    if (block === 0x3b) break; // trailer
     if (block === 0x21) {
       const label = b[p++];
-      const size = b[p++];
-      if (label === 0xf9 && (b[p] & 0x01) === 1) {
-        transparentIndex = b[p + 3];
+      if (label === 0xf9) {
+        // GCE: size(4) flags delay(2) tindex terminator
+        const size = b[p++];
+        const flags = b[p];
+        pendingGce = {
+          disposal: (flags >> 2) & 0x07,
+          transparentIndex: (flags & 0x01) === 1 ? b[p + 3] : -1,
+          delayCs: b.readUInt16LE(p + 1),
+        };
+        p += size;
+        assert.strictEqual(b[p], 0, 'bad GCE terminator');
+        p++;
+      } else {
+        // 应用/注释等扩展：标识块 + 子块序列
+        let identifier = '';
+        if (label === 0xff) {
+          const size = b[p++];
+          identifier = b.subarray(p, p + size).toString('latin1');
+          p += size;
+          if (identifier === 'NETSCAPE2.0') hasLoop = true;
+        }
+        while (b[p] !== 0) p += 1 + b[p];
+        p++;
       }
-      p += size;
-      if (b[p] !== 0) throw new Error('bad extension terminator');
-      p++;
     } else if (block === 0x2c) {
+      const left = b.readUInt16LE(p);
+      const top = b.readUInt16LE(p + 2);
       const iw = b.readUInt16LE(p + 4);
       const ih = b.readUInt16LE(p + 6);
-      assert.strictEqual(iw, width, 'image width mismatch');
-      assert.strictEqual(ih, height, 'image height mismatch');
+      const descPacked = b[p + 8];
       p += 9;
+
+      // 局部色表（若有）
+      let table = gct;
+      if ((descPacked >> 7) & 1) {
+        const lctEntries = 2 ** ((descPacked & 0x07) + 1);
+        table = [];
+        for (let i = 0; i < lctEntries; i++) table.push([b[p++], b[p++], b[p++]]);
+      }
+
       const minCodeSize = b[p++];
       const data = [];
       while (b[p] !== 0) {
@@ -116,12 +145,25 @@ function decodeGIF(buffer) {
         for (let i = 0; i < n; i++) data.push(b[p + i]);
         p += n;
       }
+      p++; // 跳过子块结束符 0x00
       const indices = lzwDecode(data, minCodeSize, iw * ih);
-      return { width, height, gct, transparentIndex, indices };
+      frames.push({
+        left, top,
+        width: iw, height: ih,
+        gct: table,
+        transparentIndex: pendingGce?.transparentIndex ?? -1,
+        delayCs: pendingGce?.delayCs ?? 0,
+        disposal: pendingGce?.disposal ?? 0,
+        indices,
+      });
+      pendingGce = null;
     } else {
-      throw new Error(`unknown block 0x${block.toString(16)} at ${p - 1}`);
+      const head = [...b.subarray(0, Math.min(b.length, 48))].map(x => x.toString(16).padStart(2, '0')).join(' ');
+      throw new Error(`unknown block 0x${block.toString(16)} at ${p - 1}; total=${b.length}; head=${head}`);
     }
   }
+  if (frames.length === 0) throw new Error('no image block found');
+  return { width, height, frames, hasLoop };
 }
 
 function makeImageData(width, height, fill) {
@@ -140,13 +182,16 @@ async function roundtrip(name, img, { exact = true } = {}) {
     blob.type, 'image/gif', `${name}: mime mismatch`
   );
   const dec = decodeGIF(buf);
+  assert.strictEqual(dec.frames.length, 1, `${name}: single-frame expected`);
+  const frame = dec.frames[0];
+  const { gct, indices, transparentIndex } = frame;
 
   for (let p = 0; p < dec.width * dec.height; p++) {
-    const idx = dec.indices[p];
-    assert.ok(idx >= 0 && idx < dec.gct.length, `${name}: index ${idx} out of range`);
+    const idx = indices[p];
+    assert.ok(idx >= 0 && idx < gct.length, `${name}: index ${idx} out of range`);
     const x = p % dec.width, y = Math.floor(p / dec.width);
 
-    if (dec.transparentIndex >= 0 && idx === dec.transparentIndex) {
+    if (transparentIndex >= 0 && idx === transparentIndex) {
       // 必须对应原图的透明像素（checker 场景）
       assert.strictEqual(
         img.data[p * 4 + 3] < 128, true,
@@ -154,7 +199,7 @@ async function roundtrip(name, img, { exact = true } = {}) {
       );
       continue;
     }
-    const [pr, pg, pb] = dec.gct[idx];
+    const [pr, pg, pb] = gct[idx];
     if (exact) {
       assert.deepStrictEqual(
         [pr, pg, pb],
@@ -164,7 +209,49 @@ async function roundtrip(name, img, { exact = true } = {}) {
       assert.strictEqual(img.data[p * 4 + 3] >= 128, true, `${name}: pixel ${x},${y} should be opaque`);
     }
   }
-  console.log(`  ok  ${name} (${dec.width}x${dec.height}, palette<=${dec.gct.length}, transparent=${dec.transparentIndex})`);
+  console.log(`  ok  ${name} (${dec.width}x${dec.height}, palette<=${gct.length}, transparent=${transparentIndex})`);
+}
+
+async function roundtripAnimated(name, framesIn, { loop = true } = {}) {
+  const blob = encodeAnimatedGIF(framesIn, { loop });
+  const buf = Buffer.from(await blob.arrayBuffer());
+  const dec = decodeGIF(buf);
+
+  assert.strictEqual(dec.frames.length, framesIn.length, `${name}: frame count`);
+  assert.strictEqual(dec.hasLoop, loop, `${name}: NETSCAPE loop flag`);
+
+  for (let f = 0; f < framesIn.length; f++) {
+    const src = framesIn[f].imageData;
+    const fr = dec.frames[f];
+
+    // 帧延时（毫秒 → 厘秒，下限 2cs）
+    const expectedCs = Math.max(2, Math.round(framesIn[f].delayMs / 10));
+    assert.strictEqual(fr.delayCs, expectedCs, `${name}: frame ${f} delay`);
+
+    // 全画布帧位置与尺寸
+    assert.strictEqual(fr.left, 0, `${name}: frame ${f} left`);
+    assert.strictEqual(fr.top, 0, `${name}: frame ${f} top`);
+    assert.strictEqual(fr.width, src.width, `${name}: frame ${f} width`);
+    assert.strictEqual(fr.height, src.height, `${name}: frame ${f} height`);
+
+    const { gct, indices, transparentIndex } = fr;
+    for (let p = 0; p < src.width * src.height; p++) {
+      const idx = indices[p];
+      assert.ok(idx >= 0 && idx < gct.length, `${name}: frame ${f} index ${idx} out of range`);
+      if (transparentIndex >= 0 && idx === transparentIndex) {
+        assert.strictEqual(src.data[p * 4 + 3] < 128, true, `${name}: frame ${f} pixel ${p} should be transparent`);
+        continue;
+      }
+      assert.deepStrictEqual(
+        [...gct[idx]],
+        [src.data[p * 4], src.data[p * 4 + 1], src.data[p * 4 + 2]],
+        `${name}: frame ${f} pixel ${p} color mismatch`
+      );
+    }
+  }
+
+  const sizes = new Set(dec.frames.map(f => `${f.width}x${f.height}@${f.delayCs}ms`));
+  console.log(`  ok  ${name} (${dec.frames.length} frames, loop=${dec.hasLoop}, ${[...sizes].join(', ')})`);
 }
 
 console.log('GIF encoder roundtrip tests');
@@ -201,5 +288,56 @@ await roundtrip('mixed alpha 32x32', makeImageData(32, 32, (p) => {
   const alpha = p % 3 === 0 ? 20 : 255;
   return [(p * 5) & 0xff, (p * 11) & 0xff, (p * 17) & 0xff, alpha];
 }), { exact: false });
+
+console.log('animated GIF tests');
+
+// 8. 三帧纯色动画：精确色 + 帧延时 + 循环扩展
+await roundtripAnimated('3 solid frames', [
+  { imageData: makeImageData(6, 4, () => [255, 0, 0, 255]), delayMs: 200 },
+  { imageData: makeImageData(6, 4, () => [0, 255, 0, 255]), delayMs: 500 },
+  { imageData: makeImageData(6, 4, () => [0, 0, 255, 255]), delayMs: 1000 },
+]);
+
+// 9. 混合内容动画：不透明帧 + 含透明帧（disposal 切换）
+await roundtripAnimated('opaque + transparent frames', [
+  { imageData: makeImageData(8, 8, () => [10, 20, 30, 255]), delayMs: 100 },
+  { imageData: makeImageData(8, 8, (p) => {
+      const checker = ((p % 8) + Math.floor(p / 8)) % 2 === 0;
+      return checker ? [200, 100, 50, 255] : [0, 0, 0, 0];
+    }), delayMs: 300 },
+]);
+
+// 10. 多帧渐变动画（量化路径 + 局部色表独立性）
+{
+  const mk = (phase) => makeImageData(24, 24, (p) => {
+    const v = Math.floor((p / 96 + phase) * 64) & 0xff;
+    return [v, 128, 255 - v, 255];
+  });
+  await roundtripAnimated('4 gradient frames (quantized)', [
+    { imageData: mk(0), delayMs: 80 },   // 8cs 下限
+    { imageData: mk(0.25), delayMs: 120 },
+    { imageData: mk(0.5), delayMs: 120 },
+    { imageData: mk(0.75), delayMs: 120 },
+  ]);
+}
+
+// 11. 关闭循环
+await roundtripAnimated('no-loop single frame', [
+  { imageData: makeImageData(5, 5, () => [1, 2, 3, 255]), delayMs: 250 },
+], { loop: false });
+
+// 12. 尺寸不一致必须抛错
+await assert.rejects(
+  async () => encodeAnimatedGIF([
+    { imageData: makeImageData(4, 4, () => [0, 0, 0, 255]), delayMs: 100 },
+    { imageData: makeImageData(5, 5, () => [0, 0, 0, 255]), delayMs: 100 },
+  ]),
+  /same canvas size/
+);
+console.log('  ok  mismatched frame size rejected');
+
+// 13. 空帧列表必须抛错
+await assert.rejects(async () => encodeAnimatedGIF([]), /no frames/);
+console.log('  ok  empty frames rejected');
 
 console.log('all tests passed');

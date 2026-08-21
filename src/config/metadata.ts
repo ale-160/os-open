@@ -301,6 +301,54 @@ export function getConvertMetadata(lang: string = "en"): Metadata {
   };
 }
 
+export function getGifMakerMetadata(lang: string = "en"): Metadata {
+  const isZh = lang === "zh";
+  const title = isZh
+    ? "web-img · GIF 动画合成 - 多张图片合成 GIF 动图"
+    : "web-img · GIF Maker - Combine Images into Animated GIF";
+  const description = isZh
+    ? "免费在线 GIF 动画制作工具：上传多张图片，调整帧顺序与帧延时，一键合成可循环播放的 GIF 动图。纯前端本地处理，图片不会上传服务器。"
+    : "Free online animated GIF maker: upload multiple images, reorder frames, set frame delay, and combine them into a looping GIF — all processed locally in your browser.";
+  const keywords = isZh
+    ? ["GIF合成", "GIF动画制作", "图片转GIF", "GIF生成器", "动图制作", "在线GIF工具", "web-img"]
+    : ["GIF maker", "animated GIF", "image to GIF", "GIF generator", "online GIF tool", "web-img"];
+  const base = lang === "en" ? METADATA_EN : METADATA_ZH;
+  const url = isZh ? "https://web-img.ale160.com/zh/gif/" : "https://web-img.ale160.com/gif/";
+
+  return {
+    title,
+    description,
+    keywords,
+    authors: base.authors,
+    creator: base.creator,
+    publisher: base.publisher,
+    icons: { icon: "/favicon.png" },
+    formatDetection: { email: false, telephone: false },
+    openGraph: {
+      ...base.openGraph,
+      title,
+      description,
+      url,
+      locale: isZh ? "zh_CN" : "en_US",
+    },
+    twitter: { ...base.twitter, title, description },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+    alternates: {
+      canonical: url,
+      languages: {
+        "en": "https://web-img.ale160.com/gif/",
+        "zh-CN": "https://web-img.ale160.com/zh/gif/",
+      },
+    },
+  };
+}
+
 export const viewport = {
   width: "device-width",
   initialScale: 1,

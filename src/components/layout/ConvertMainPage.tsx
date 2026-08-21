@@ -12,7 +12,7 @@ import { downloadFile, formatFileSize } from '@/utils/file';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import {
   FileImage, ArrowLeft, X, Loader2, Download, Trash2,
-  PackageCheck, CheckCircle2, XCircle, Circle, Repeat,
+  PackageCheck, CheckCircle2, XCircle, Circle, Repeat, Film,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { cn } from '@/lib/utils';
@@ -316,6 +316,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     converting: lang === 'zh' ? '转换中...' : 'Converting...',
     downloadAll: lang === 'zh' ? '打包下载' : 'Download All',
     clearAll: lang === 'zh' ? '清空' : 'Clear',
+    gifMaker: lang === 'zh' ? 'GIF 合成' : 'GIF Maker',
     files: lang === 'zh' ? '个文件' : 'files',
     original: lang === 'zh' ? '原图' : 'Original',
     result: lang === 'zh' ? '结果' : 'Result',
@@ -361,16 +362,26 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
           </button>
           <h1 className="text-lg font-bold text-primary">{t.title}</h1>
         </div>
-        {items.length > 0 && (
-          <button
-            onClick={handleClearAll}
-            disabled={isConverting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors text-sm"
+        <div className="flex items-center gap-1.5">
+          <a
+            href={lang === 'zh' ? '/zh/gif' : '/gif'}
+            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title={t.gifMaker}
+            aria-label={t.gifMaker}
           >
-            <Trash2 className="w-4 h-4" />
-            <span>{t.clearAll}</span>
-          </button>
-        )}
+            <Film className="w-4.5 h-4.5" />
+          </a>
+          {items.length > 0 && (
+            <button
+              onClick={handleClearAll}
+              disabled={isConverting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors text-sm"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>{t.clearAll}</span>
+            </button>
+          )}
+        </div>
       </header>
 
       {/* 主内容：移动端上下堆叠，桌面端左右分栏 */}

@@ -88,5 +88,31 @@ export default function sitemap(): MetadataRoute.Sitemap {
         },
       },
     },
+    {
+      url: `${BASE_URL}/gif/`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+      alternates: {
+        languages: {
+          en: `${BASE_URL}/gif/`,
+          zh: `${BASE_URL}/zh/gif/`,
+          "x-default": `${BASE_URL}/gif/`,
+        },
+      },
+    },
+    {
+      url: `${BASE_URL}/zh/gif/`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.7,
+      alternates: {
+        languages: {
+          en: `${BASE_URL}/gif/`,
+          zh: `${BASE_URL}/zh/gif/`,
+          "x-default": `${BASE_URL}/gif/`,
+        },
+      },
+    },
   ];
 }

@@ -1,13 +1,12 @@
 'use client';
 
 /**
- * 纯前端单帧 GIF 编码器（GIF89a）。
+ * 纯前端 GIF 编码器（GIF89a），支持单帧与多帧动画。
  *
  * - 颜色：中位切分法（median cut）量化至 ≤255 色；若原图不透明且颜色数足够少则直接使用原色
  * - 透明：alpha < 128 的像素映射到保留的透明索引（通过 Graphic Control Extension 声明）
  * - 压缩：标准 GIF 变宽 LZW，码长 12 位封顶后重置码表
- *
- * 输出为静态（单帧）GIF。
+ * - 动画：每帧独立局部色表 + 帧延时，NETSCAPE2.0 循环扩展
  */
 
 /** 打包不透明像素颜色，便于去重与缓存：(r<<16)|(g<<8)|b */
@@ -207,25 +206,15 @@ function quantize(imageData: ImageData, maxColors: number): QuantizeResult {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LZW 压缩（GIF 规范：LSB 优先、变宽码、12 位封顶）
-// 实现已内联至 encodeGIF（位缓冲 + 码表为局部状态，避免跨调用残留）
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * 将 ImageData 编码为单帧 GIF Blob。
+ * 对索引序列做 LZW 压缩，返回未分块的码流字节。
  */
-export function encodeGIF(imageData: ImageData): Blob {
-  const { width, height } = imageData;
-  const { palette, indices, transparentIndex } = quantize(imageData, 256);
-  const paletteSize = palette.length + (transparentIndex >= 0 ? 1 : 0);
-
-  // ── LZW 数据 ──
-  const bitsNeeded = Math.max(2, Math.ceil(Math.log2(Math.max(2, paletteSize))));
-  const minCodeSize = bitsNeeded;
-
+function lzwEncodeCoded(indices: Uint8Array, minCodeSize: number): number[] {
   const clearCode = 1 << minCodeSize;
   const eoiCode = clearCode + 1;
 
-  // 展开为局部函数避免类状态残留
   const codedBytes: number[] = [];
   let bitBuf = 0;
   let bitCnt = 0;
@@ -275,26 +264,70 @@ export function encodeGIF(imageData: ImageData): Blob {
   emit(eoiCode, codeSize);
   if (bitCnt > 0) codedBytes.push(bitBuf & 0xff);
 
-  // 子块封装（每块 ≤ 255 字节，以 0x00 结束）
+  return codedBytes;
+}
+
+/** 子块封装（每块 ≤ 255 字节，以 0x00 结束） */
+function packSubBlocks(codedBytes: number[]): number[] {
   const dataBlocks: number[] = [];
   for (let i = 0; i < codedBytes.length; i += 255) {
     const chunk = codedBytes.slice(i, i + 255);
     dataBlocks.push(chunk.length, ...chunk);
   }
   dataBlocks.push(0);
+  return dataBlocks;
+}
 
-  // ── 组装文件 ──
-  // GCT 大小必须为 2 的幂；屏幕描述符字段 N 满足 表项数 = 2^(N+1)
+interface ColorTableInfo {
+  /** 已填充至 2 的幂对齐的字节序列 */
+  bytes: number[];
+  /** 屏幕描述符中的表大小字段 N（表项数 = 2^(N+1)） */
+  fieldN: number;
+  /** 最小 LZW 码长 */
+  minCodeSize: number;
+}
+
+/** 由调色板构建 GIF 色表字节（透明槽位追加在末尾，RGB 值无关紧要） */
+function buildColorTable(palette: number[][], transparentIndex: number): ColorTableInfo {
+  const paletteSize = palette.length + (transparentIndex >= 0 ? 1 : 0);
+  // GCT 大小必须为 2 的幂；描述符字段 N 满足 表项数 = 2^(N+1)
   const k = Math.ceil(Math.log2(Math.max(2, paletteSize))); // ≥ 1
-  const gctEntries = 1 << k;
-  const gctField = k - 1;
-  const gctBytes: number[] = [];
+  const entries = 1 << k;
+  const bytes: number[] = [];
   for (const [r, g, b] of palette) {
-    gctBytes.push(r, g, b);
+    bytes.push(r, g, b);
   }
-  if (transparentIndex >= 0) gctBytes.push(0, 0, 0); // 透明槽位（RGB 值无关紧要）
-  while (gctBytes.length < gctEntries * 3) gctBytes.push(0, 0, 0);
+  if (transparentIndex >= 0) bytes.push(0, 0, 0);
+  while (bytes.length < entries * 3) bytes.push(0, 0, 0);
+  return { bytes, fieldN: k - 1, minCodeSize: Math.max(2, k) };
+}
 
+interface EncodedFrame {
+  table: ColorTableInfo;
+  blocks: number[];
+  transparentIndex: number;
+  delayCs: number;
+}
+
+function encodeFrame(frame: { imageData: ImageData; delayMs: number }): EncodedFrame {
+  const q = quantize(frame.imageData, 256);
+  const table = buildColorTable(q.palette, q.transparentIndex);
+  const coded = lzwEncodeCoded(q.indices, table.minCodeSize);
+  return {
+    table,
+    blocks: packSubBlocks(coded),
+    transparentIndex: q.transparentIndex,
+    // 浏览器把 <2cs（20ms）的延时视作 10cs，故下限取 2
+    delayCs: Math.max(2, Math.round(frame.delayMs / 10)),
+  };
+}
+
+/**
+ * 将 ImageData 编码为单帧 GIF Blob。
+ */
+export function encodeGIF(imageData: ImageData): Blob {
+  const { width, height } = imageData;
+  const frame = encodeFrame({ imageData, delayMs: 100 });
   const out: number[] = [];
 
   // Header
@@ -303,19 +336,20 @@ export function encodeGIF(imageData: ImageData): Blob {
   // Logical Screen Descriptor
   out.push(width & 0xff, (width >> 8) & 0xff);
   out.push(height & 0xff, (height >> 8) & 0xff);
-  out.push(0x80 | ((bitsNeeded - 1) << 4) | gctField); // GCT 存在, 颜色位数(信息性), 表大小 N
+  // GCT 存在, 颜色位数(信息性), 表大小字段
+  out.push(0x80 | ((frame.table.minCodeSize - 1) << 4) | frame.table.fieldN);
   out.push(0x00); // 背景色索引
   out.push(0x00); // 像素宽高比
 
   // Global Color Table
-  out.push(...gctBytes);
+  out.push(...frame.table.bytes);
 
   // Graphic Control Extension（仅需要透明时）
-  if (transparentIndex >= 0) {
+  if (frame.transparentIndex >= 0) {
     out.push(0x21, 0xf9, 0x04);
     out.push(0x01); // 透明标志
     out.push(0x00, 0x00); // 延时
-    out.push(transparentIndex);
+    out.push(frame.transparentIndex);
     out.push(0x00); // 块结束
   }
 
@@ -327,8 +361,93 @@ export function encodeGIF(imageData: ImageData): Blob {
   out.push(0x00); // 无局部色表、非隔行
 
   // LZW
-  out.push(minCodeSize);
-  out.push(...dataBlocks);
+  out.push(frame.table.minCodeSize);
+  out.push(...frame.blocks);
+
+  // Trailer
+  out.push(0x3b);
+
+  return new Blob([new Uint8Array(out)], { type: 'image/gif' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 多帧动画 GIF
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface GifFrameInput {
+  imageData: ImageData;
+  /** 该帧显示时长（毫秒） */
+  delayMs: number;
+}
+
+/**
+ * 将多帧同尺寸 ImageData 编码为动画 GIF。
+ *
+ * - 每帧独立量化并携带局部色表（LCT），互不影响
+ * - 含透明的帧使用 disposal=2（恢复背景），不透明帧 disposal=1
+ * - loop=true 写入 NETSCAPE2.0 无限循环扩展
+ *
+ * 所有帧的 width/height 必须一致（调用方负责归一化画布）。
+ */
+export function encodeAnimatedGIF(
+  framesInput: readonly GifFrameInput[],
+  options?: { loop?: boolean }
+): Blob {
+  if (framesInput.length === 0) throw new Error('no frames');
+  const width = framesInput[0].imageData.width;
+  const height = framesInput[0].imageData.height;
+  for (const f of framesInput) {
+    if (f.imageData.width !== width || f.imageData.height !== height) {
+      throw new Error('all frames must share the same canvas size');
+    }
+  }
+
+  const frames = framesInput.map(encodeFrame);
+  const first = frames[0];
+  const loop = options?.loop !== false;
+
+  const out: number[] = [];
+
+  // Header + Logical Screen Descriptor（GCT 取首帧色表，兼容旧解码器）
+  out.push(0x47, 0x49, 0x46, 0x38, 0x39, 0x61); // "GIF89a"
+  out.push(width & 0xff, (width >> 8) & 0xff);
+  out.push(height & 0xff, (height >> 8) & 0xff);
+  out.push(0x80 | ((first.table.minCodeSize - 1) << 4) | first.table.fieldN);
+  out.push(0x00); // 背景色索引
+  out.push(0x00); // 像素宽高比
+
+  out.push(...first.table.bytes);
+
+  // NETSCAPE2.0 循环扩展（无限循环）
+  if (loop) {
+    const ns = 'NETSCAPE2.0';
+    out.push(0x21, 0xff, 0x0b);
+    for (let i = 0; i < ns.length; i++) out.push(ns.charCodeAt(i));
+    out.push(0x03, 0x01, 0x00, 0x00, 0x00); // 子块 ID=1, 循环次数=0(无限)
+  }
+
+  for (const frame of frames) {
+    const hasAlpha = frame.transparentIndex >= 0;
+
+    // Graphic Control Extension：每帧都需要（承载帧延时）
+    out.push(0x21, 0xf9, 0x04);
+    // 不透明帧 disposal=1(不清除)；含透明帧 disposal=2(恢复背景)
+    out.push(hasAlpha ? 0x09 : 0x04);
+    out.push(frame.delayCs & 0xff, (frame.delayCs >> 8) & 0xff);
+    out.push(hasAlpha ? frame.transparentIndex : 0x00);
+    out.push(0x00);
+
+    // Image Descriptor（带局部色表标志）
+    out.push(0x2c);
+    out.push(0x00, 0x00, 0x00, 0x00); // left, top
+    out.push(width & 0xff, (width >> 8) & 0xff);
+    out.push(height & 0xff, (height >> 8) & 0xff);
+    out.push(0x80 | frame.table.fieldN);
+
+    out.push(...frame.table.bytes);
+    out.push(frame.table.minCodeSize);
+    out.push(...frame.blocks);
+  }
 
   // Trailer
   out.push(0x3b);

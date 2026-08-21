@@ -9,6 +9,7 @@ export interface Translations {
   tagline: string;
   compress: string;
   convert: string;
+  gifMaker: string;
   edit: string;
   watermark: string;
   merge: string;
@@ -149,6 +150,7 @@ export const zhStrings: Record<keyof Translations, string> = {
   tagline: '纯前端图片处理工具',
   compress: '压缩',
   convert: '转换',
+  gifMaker: 'GIF 合成',
   edit: '编辑',
   watermark: '水印',
   merge: '合并',
@@ -289,6 +291,7 @@ export const enStrings: Record<keyof Translations, string> = {
   tagline: 'Pure Frontend Image Tool',
   compress: 'Compress',
   convert: 'Convert',
+  gifMaker: 'GIF Maker',
   edit: 'Edit',
   watermark: 'Watermark',
   merge: 'Merge',
