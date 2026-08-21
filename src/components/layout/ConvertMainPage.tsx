@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDragDrop } from '@/hooks/useDragDrop';
 import { loadImage } from '@/utils/canvas';
 import { canvasToBMP, encodeICO } from '@/utils/imageEncoders';
+import { encodeGIF } from '@/utils/gifEncoder';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import {
@@ -18,7 +19,7 @@ interface ConvertMainPageProps {
   lang: 'en' | 'zh';
 }
 
-type TargetFormat = 'jpeg' | 'png' | 'webp' | 'bmp' | 'ico';
+type TargetFormat = 'jpeg' | 'png' | 'webp' | 'gif' | 'bmp' | 'ico';
 
 type ItemStatus = 'pending' | 'converting' | 'done' | 'error';
 
@@ -42,6 +43,7 @@ const FORMATS: { id: TargetFormat; ext: string; quality: boolean; note: { zh: st
   { id: 'jpeg', ext: '.jpg', quality: true, note: { zh: '有损压缩，体积小', en: 'Lossy, small size' } },
   { id: 'png', ext: '.png', quality: false, note: { zh: '无损，支持透明', en: 'Lossless, transparency' } },
   { id: 'webp', ext: '.webp', quality: true, note: { zh: '比 JPEG 小 25-35%', en: '25-35% smaller than JPEG' } },
+  { id: 'gif', ext: '.gif', quality: false, note: { zh: '索引色，最大 256 色，支持透明', en: 'Indexed ≤256 colors, transparency' } },
   { id: 'bmp', ext: '.bmp', quality: false, note: { zh: '无压缩位图，不支持透明', en: 'Uncompressed, no alpha' } },
   { id: 'ico', ext: '.ico', quality: false, note: { zh: '多尺寸图标（16-256px）', en: 'Multi-size icon (16-256px)' } },
 ];
@@ -191,6 +193,12 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
       ctx.fillRect(0, 0, targetW, targetH);
     }
     ctx.drawImage(img, 0, 0, targetW, targetH);
+
+    if (format === 'gif') {
+      // GIF 支持索引透明，不做白底合成
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      return { blob: encodeGIF(imageData), width: targetW, height: targetH, filename };
+    }
 
     if (format === 'bmp') {
       const blob = canvasToBMP(canvas);

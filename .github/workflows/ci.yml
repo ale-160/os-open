@@ -56,6 +56,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests (GIF encoder roundtrip)
+        run: |
+          node node_modules/typescript/bin/tsc src/utils/gifEncoder.ts --outDir .test-tmp --module commonjs --target es2020
+          node scripts/test-gif-encoder.mjs
+
       - name: Build
         run: npm run build
 

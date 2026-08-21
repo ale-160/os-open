@@ -144,14 +144,15 @@ export const PDF_METADATA_EN = {
 
 // 图片格式转换页元数据
 export const CONVERT_METADATA_ZH = {
-  title: "web-img · 图片格式转换 - 批量转换 JPG PNG WebP BMP ICO",
-  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF 输入。纯前端本地处理，图片不会上传服务器。",
+  title: "web-img · 图片格式转换 - 批量转换 JPG PNG WebP GIF BMP ICO",
+  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、GIF、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF 输入。纯前端本地处理，图片不会上传服务器。",
   keywords: [
     "图片格式转换",
     "格式转换器",
     "PNG转JPG",
     "JPG转WebP",
-    "HEIC转JPG",
+    "图片转GIF",
+    "GIF转换",
     "图片转ICO",
     "批量转换",
     "在线转换工具",
@@ -160,13 +161,14 @@ export const CONVERT_METADATA_ZH = {
 };
 
 export const CONVERT_METADATA_EN = {
-  title: "web-img · Image Converter - Batch Convert JPG PNG WebP BMP ICO",
-  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF input. All processed locally — files never leave your device.",
+  title: "web-img · Image Converter - Batch Convert JPG PNG WebP GIF BMP ICO",
+  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, GIF, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF input. All processed locally — files never leave your device.",
   keywords: [
     "image converter",
     "format converter",
     "PNG to JPG",
     "JPG to WebP",
+    "image to GIF",
     "image to ICO",
     "batch convert",
     "online converter",
