@@ -1,16 +1,27 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import * as pdfjsLib from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { useDragDrop } from '@/hooks/useDragDrop';
 import { isPdfFile } from '@/utils/pdfToImage';
+import { canvasToBlob, type ImageFormat } from '@/utils/canvas';
+import { downloadFile } from '@/utils/file';
 import { FileText, ArrowLeft, Download, X, Loader2 } from 'lucide-react';
-import { GlobalWorkerOptions } from 'pdfjs-dist';
+import JSZip from 'jszip';
 
-// 设置 worker 源（客户端才需要）
-if (typeof window !== 'undefined') {
-  GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+/** 渲染倍率：高分辨率渲染保证导出清晰度 */
+const PAGE_SCALE = 2.0;
+
+/**
+ * 按需加载 pdfjs（仅浏览器端）。
+ * 动态导入可避免 Node 预渲染时加载浏览器版 pdfjs 产生的告警，
+ * 同时将约 1.4MB 的解析推迟到用户真正导入 PDF 时。
+ */
+async function loadPdfjs() {
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  return pdfjs;
 }
 
 interface PdfMainPageProps {
@@ -30,17 +41,16 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
   const [error, setError] = useState<string | null>(null);
 
   // PDF 文档相关
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [pageScale] = useState(2.0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderLockRef = useRef(false);
 
   // 下载模态框
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadFormat, setDownloadFormat] = useState('png');
+  const [downloadFormat, setDownloadFormat] = useState<ImageFormat>('png');
   const [downloadQuality, setDownloadQuality] = useState('100'); // 默认最佳质量
   const [pageRangeInput, setPageRangeInput] = useState('1');
   const [converting, setConverting] = useState(false);
@@ -59,18 +69,60 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     };
   }, [pdfObjectUrl]);
 
+  // 渲染指定页面
+  const renderPage = useCallback(async (pageNum: number, doc: PDFDocumentProxy | null = pdfDoc) => {
+    if (!doc || !canvasRef.current) return;
+
+    try {
+      const page = await doc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: PAGE_SCALE });
+
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({ canvasContext: context, viewport }).promise;
+      setCurrentPage(pageNum);
+    } catch (err) {
+      // 用户快速翻页时 pdfjs 会以 RenderingCancelledException 中断旧渲染，属正常现象
+      if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
+        console.error('渲染页面失败:', err);
+        setError(lang === 'zh' ? '渲染页面失败' : 'Failed to render page');
+      }
+    }
+  }, [pdfDoc, lang]);
+
   // 监听 pdfDoc 变化，渲染第一页（解决首次加载不显示问题）
   useEffect(() => {
     if (pdfDoc && canvasRef.current && !renderLockRef.current) {
       renderLockRef.current = true;
-      renderPage(1, pdfDoc).then(() => {
+      renderPage(1, pdfDoc).finally(() => {
         renderLockRef.current = false;
       });
     }
-  }, [pdfDoc]);
+  }, [pdfDoc, renderPage]);
+
+  // 加载 PDF 文档
+  const loadPdfDocument = useCallback(async (file: File) => {
+    try {
+      const pdfjs = await loadPdfjs();
+      const arrayBuffer = await file.arrayBuffer();
+      const doc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      setPdfDoc(doc);
+      setTotalPages(doc.numPages);
+      setCurrentPage(1);
+      // 第一页渲染由 useEffect 处理
+    } catch (err) {
+      console.error('加载 PDF 失败:', err);
+      setError(lang === 'zh' ? '加载 PDF 失败，请重试' : 'Failed to load PDF, please try again');
+    }
+  }, [lang]);
 
   // 处理文件选择
-  const handleFilesSelected = async (files: FileList | File[]) => {
+  const handleFilesSelected = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     const pdfFile = fileArray.find(isPdfFile);
 
@@ -94,63 +146,20 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     // 加载 PDF 文档
     await loadPdfDocument(pdfFile);
     setLoading(false);
-  };
+  }, [pdfObjectUrl, loadPdfDocument, lang]);
 
   // 处理拖拽文件（过滤 PDF）
-  const handleDragFiles = (files: File[]) => {
+  const handleDragFiles = useCallback((files: File[]) => {
     const validPdfFiles = files.filter(isPdfFile);
     if (validPdfFiles.length > 0) {
       void handleFilesSelected(validPdfFiles);
     } else {
       setError(lang === 'zh' ? '请选择 PDF 文件' : 'Please select a PDF file');
     }
-  };
+  }, [handleFilesSelected, lang]);
 
   // 使用通用的拖拽处理 Hook
   const { isDragging, dragHandlers } = useDragDrop(handleDragFiles);
-
-  // 加载 PDF 文档
-  const loadPdfDocument = async (file: File) => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      setPdfDoc(doc);
-      setTotalPages(doc.numPages);
-      setCurrentPage(1);
-      // 第一页渲染由 useEffect 处理
-    } catch (err) {
-      console.error('加载 PDF 失败:', err);
-      setError(lang === 'zh' ? '加载 PDF 失败，请重试' : 'Failed to load PDF, please try again');
-    }
-  };
-
-  // 渲染指定页面
-  const renderPage = async (pageNum: number, doc: any = pdfDoc) => {
-    if (!doc || !canvasRef.current) return;
-
-    try {
-      const page = await doc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: pageScale });
-
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport
-      };
-
-      await page.render(renderContext).promise;
-      setCurrentPage(pageNum);
-    } catch (err) {
-      console.error('渲染页面失败:', err);
-      setError(lang === 'zh' ? '渲染页面失败' : 'Failed to render page');
-    }
-  };
 
   // 上一页
   const handlePrevPage = () => {
@@ -215,11 +224,11 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
 
       // 创建临时画布进行渲染
       const tempCanvas = document.createElement('canvas');
+      const rendered: { filename: string; blob: Blob }[] = [];
 
-      for (let i = 0; i < pages.length; i++) {
-        const pageNum = pages[i];
+      for (const pageNum of pages) {
         const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: pageScale });
+        const viewport = page.getViewport({ scale: PAGE_SCALE });
 
         tempCanvas.width = viewport.width;
         tempCanvas.height = viewport.height;
@@ -227,45 +236,31 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
         const context = tempCanvas.getContext('2d');
         if (!context) continue;
 
-        const renderContext = {
-          canvasContext: context,
-          viewport: viewport
-        };
+        await page.render({ canvasContext: context, viewport }).promise;
 
-        await page.render(renderContext).promise;
-
-        // 生成数据 URL
-        let dataUrl: string;
-        let ext: string;
-
-        switch (downloadFormat) {
-          case 'jpeg':
-            dataUrl = tempCanvas.toDataURL('image/jpeg', quality);
-            ext = '.jpg';
-            break;
-          case 'webp':
-            dataUrl = tempCanvas.toDataURL('image/webp', quality);
-            ext = '.webp';
-            break;
-          default:
-            dataUrl = tempCanvas.toDataURL('image/png');
-            ext = '.png';
-        }
-
-        // 下载单页
         const filename = pages.length === 1
-          ? `${baseName}${ext}`
-          : `${baseName}_page${pageNum}${ext}`;
+          ? `${baseName}.${downloadFormat === 'jpeg' ? 'jpg' : downloadFormat}`
+          : `${baseName}_page${pageNum}.${downloadFormat === 'jpeg' ? 'jpg' : downloadFormat}`;
 
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = filename;
-        link.click();
+        const blob = await canvasToBlob(tempCanvas, downloadFormat, quality);
+        rendered.push({ filename, blob });
+      }
 
-        // 添加小延迟避免浏览器阻止多次下载
-        if (i < pages.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 150));
+      if (rendered.length === 0) {
+        throw new Error('No pages rendered');
+      }
+
+      if (rendered.length === 1) {
+        // 单页直接下载
+        downloadFile(rendered[0].blob, rendered[0].filename);
+      } else {
+        // 多页打包为 ZIP，避免浏览器拦截连续多次下载
+        const zip = new JSZip();
+        for (const item of rendered) {
+          zip.file(item.filename, item.blob);
         }
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        downloadFile(zipBlob, `${baseName}-images.zip`);
       }
 
       setShowDownloadModal(false);
@@ -282,6 +277,8 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     if (pdfObjectUrl) {
       URL.revokeObjectURL(pdfObjectUrl);
     }
+    // 释放 pdfjs 文档占用的内存
+    void pdfDoc?.destroy();
     setCurrentPdfFile(null);
     setPdfObjectUrl(null);
     setPdfDoc(null);
@@ -496,7 +493,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
                 <label className="block text-sm font-medium mb-2">{t.downloadFormat}</label>
                 <select
                   value={downloadFormat}
-                  onChange={(e) => setDownloadFormat(e.target.value)}
+                  onChange={(e) => setDownloadFormat(e.target.value as ImageFormat)}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background"
                   disabled={converting}
                 >

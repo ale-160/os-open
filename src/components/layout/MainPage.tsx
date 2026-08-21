@@ -61,16 +61,7 @@ export default function MainPage({ lang }: MainPageProps) {
 
   const isMounted = langMounted && themeMounted;
 
-  // 加载存储的状态
-  useEffect(() => {
-    if (isMounted) {
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  }, [langMounted, themeMounted, theme]);
+  // 暗色类名由 useTheme 内部统一维护，此处不再重复操作 DOM
 
   // 侧边栏：有 tab 选中时自动展开
   const sidebarOpen = sidebarPinned || activeTab !== null;
@@ -200,6 +191,17 @@ export default function MainPage({ lang }: MainPageProps) {
     }
   }, [previewImage]);
 
+  /** 从 dataURL 或 ObjectURL 加载图片，失败时抛错而不是永久挂起 */
+  const loadImageFromUrl = useCallback(async (url: string): Promise<HTMLImageElement> => {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+    });
+    return img;
+  }, []);
+
   /** 根据原始格式将 canvas 导出为 dataURL */
   const canvasToOriginalDataUrl = useCallback((canvas: HTMLCanvasElement): string => {
     const origFmt = getOriginalFormat() ?? 'jpeg';
@@ -210,52 +212,54 @@ export default function MainPage({ lang }: MainPageProps) {
 
   const handleRotate = useCallback(async (angle: number) => {
     if (!previewImage) return;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const img = await loadImageFromUrl(previewImage.url);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const img = new Image();
-    img.src = previewImage.url;
-    await new Promise(resolve => img.onload = resolve);
+      if (angle === 90 || angle === 270) {
+        const [w, h] = [img.height, img.width];
+        canvas.width = w;
+        canvas.height = h;
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
 
-    if (angle === 90 || angle === 270) {
-      const [w, h] = [img.height, img.width];
-      canvas.width = w;
-      canvas.height = h;
-    } else {
-      canvas.width = img.width;
-      canvas.height = img.height;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((angle * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
+      setRotation(prev => ((prev + angle) % 360 + 360) % 360);
+      toast.success(t('rotateSuccess'));
+    } catch {
+      toast.error(t('processFailed'));
     }
-
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((angle * Math.PI) / 180);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
-
-    updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
-    setRotation(prev => ((prev + angle) % 360 + 360) % 360);
-    toast.success(t('rotateSuccess'));
-  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t]);
+  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t, loadImageFromUrl]);
 
   const handleFlip = useCallback(async () => {
     if (!previewImage) return;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const img = await loadImageFromUrl(previewImage.url);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const img = new Image();
-    img.src = previewImage.url;
-    await new Promise(resolve => img.onload = resolve);
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0);
 
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, 0, 0);
-
-    updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
-    setIsFlipped(prev => !prev);
-    toast.success(t('flipSuccess'));
-  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t]);
+      updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
+      setIsFlipped(prev => !prev);
+      toast.success(t('flipSuccess'));
+    } catch {
+      toast.error(t('processFailed'));
+    }
+  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t, loadImageFromUrl]);
 
   const handleToggleHideOriginal = useCallback(() => {
     setHideOriginal(prev => !prev);
@@ -397,7 +401,6 @@ export default function MainPage({ lang }: MainPageProps) {
                   imageUrl={currentOriginal.url}
                   imageWidth={currentOriginal.width}
                   imageHeight={currentOriginal.height}
-                  imageSize={currentOriginal.size}
                   onApply={handleApply}
                   resetSignal={resetSignal}
                   isFlipped={isFlipped}
@@ -420,7 +423,7 @@ export default function MainPage({ lang }: MainPageProps) {
               )}
               {activeTab && !currentOriginal && (
                 <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground text-sm gap-2">
-                  <UploadZone onFilesSelected={handleFilesSelected} hasExistingImage={false} compact />
+                  <UploadZone onFilesSelected={handleFilesSelected} compact />
                 </div>
               )}
             </ToolPanel>
@@ -474,7 +477,7 @@ export default function MainPage({ lang }: MainPageProps) {
                   ) : (
                     <div className="flex items-center justify-center h-full p-4">
                       <div className="w-full max-w-md">
-                        <UploadZone onFilesSelected={handleFilesSelected} hasExistingImage={false} />
+                        <UploadZone onFilesSelected={handleFilesSelected} />
                       </div>
                     </div>
                   )}

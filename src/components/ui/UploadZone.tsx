@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Upload, ImagePlus, FileText } from 'lucide-react';
+import { Upload, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/hooks/useLanguage';
 
@@ -9,7 +9,6 @@ interface UploadZoneProps {
   onFilesSelected: (files: FileList | File[]) => void;
   multiple?: boolean;
   accept?: string;
-  hasExistingImage?: boolean;
   compact?: boolean;
 }
 

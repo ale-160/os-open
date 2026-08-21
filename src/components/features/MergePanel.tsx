@@ -20,11 +20,21 @@ export function MergePanel({ imageUrl, onApply }: MergePanelProps) {
   const [gap, setGap] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const originalImagesRef = useRef<string[]>([imageUrl]);
+  // 同步最新 images 列表，供卸载清理使用
+  const imagesRef = useRef<string[]>([imageUrl]);
 
   useEffect(() => {
+    // 原图更换时，释放旧列表中追加图片的 blob: URL（首张原图 URL 归父组件管理）
+    imagesRef.current.forEach((url, i) => {
+      if (url.startsWith('blob:') && i !== 0) URL.revokeObjectURL(url);
+    });
     originalImagesRef.current = [imageUrl];
     setImages([imageUrl]);
   }, [imageUrl]);
+
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
 
   const handleMerge = useCallback(async () => {
     if (images.length < 2) {
@@ -49,8 +59,8 @@ export function MergePanel({ imageUrl, onApply }: MergePanelProps) {
 
       const dataUrl = canvasToDataUrl(canvas);
       onApply(dataUrl, width, height);
-      toast.success(t('processing'));
-    } catch (error) {
+      toast.success(t('processSuccess'));
+    } catch {
       toast.error(t('mergeFailed'));
     } finally {
       setIsProcessing(false);
@@ -74,8 +84,7 @@ export function MergePanel({ imageUrl, onApply }: MergePanelProps) {
     const newImages: string[] = [];
     Array.from(files).forEach(file => {
       if (file.type.startsWith('image/')) {
-        const url = URL.createObjectURL(file);
-        newImages.push(url);
+        newImages.push(URL.createObjectURL(file));
       }
     });
     if (newImages.length > 0) {
@@ -87,11 +96,26 @@ export function MergePanel({ imageUrl, onApply }: MergePanelProps) {
   }, [images, handleMerge]);
 
   const handleRemoveImage = useCallback((index: number) => {
+    // 首张为原图 URL（由父组件管理），仅释放后续追加的 blob: URL
+    const removed = imagesRef.current[index];
+    if (removed && removed.startsWith('blob:') && index !== 0) {
+      URL.revokeObjectURL(removed);
+    }
     setImages((prev) => prev.filter((_, i) => i !== index));
     if (images.length - 1 >= 2) {
       setTimeout(handleMerge, 100);
     }
   }, [images, handleMerge]);
+
+  // 卸载时释放追加图片的 ObjectURL（首张原图 URL 归父组件管理）
+  useEffect(() => {
+    const ref = imagesRef;
+    return () => {
+      ref.current.forEach((url, i) => {
+        if (url.startsWith('blob:') && i !== 0) URL.revokeObjectURL(url);
+      });
+    };
+  }, []);
 
   return (
     <div className="space-y-4">

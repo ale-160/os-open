@@ -5,8 +5,10 @@ import { LanguageContext, zhStrings, enStrings, type Language, type Translations
 
 function getBrowserLanguage(): Language {
   if (typeof window !== 'undefined') {
-    const browserLang = navigator.language || (navigator as any).userLanguage;
-    if (browserLang && browserLang.startsWith('zh')) {
+    // userLanguage 为 IE 遗留属性，仅做兼容性回退
+    const nav = navigator as Navigator & { userLanguage?: string };
+    const browserLang = nav.language || nav.userLanguage || '';
+    if (browserLang.startsWith('zh')) {
       return 'zh';
     }
   }

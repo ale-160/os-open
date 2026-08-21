@@ -7,6 +7,7 @@ import {
   ChevronDown, ChevronRight, ChevronUp, AlertTriangle,
 } from 'lucide-react';
 import { SizePreset, PRESET_GROUPS } from '@/data/presets';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { cn } from '@/lib/utils';
 
 interface PresetGroupDef {
@@ -36,9 +37,15 @@ export function PresetManagerModal({ isOpen, onClose, presets, onPresetsChange }
   });
   const [addingToGroupId, setAddingToGroupId] = useState<string | null>(null);
 
-  // ── 可管理的分组列表（支持删除/重命名） ──
-  const [managedGroups, setManagedGroups] = useState<PresetGroupDef[]>(() =>
-    PRESET_GROUPS.map(g => ({ ...g }))
+  // ── 可管理的分组列表（支持删除/重命名，持久化到 localStorage） ──
+  const [managedGroups, setManagedGroups] = usePersistentState<PresetGroupDef[]>(
+    'web-img-preset-groups',
+    PRESET_GROUPS.map(g => ({ ...g })),
+    (v) => Array.isArray(v) && v.every(g =>
+      typeof g === 'object' && g !== null &&
+      typeof (g as PresetGroupDef).id === 'string' &&
+      typeof (g as PresetGroupDef).name === 'string'
+    )
   );
 
   // ── 分组重命名状态 ──
@@ -179,7 +186,7 @@ export function PresetManagerModal({ isOpen, onClose, presets, onPresetsChange }
     setEditWidth('1080');
     setEditHeight('1080');
     setAddingToGroupId(null);
-  }, [presets, getNextPresetNumber, onPresetsChange]);
+  }, [presets, getNextPresetNumber, onPresetsChange, language]);
 
   const handleDeletePreset = useCallback((id: string) => {
     onPresetsChange(presets.filter(p => p.id !== id));
@@ -284,7 +291,7 @@ export function PresetManagerModal({ isOpen, onClose, presets, onPresetsChange }
       [updated[idx], updated[newIdx]] = [updated[newIdx], updated[idx]];
       return updated;
     });
-  }, []);
+  }, [setManagedGroups]);
 
   // ── 确认固定分组 ──
   const confirmPinGroup = useCallback((groupId: string) => {
@@ -320,7 +327,7 @@ export function PresetManagerModal({ isOpen, onClose, presets, onPresetsChange }
     setIsCreatingGroup(false);
     // 立即向新分组添加预设
     handleAddToGroup(groupId);
-  }, [newGroupName, handleAddToGroup]);
+  }, [newGroupName, handleAddToGroup, setManagedGroups]);
 
   if (!isOpen) return null;
 

@@ -9,10 +9,17 @@ export type ResizeMode = 'stretch' | 'crop';
 
 export function loadImage(file: File | Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(img);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to decode image'));
+    };
+    img.src = url;
   });
 }
 
@@ -29,8 +36,14 @@ export function canvasToDataUrl(canvas: HTMLCanvasElement, format: ImageFormat =
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement, format: ImageFormat = 'png', quality = 0.95): Promise<Blob> {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => resolve(blob!), `image/${format}`, quality);
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) {
+        resolve(blob);
+      } else {
+        reject(new Error(`Failed to encode image as ${format}`));
+      }
+    }, `image/${format}`, quality);
   });
 }
 
@@ -54,8 +67,8 @@ function prepareAndSaveImage(
   } else {
     ctx.drawImage(img, 0, 0, outputWidth, outputHeight);
   }
-  
-  URL.revokeObjectURL(img.src);
+
+  // ObjectURL 已由 loadImage 在加载完成后释放
   return canvasToBlob(canvas, format, quality / 100);
 }
 
