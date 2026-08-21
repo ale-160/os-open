@@ -6,6 +6,7 @@
 
 ### 新增
 
+- **Web Worker 并发转换**：批量转换的解码/缩放/编码全部移入 Worker 线程池（`min(4, CPU 核数)` 个线程并行），大图批量转换不再阻塞 UI 主线程；Worker 创建或运行失败时自动回退主线程实现，功能始终可用。ICO 编码器同步重构为无 DOM 依赖（优先 OffscreenCanvas）
 - **GIF 输出编码器**：自研零依赖单帧 GIF89a 编码器——中位切分法量化至 ≤256 色、索引透明（Graphic Control Extension）、标准变宽 LZW 压缩（12 位封顶 + CLEAR 重置）；配套参考解码器往返测试（7 个用例覆盖精确色/透明/量化/码表满重置路径），已接入 CI
 - **批量格式转换页**（参考 convertio.co 的核心流程）：新增 `/convert` 与 `/zh/convert` 路由，支持多文件拖入/选择 → 选择目标格式 → 批量转换 → 单个下载或打包 ZIP
   - 输出格式扩展为 6 种：JPEG、PNG、WebP（Canvas 原生）+ **GIF**、**BMP**、**ICO**（均自研编码器，零依赖）

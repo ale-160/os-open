@@ -68,8 +68,45 @@ export function canvasToBMP(canvas: HTMLCanvasElement): Blob | null {
 export const ICO_SIZES = [16, 32, 48, 64, 128, 256] as const;
 
 /**
+ * 创建 2D 画布：优先 OffscreenCanvas（Worker 可用），回退 DOM Canvas。
+ */
+function makeCanvas(width: number, height: number): {
+  canvas: OffscreenCanvas | HTMLCanvasElement;
+  ctx: OffscreenCanvasRenderingContext2D | CanvasRenderingContext2D;
+} | null {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    const canvas = new OffscreenCanvas(width, height);
+    const ctx = canvas.getContext('2d');
+    if (ctx) return { canvas, ctx };
+  }
+  if (typeof document !== 'undefined') {
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) return { canvas, ctx };
+  }
+  return null;
+}
+
+/** 画布 → PNG Blob，兼容 OffscreenCanvas 与 DOM Canvas */
+function toPngBlob(canvas: OffscreenCanvas | HTMLCanvasElement): Promise<Blob> {
+  const oc = canvas as OffscreenCanvas;
+  if (typeof oc.convertToBlob === 'function') {
+    return oc.convertToBlob({ type: 'image/png' });
+  }
+  return new Promise<Blob>((resolve, reject) => {
+    (canvas as HTMLCanvasElement).toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('PNG encode failed'))),
+      'image/png'
+    );
+  });
+}
+
+/**
  * 将源图像编码为多尺寸 ICO Blob（内嵌 PNG）。
  * 各尺寸按等比缩放居中放置于正方形画布，适合生成 favicon/应用图标。
+ * 无 DOM 依赖，可在 Web Worker 中运行。
  */
 export async function encodeICO(
   source: CanvasImageSource,
@@ -80,11 +117,9 @@ export async function encodeICO(
   const pngs: { size: number; blob: Blob }[] = [];
 
   for (const size of sizes) {
-    const canvas = document.createElement('canvas');
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) continue;
+    const made = makeCanvas(size, size);
+    if (!made) continue;
+    const { canvas, ctx } = made;
 
     // 等比缩放并居中（contain），保留透明边距
     const scale = Math.min(size / sourceWidth, size / sourceHeight);
@@ -94,10 +129,7 @@ export async function encodeICO(
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(source, Math.floor((size - w) / 2), Math.floor((size - h) / 2), w, h);
 
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('PNG encode failed'))), 'image/png');
-    });
-    pngs.push({ size, blob });
+    pngs.push({ size, blob: await toPngBlob(canvas) });
   }
 
   if (pngs.length === 0) {

@@ -3,9 +3,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDragDrop } from '@/hooks/useDragDrop';
+import { useConversionPool } from '@/hooks/useConversionPool';
 import { loadImage } from '@/utils/canvas';
 import { canvasToBMP, encodeICO } from '@/utils/imageEncoders';
 import { encodeGIF } from '@/utils/gifEncoder';
+import type { ConvertRequest, ConvertSuccess } from '@/workers/protocol';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import {
@@ -149,9 +151,9 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     setItems([]);
   }, []);
 
-  // ── 转换核心 ──
-  const convertOne = useCallback(async (item: ConvertItem): Promise<ConvertItem['result']> => {
-    const img = await loadImage(item.file);
+  // ── 转换核心（主线程实现，同时作为 Worker 池的兜底路径）──
+  const convertOne = useCallback(async (file: File): Promise<ConvertItem['result']> => {
+    const img = await loadImage(file);
     const srcW = img.naturalWidth || 1024;
     const srcH = img.naturalHeight || 1024;
 
@@ -168,7 +170,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
       }
     }
 
-    const baseName = item.file.name.replace(/\.[^/.]+$/, '');
+    const baseName = file.name.replace(/\.[^/.]+$/, '');
     const formatDef = FORMATS.find(f => f.id === format)!;
     const filename = `${baseName}${formatDef.ext}`;
 
@@ -217,6 +219,15 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     return { blob, width: targetW, height: targetH, filename };
   }, [format, quality, limitSize, maxWidth, maxHeight]);
 
+  // Worker 线程池并发转换；不可用时自动回退上面的主线程实现
+  const convertViaPool = useConversionPool(
+    useCallback(async (req: ConvertRequest): Promise<ConvertSuccess> => {
+      const result = await convertOne(req.file);
+      if (!result) throw new Error('convert failed');
+      return { id: req.id, ok: true, ...result };
+    }, [convertOne])
+  );
+
   const handleConvertAll = useCallback(async () => {
     const pending = items.filter(i => i.status !== 'converting');
     if (pending.length === 0) return;
@@ -227,17 +238,31 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     const ids = new Set(pending.map(i => i.id));
     setItems(prev => prev.map(i => (ids.has(i.id) ? { ...i, status: 'converting', result: undefined } : i)));
 
-    for (const item of pending) {
+    // 并发派发：Worker 池内多线程并行，结果逐个返回时更新对应条目
+    await Promise.all(pending.map(async item => {
       try {
-        const result = await convertOne(item);
-        setItems(prev => prev.map(i => (i.id === item.id ? { ...i, status: 'done', result } : i)));
+        const res = await convertViaPool.run({
+          id: item.id,
+          file: item.file,
+          format,
+          quality,
+          maxWidth: limitSize && parseInt(maxWidth) > 0 ? parseInt(maxWidth) : null,
+          maxHeight: limitSize && parseInt(maxHeight) > 0 ? parseInt(maxHeight) : null,
+        });
+        setItems(prev =>
+          prev.map(i =>
+            i.id === item.id
+              ? { ...i, status: 'done', result: { blob: res.blob, width: res.width, height: res.height, filename: res.filename } }
+              : i
+          )
+        );
       } catch {
         setItems(prev => prev.map(i => (i.id === item.id ? { ...i, status: 'error' } : i)));
       }
-    }
+    }));
 
     setIsConverting(false);
-  }, [items, convertOne, settingsKey]);
+  }, [items, convertViaPool, format, quality, limitSize, maxWidth, maxHeight, settingsKey]);
 
   const doneItems = items.filter(i => i.status === 'done' && i.result);
 
