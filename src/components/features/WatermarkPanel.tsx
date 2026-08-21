@@ -72,8 +72,8 @@ export function WatermarkPanel({ imageUrl, imageWidth, imageHeight, onApply }: W
 
       const dataUrl = canvasToDataUrl(canvas);
       onApply(dataUrl, img.width, img.height);
-      toast.success(t('processing'));
-    } catch (error) {
+      toast.success(t('processSuccess'));
+    } catch {
       toast.error(t('watermarkFailed'));
     } finally {
       setIsProcessing(false);
@@ -106,12 +106,23 @@ export function WatermarkPanel({ imageUrl, imageWidth, imageHeight, onApply }: W
     const file = e.target.files?.[0];
     if (file) {
       setWatermarkImageName(file.name);
-      setWatermarkImageUrl(URL.createObjectURL(file));
+      // 释放被替换的旧水印图 ObjectURL
+      setWatermarkImageUrl(prev => {
+        if (prev) URL.revokeObjectURL(prev);
+        return URL.createObjectURL(file);
+      });
       if (mode === 'image') {
         setTimeout(handleApply, 100);
       }
     }
   }, [mode, handleApply]);
+
+  // 卸载时释放水印图 ObjectURL
+  useEffect(() => {
+    return () => {
+      if (watermarkImageUrl) URL.revokeObjectURL(watermarkImageUrl);
+    };
+  }, [watermarkImageUrl]);
 
   const handleSliderChange = useCallback(() => {
     if (mode === 'text' && watermarkText) {

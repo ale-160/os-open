@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { useLanguage } from '@/hooks/useLanguage';
 import { compressImage, ImageFormat, loadImage, createCanvas } from '@/utils/canvas';
 import { sizePresets, exportFormats, ExportFormat, SizePreset, FormatPreset } from '@/data/presets';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Settings, Crop as CropIcon, Plus } from 'lucide-react';
@@ -16,7 +17,6 @@ interface AdjustPanelProps {
   imageUrl: string;
   imageWidth: number;
   imageHeight: number;
-  imageSize: number;
   onApply: (imageData: string, width: number, height: number) => void;
   resetSignal?: number;
   /** 是否已水平镜像 */
@@ -46,7 +46,6 @@ export function AdjustPanel({
   imageUrl,
   imageWidth,
   imageHeight,
-  imageSize: _imageSize,
   onApply,
   resetSignal = 0,
   isFlipped = false,
@@ -89,9 +88,32 @@ export function AdjustPanel({
   const [customWidth, setCustomWidth] = useState('');
   const [customHeight, setCustomHeight] = useState('');
 
-  // 本地预设管理
-  const [localPresets, setLocalPresets] = useState<SizePreset[]>(sizePresets);
-  const [localFormats, setLocalFormats] = useState<FormatPreset[]>(exportFormats);
+  // 本地预设管理（持久化到 localStorage，刷新不丢失）
+  const isValidPresetList = (v: unknown): boolean =>
+    Array.isArray(v) && v.every(p =>
+      typeof p === 'object' && p !== null &&
+      typeof (p as SizePreset).id === 'string' &&
+      typeof (p as SizePreset).name === 'string' &&
+      typeof (p as SizePreset).fixed === 'boolean'
+    );
+  const isValidFormatList = (v: unknown): boolean =>
+    Array.isArray(v) && v.every(f =>
+      typeof f === 'object' && f !== null &&
+      typeof (f as FormatPreset).id === 'string' &&
+      typeof (f as FormatPreset).mimeType === 'string' &&
+      typeof (f as FormatPreset).fixed === 'boolean'
+    );
+
+  const [localPresets, setLocalPresets] = usePersistentState<SizePreset[]>(
+    'web-img-size-presets',
+    sizePresets,
+    isValidPresetList
+  );
+  const [localFormats, setLocalFormats] = usePersistentState<FormatPreset[]>(
+    'web-img-export-formats',
+    exportFormats,
+    isValidFormatList
+  );
 
   // 获取固定的预设
   const fixedPresets = useMemo(() => {
@@ -249,10 +271,10 @@ export function AdjustPanel({
       const finalImg = await loadImage(compressed);
       onApply(dataUrl, finalImg.width, finalImg.height);
       toast.success(t('processSuccess'));
-    } catch (_error) {
+    } catch {
       toast.error(t('processFailed'));
     }
-  }, [onApply, applyEffects]);
+  }, [onApply, applyEffects, t]);
 
   const handleFormatClick = useCallback((newFormat: ExportFormat) => {
     setFormat(newFormat);
@@ -268,9 +290,6 @@ export function AdjustPanel({
     setShowCustomInput(false);
     setTimeout(() => handleApply(), 0);
   }, [handleApply]);
-  useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuality(Number(e.target.value));
-  }, []);
   const handleQualityChangeEnd = useCallback(() => {
     setTimeout(() => handleApply(), 0);
   }, [handleApply]);
@@ -312,8 +331,6 @@ export function AdjustPanel({
     }
     setTimeout(() => handleApply(), 0);
   }, [handleApply]);
-
-  // 裁剪回调
 
   return (
     <div className="flex flex-col gap-4">

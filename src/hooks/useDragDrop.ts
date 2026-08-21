@@ -66,7 +66,11 @@ export function useDragDrop(onFilesDropped: (files: File[]) => void) {
     const handleNativeDragLeave = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      setIsDragging(false);
+      // 仅在真正离开窗口时取消状态；
+      // 在窗口内元素间移动也会触发 dragleave（relatedTarget 非空），忽略以避免指示器闪烁
+      if (e.relatedTarget === null) {
+        setIsDragging(false);
+      }
     };
 
     const handleNativeDrop = (e: DragEvent) => {
@@ -91,11 +95,11 @@ export function useDragDrop(onFilesDropped: (files: File[]) => void) {
     };
   }, [extractFiles, onFilesDropped]);
 
-  // React 事件处理器
+  // React 事件处理器（参数类型为联合类型，可直接赋值给 React 的拖拽事件属性）
   const dragHandlers = {
-    onDragOver: handleDragOver as any,
-    onDragLeave: handleDragLeave as any,
-    onDrop: handleDrop as any,
+    onDragOver: handleDragOver,
+    onDragLeave: handleDragLeave,
+    onDrop: handleDrop,
   };
 
   return {

@@ -1,16 +1,31 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import * as pdfjsLib from 'pdfjs-dist';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { useDragDrop } from '@/hooks/useDragDrop';
 import { isPdfFile } from '@/utils/pdfToImage';
+import { canvasToBlob, type ImageFormat } from '@/utils/canvas';
+import { downloadFile } from '@/utils/file';
 import { FileText, ArrowLeft, Download, X, Loader2 } from 'lucide-react';
-import { GlobalWorkerOptions } from 'pdfjs-dist';
+import JSZip from 'jszip';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DragOverlay } from '@/components/ui/DragOverlay';
+import { ImagesToPdfPanel } from '@/components/features/ImagesToPdfPanel';
+import { cn } from '@/lib/utils';
 
-// 设置 worker 源（客户端才需要）
-if (typeof window !== 'undefined') {
-  GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+/** 渲染倍率：高分辨率渲染保证导出清晰度 */
+const PAGE_SCALE = 2.0;
+
+/**
+ * 按需加载 pdfjs（仅浏览器端）。
+ * 动态导入可避免 Node 预渲染时加载浏览器版 pdfjs 产生的告警，
+ * 同时将约 1.4MB 的解析推迟到用户真正导入 PDF 时。
+ */
+async function loadPdfjs() {
+  const pdfjs = await import('pdfjs-dist');
+  pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+  return pdfjs;
 }
 
 interface PdfMainPageProps {
@@ -24,23 +39,24 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
   }, [lang]);
 
   const router = useRouter();
+  /** 页面模式：PDF → 图片 / 图片 → PDF */
+  const [mode, setMode] = useState<'toImage' | 'toPdf'>('toImage');
   const [currentPdfFile, setCurrentPdfFile] = useState<File | null>(null);
   const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // PDF 文档相关
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [pageScale] = useState(2.0);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const renderLockRef = useRef(false);
 
   // 下载模态框
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadFormat, setDownloadFormat] = useState('png');
+  const [downloadFormat, setDownloadFormat] = useState<ImageFormat>('png');
   const [downloadQuality, setDownloadQuality] = useState('100'); // 默认最佳质量
   const [pageRangeInput, setPageRangeInput] = useState('1');
   const [converting, setConverting] = useState(false);
@@ -59,18 +75,70 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     };
   }, [pdfObjectUrl]);
 
+  // ESC 关闭下载弹窗（转换进行中不允许关闭）
+  useEffect(() => {
+    if (!showDownloadModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !converting) setShowDownloadModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showDownloadModal, converting]);
+
+  // 渲染指定页面
+  const renderPage = useCallback(async (pageNum: number, doc: PDFDocumentProxy | null = pdfDoc) => {
+    if (!doc || !canvasRef.current) return;
+
+    try {
+      const page = await doc.getPage(pageNum);
+      const viewport = page.getViewport({ scale: PAGE_SCALE });
+
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      if (!context) return;
+
+      canvas.height = viewport.height;
+      canvas.width = viewport.width;
+
+      await page.render({ canvasContext: context, viewport }).promise;
+      setCurrentPage(pageNum);
+    } catch (err) {
+      // 用户快速翻页时 pdfjs 会以 RenderingCancelledException 中断旧渲染，属正常现象
+      if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
+        console.error('渲染页面失败:', err);
+        setError(lang === 'zh' ? '渲染页面失败' : 'Failed to render page');
+      }
+    }
+  }, [pdfDoc, lang]);
+
   // 监听 pdfDoc 变化，渲染第一页（解决首次加载不显示问题）
   useEffect(() => {
     if (pdfDoc && canvasRef.current && !renderLockRef.current) {
       renderLockRef.current = true;
-      renderPage(1, pdfDoc).then(() => {
+      renderPage(1, pdfDoc).finally(() => {
         renderLockRef.current = false;
       });
     }
-  }, [pdfDoc]);
+  }, [pdfDoc, renderPage]);
+
+  // 加载 PDF 文档
+  const loadPdfDocument = useCallback(async (file: File) => {
+    try {
+      const pdfjs = await loadPdfjs();
+      const arrayBuffer = await file.arrayBuffer();
+      const doc = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      setPdfDoc(doc);
+      setTotalPages(doc.numPages);
+      setCurrentPage(1);
+      // 第一页渲染由 useEffect 处理
+    } catch (err) {
+      console.error('加载 PDF 失败:', err);
+      setError(lang === 'zh' ? '加载 PDF 失败，请重试' : 'Failed to load PDF, please try again');
+    }
+  }, [lang]);
 
   // 处理文件选择
-  const handleFilesSelected = async (files: FileList | File[]) => {
+  const handleFilesSelected = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
     const pdfFile = fileArray.find(isPdfFile);
 
@@ -94,63 +162,21 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     // 加载 PDF 文档
     await loadPdfDocument(pdfFile);
     setLoading(false);
-  };
+  }, [pdfObjectUrl, loadPdfDocument, lang]);
 
-  // 处理拖拽文件（过滤 PDF）
-  const handleDragFiles = (files: File[]) => {
+  // 处理拖拽文件（过滤 PDF）；「图片 → PDF」模式下交给面板自己的拖拽处理
+  const handleDragFiles = useCallback((files: File[]) => {
+    if (mode !== 'toImage') return;
     const validPdfFiles = files.filter(isPdfFile);
     if (validPdfFiles.length > 0) {
       void handleFilesSelected(validPdfFiles);
     } else {
       setError(lang === 'zh' ? '请选择 PDF 文件' : 'Please select a PDF file');
     }
-  };
+  }, [handleFilesSelected, lang, mode]);
 
   // 使用通用的拖拽处理 Hook
   const { isDragging, dragHandlers } = useDragDrop(handleDragFiles);
-
-  // 加载 PDF 文档
-  const loadPdfDocument = async (file: File) => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const doc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      setPdfDoc(doc);
-      setTotalPages(doc.numPages);
-      setCurrentPage(1);
-      // 第一页渲染由 useEffect 处理
-    } catch (err) {
-      console.error('加载 PDF 失败:', err);
-      setError(lang === 'zh' ? '加载 PDF 失败，请重试' : 'Failed to load PDF, please try again');
-    }
-  };
-
-  // 渲染指定页面
-  const renderPage = async (pageNum: number, doc: any = pdfDoc) => {
-    if (!doc || !canvasRef.current) return;
-
-    try {
-      const page = await doc.getPage(pageNum);
-      const viewport = page.getViewport({ scale: pageScale });
-
-      const canvas = canvasRef.current;
-      const context = canvas.getContext('2d');
-      if (!context) return;
-
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
-
-      const renderContext = {
-        canvasContext: context,
-        viewport: viewport
-      };
-
-      await page.render(renderContext).promise;
-      setCurrentPage(pageNum);
-    } catch (err) {
-      console.error('渲染页面失败:', err);
-      setError(lang === 'zh' ? '渲染页面失败' : 'Failed to render page');
-    }
-  };
 
   // 上一页
   const handlePrevPage = () => {
@@ -215,11 +241,11 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
 
       // 创建临时画布进行渲染
       const tempCanvas = document.createElement('canvas');
+      const rendered: { filename: string; blob: Blob }[] = [];
 
-      for (let i = 0; i < pages.length; i++) {
-        const pageNum = pages[i];
+      for (const pageNum of pages) {
         const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: pageScale });
+        const viewport = page.getViewport({ scale: PAGE_SCALE });
 
         tempCanvas.width = viewport.width;
         tempCanvas.height = viewport.height;
@@ -227,45 +253,31 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
         const context = tempCanvas.getContext('2d');
         if (!context) continue;
 
-        const renderContext = {
-          canvasContext: context,
-          viewport: viewport
-        };
+        await page.render({ canvasContext: context, viewport }).promise;
 
-        await page.render(renderContext).promise;
-
-        // 生成数据 URL
-        let dataUrl: string;
-        let ext: string;
-
-        switch (downloadFormat) {
-          case 'jpeg':
-            dataUrl = tempCanvas.toDataURL('image/jpeg', quality);
-            ext = '.jpg';
-            break;
-          case 'webp':
-            dataUrl = tempCanvas.toDataURL('image/webp', quality);
-            ext = '.webp';
-            break;
-          default:
-            dataUrl = tempCanvas.toDataURL('image/png');
-            ext = '.png';
-        }
-
-        // 下载单页
         const filename = pages.length === 1
-          ? `${baseName}${ext}`
-          : `${baseName}_page${pageNum}${ext}`;
+          ? `${baseName}.${downloadFormat === 'jpeg' ? 'jpg' : downloadFormat}`
+          : `${baseName}_page${pageNum}.${downloadFormat === 'jpeg' ? 'jpg' : downloadFormat}`;
 
-        const link = document.createElement('a');
-        link.href = dataUrl;
-        link.download = filename;
-        link.click();
+        const blob = await canvasToBlob(tempCanvas, downloadFormat, quality);
+        rendered.push({ filename, blob });
+      }
 
-        // 添加小延迟避免浏览器阻止多次下载
-        if (i < pages.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 150));
+      if (rendered.length === 0) {
+        throw new Error('No pages rendered');
+      }
+
+      if (rendered.length === 1) {
+        // 单页直接下载
+        downloadFile(rendered[0].blob, rendered[0].filename);
+      } else {
+        // 多页打包为 ZIP，避免浏览器拦截连续多次下载
+        const zip = new JSZip();
+        for (const item of rendered) {
+          zip.file(item.filename, item.blob);
         }
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        downloadFile(zipBlob, `${baseName}-images.zip`);
       }
 
       setShowDownloadModal(false);
@@ -282,6 +294,8 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     if (pdfObjectUrl) {
       URL.revokeObjectURL(pdfObjectUrl);
     }
+    // 释放 pdfjs 文档占用的内存
+    void pdfDoc?.destroy();
     setCurrentPdfFile(null);
     setPdfObjectUrl(null);
     setPdfDoc(null);
@@ -315,51 +329,80 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     png: lang === 'zh' ? 'PNG - 便携式网络图形' : 'PNG - Portable Network Graphics',
     jpeg: lang === 'zh' ? 'JPEG - 联合图像专家组' : 'JPEG - Joint Photographic Experts Group',
     webp: lang === 'zh' ? 'WebP - Google 格式' : 'WebP - Google Format',
+    tabToImage: lang === 'zh' ? 'PDF → 图片' : 'PDF → Image',
+    tabToPdf: lang === 'zh' ? '图片 → PDF' : 'Image → PDF',
+    composePrivacy: lang === 'zh'
+      ? '所有处理在浏览器本地完成，图片不会上传到服务器'
+      : 'All processing runs locally in your browser — images never leave your device',
   };
+
+  /** 面板中选择了 PDF 文件：切回 PDF → 图片模式并加载 */
+  const handlePdfFileFromPanel = useCallback((file: File) => {
+    setMode('toImage');
+    void handleFilesSelected([file]);
+  }, [handleFilesSelected]);
 
   return (
     <div
       className={`flex flex-col min-h-screen bg-background text-foreground transition-colors duration-200 ${
-        isDragging && !currentPdfFile ? 'bg-primary/5' : ''
+        isDragging && !currentPdfFile && mode === 'toImage' ? 'bg-primary/5' : ''
       }`}
-      {...dragHandlers}
+      {...(mode === 'toImage' ? dragHandlers : {})}
     >
       {/* 全局拖拽指示器 */}
-      {isDragging && !currentPdfFile && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 pointer-events-none">
-          <div className="bg-card p-8 rounded-xl shadow-2xl border-2 border-dashed border-primary flex flex-col items-center gap-4">
-            <FileText className="w-16 h-16 text-primary" />
-            <p className="text-lg font-semibold">{t.dragHere}</p>
-          </div>
-        </div>
-      )}
+      {isDragging && !currentPdfFile && mode === 'toImage' && <DragOverlay icon={<FileText className="w-14 h-14" />} label={t.dragHere} />}
 
       {/* 顶部导航 */}
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0 z-10">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/')}
+            onClick={() => router.push(lang === 'zh' ? '/zh' : '/')}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>{t.back}</span>
           </button>
-          <h1 className="text-lg font-bold text-primary">{t.pdfTool}</h1>
+          <h1 className="text-lg font-bold text-primary hidden sm:block">{t.pdfTool}</h1>
         </div>
+
+        {/* 模式切换 */}
+        <div className="flex p-1 rounded-lg bg-muted gap-1">
+          {([
+            ['toImage', t.tabToImage],
+            ['toPdf', t.tabToPdf],
+          ] as const).map(([value, label]) => (
+            <button
+              key={value}
+              onClick={() => setMode(value)}
+              aria-pressed={mode === value}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-sm font-medium transition-all',
+                mode === value
+                  ? 'bg-card shadow-sm text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* 右侧占位，保持标题居中平衡 */}
+        <div className="hidden sm:block w-20" />
       </header>
 
       {/* 主内容 */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-h-0">
+        {mode === 'toPdf' ? (
+          <ImagesToPdfPanel lang={lang} onPdfFileReceived={handlePdfFileFromPanel} />
+        ) : (
+        <>
         {!currentPdfFile ? (
           // 上传区域
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="w-full max-w-2xl">
-              <div className="text-center mb-8">
-                <FileText className="w-16 h-16 mx-auto mb-4 text-primary" />
-                <h2 className="text-2xl font-bold mb-2">{t.uploadTitle}</h2>
-                <p className="text-muted-foreground">
-                  {t.uploadHint}
-                </p>
+              <div className="mb-8">
+                <EmptyState variant="pdf" title={t.uploadTitle} description={t.uploadHint} />
               </div>
 
               {/* 自定义上传区域 */}
@@ -398,18 +441,18 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
         ) : (
           // PDF 预览区域
           <div className="flex-1 flex flex-col">
-            {/* 工具栏 */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30 shrink-0">
-              <div className="flex items-center gap-3">
-                <FileText className="w-5 h-5 text-primary" />
-                <span className="font-semibold truncate max-w-md">
+            {/* 工具栏：窄屏自动换行 */}
+            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-4 py-3 border-b border-border bg-muted/30 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <FileText className="w-5 h-5 text-primary shrink-0" />
+                <span className="font-semibold truncate max-w-48 sm:max-w-md">
                   {currentPdfFile.name}
                 </span>
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground shrink-0">
                   ({totalPages} {t.pages})
                 </span>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {pdfDoc && (
                   <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
                     <button
@@ -450,10 +493,14 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
             {/* PDF 渲染区域 */}
             <div className="flex-1 overflow-auto bg-[#1a1a1a] p-8 flex items-start justify-center">
               {loading ? (
-                <div className="flex items-center justify-center h-full text-white">
-                  <div className="text-center">
-                    <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4"></div>
-                    <p>{t.loading}</p>
+                // 解析中：页面形骨架屏 + 加载指示
+                <div className="w-full max-w-none flex items-start justify-center animate-in fade-in duration-200">
+                  <div className="relative bg-white shadow-2xl rounded-lg overflow-hidden w-72 h-96 sm:w-80 sm:h-[28rem]">
+                    <div aria-hidden="true" className="absolute inset-0 skeleton" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+                      <div className="w-10 h-10 border-4 border-primary/25 border-t-primary rounded-full animate-spin" />
+                      <p className="text-xs font-medium text-zinc-500 bg-white/80 rounded-full px-3 py-1">{t.loading}</p>
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -475,12 +522,14 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
             </div>
           </div>
         )}
+        </>
+        )}
       </main>
 
       {/* 下载模态框 */}
       {showDownloadModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-xl shadow-2xl w-full max-w-md mx-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
               <h3 className="text-lg font-semibold">{t.convertDownload}</h3>
               <button
@@ -496,7 +545,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
                 <label className="block text-sm font-medium mb-2">{t.downloadFormat}</label>
                 <select
                   value={downloadFormat}
-                  onChange={(e) => setDownloadFormat(e.target.value)}
+                  onChange={(e) => setDownloadFormat(e.target.value as ImageFormat)}
                   className="w-full px-3 py-2 rounded-lg border border-border bg-background"
                   disabled={converting}
                 >
@@ -559,7 +608,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
 
       {/* 功能说明 */}
       <div className="px-4 py-3 border-t border-border bg-muted/10 text-xs text-muted-foreground text-center">
-        {t.multiPage}
+        {mode === 'toPdf' ? t.composePrivacy : t.multiPage}
       </div>
     </div>
   );

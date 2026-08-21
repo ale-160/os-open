@@ -16,8 +16,8 @@ export function UnderDevelopmentModal({ isOpen, onClose, onUseAnyway, featureNam
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center">
+    <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+      <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-xl text-center animate-in fade-in zoom-in-95 duration-200">
         <div className="flex justify-center mb-4">
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
             <Wrench className="w-7 h-7 text-primary" />

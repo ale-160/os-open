@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { Upload, ImagePlus, FileText } from 'lucide-react';
+import { Upload, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/hooks/useLanguage';
+import { cn } from '@/lib/utils';
 
 interface UploadZoneProps {
   onFilesSelected: (files: FileList | File[]) => void;
   multiple?: boolean;
   accept?: string;
-  hasExistingImage?: boolean;
   compact?: boolean;
 }
 
@@ -99,16 +99,14 @@ export function UploadZone({ onFilesSelected, multiple = true, accept = 'image/*
 
   return (
     <div
-      className={`
-        relative flex flex-col items-center justify-center w-full
-        border-2 border-dashed rounded-lg cursor-pointer
-        transition-colors duration-200
-        ${compact ? 'h-24' : 'h-48'}
-        ${isDragging 
-          ? 'border-primary bg-primary/10' 
+      className={cn(
+        'relative flex flex-col items-center justify-center w-full overflow-hidden',
+        'border-2 border-dashed rounded-lg cursor-pointer transition-all duration-200',
+        compact ? 'h-24' : 'h-48',
+        isDragging
+          ? 'border-primary bg-primary/10 scale-[1.01] ring-4 ring-primary/15'
           : 'border-border hover:border-primary/50 hover:bg-muted/50'
-        }
-      `}
+      )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -120,12 +118,32 @@ export function UploadZone({ onFilesSelected, multiple = true, accept = 'image/*
         onChange={handleFileInput}
         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
       />
-      <div className="flex flex-col items-center gap-2 text-muted-foreground">
-        {isDragging ? (
-          <ImagePlus className={compact ? 'w-8 h-8' : 'w-12 h-12'} />
-        ) : (
-          <Upload className={compact ? 'w-8 h-8' : 'w-12 h-12'} />
-        )}
+      {/* 拖拽悬停：流动蚂蚁线 */}
+      {isDragging && (
+        <svg className="absolute inset-1 pointer-events-none" aria-hidden="true">
+          <rect
+            x="1"
+            y="1"
+            rx="7"
+            fill="none"
+            stroke="var(--primary)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeDasharray="7 7"
+            className="animate-marching-ants"
+            style={{ width: 'calc(100% - 2px)', height: 'calc(100% - 2px)' }}
+          />
+        </svg>
+      )}
+      {/* key 随状态切换强制重挂载，让入场动画每次都重放 */}
+      <div key={isDragging ? 'drag' : 'idle'} className="flex flex-col items-center gap-2 text-muted-foreground animate-in fade-in zoom-in-95 duration-200">
+        <span className={cn('inline-flex', isDragging && 'animate-float')}>
+          {isDragging ? (
+            <ImagePlus className={compact ? 'w-8 h-8 text-primary' : 'w-12 h-12 text-primary'} />
+          ) : (
+            <Upload className={compact ? 'w-8 h-8' : 'w-12 h-12'} />
+          )}
+        </span>
         <p className={compact ? 'text-xs font-medium' : 'text-sm font-medium'}>
           {isDragging ? t('dropHere') : t('uploadTitle')}
         </p>

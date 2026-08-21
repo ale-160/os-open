@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart, ArrowLeftRight, Film } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage, zhStrings, enStrings } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
@@ -12,11 +12,14 @@ import { UploadZone } from '@/components/ui/UploadZone';
 import { ToolPanel } from '@/components/ui/ToolPanel';
 import { SmallSidebar } from '@/components/ui/SmallSidebar';
 import { UnderDevelopmentModal } from '@/components/ui/UnderDevelopmentModal';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { DragOverlay } from '@/components/ui/DragOverlay';
 import { AdjustPanel } from '@/components/features/CompressPanel';
 import { WatermarkPanel } from '@/components/features/WatermarkPanel';
 import { MergePanel } from '@/components/features/MergePanel';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { isPdfFile } from '@/utils/pdfToImage';
+import { normalizeImageFiles } from '@/utils/heicDecode';
 import type { ToolTab } from '@/data/presets';
 import { cn } from '@/lib/utils';
 
@@ -61,16 +64,7 @@ export default function MainPage({ lang }: MainPageProps) {
 
   const isMounted = langMounted && themeMounted;
 
-  // 加载存储的状态
-  useEffect(() => {
-    if (isMounted) {
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
-    }
-  }, [langMounted, themeMounted, theme]);
+  // 暗色类名由 useTheme 内部统一维护，此处不再重复操作 DOM
 
   // 侧边栏：有 tab 选中时自动展开
   const sidebarOpen = sidebarPinned || activeTab !== null;
@@ -87,8 +81,9 @@ export default function MainPage({ lang }: MainPageProps) {
       const pdfPath = lang === 'zh' ? '/zh/pdf' : '/pdf';
       router.push(pdfPath);
     } else {
-      // 普通图片文件，直接添加
-      addImages(fileArray);
+      // 普通图片文件；HEIC 先解码为浏览器可处理的 JPEG
+      const normalized = await normalizeImageFiles(fileArray, lang);
+      addImages(normalized);
       setActiveTab('adjust');
     }
   }, [addImages, router, lang]);
@@ -116,6 +111,26 @@ export default function MainPage({ lang }: MainPageProps) {
     setShowConfirmDialog(false);
     setPendingFiles(null);
   }, []);
+
+  // ESC 关闭全屏预览
+  useEffect(() => {
+    if (!showFullscreenImage) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowFullscreenImage(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showFullscreenImage]);
+
+  // ESC 取消替换确认弹窗
+  useEffect(() => {
+    if (!showConfirmDialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleCancelUpload();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showConfirmDialog, handleCancelUpload]);
 
   const handleClearAll = useCallback(() => {
     clearImages();
@@ -200,6 +215,17 @@ export default function MainPage({ lang }: MainPageProps) {
     }
   }, [previewImage]);
 
+  /** 从 dataURL 或 ObjectURL 加载图片，失败时抛错而不是永久挂起 */
+  const loadImageFromUrl = useCallback(async (url: string): Promise<HTMLImageElement> => {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = url;
+    });
+    return img;
+  }, []);
+
   /** 根据原始格式将 canvas 导出为 dataURL */
   const canvasToOriginalDataUrl = useCallback((canvas: HTMLCanvasElement): string => {
     const origFmt = getOriginalFormat() ?? 'jpeg';
@@ -210,52 +236,54 @@ export default function MainPage({ lang }: MainPageProps) {
 
   const handleRotate = useCallback(async (angle: number) => {
     if (!previewImage) return;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const img = await loadImageFromUrl(previewImage.url);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const img = new Image();
-    img.src = previewImage.url;
-    await new Promise(resolve => img.onload = resolve);
+      if (angle === 90 || angle === 270) {
+        const [w, h] = [img.height, img.width];
+        canvas.width = w;
+        canvas.height = h;
+      } else {
+        canvas.width = img.width;
+        canvas.height = img.height;
+      }
 
-    if (angle === 90 || angle === 270) {
-      const [w, h] = [img.height, img.width];
-      canvas.width = w;
-      canvas.height = h;
-    } else {
-      canvas.width = img.width;
-      canvas.height = img.height;
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate((angle * Math.PI) / 180);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+      updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
+      setRotation(prev => ((prev + angle) % 360 + 360) % 360);
+      toast.success(t('rotateSuccess'));
+    } catch {
+      toast.error(t('processFailed'));
     }
-
-    ctx.translate(canvas.width / 2, canvas.height / 2);
-    ctx.rotate((angle * Math.PI) / 180);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
-
-    updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
-    setRotation(prev => ((prev + angle) % 360 + 360) % 360);
-    toast.success(t('rotateSuccess'));
-  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t]);
+  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t, loadImageFromUrl]);
 
   const handleFlip = useCallback(async () => {
     if (!previewImage) return;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const img = await loadImageFromUrl(previewImage.url);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const img = new Image();
-    img.src = previewImage.url;
-    await new Promise(resolve => img.onload = resolve);
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(img, 0, 0);
 
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.translate(canvas.width, 0);
-    ctx.scale(-1, 1);
-    ctx.drawImage(img, 0, 0);
-
-    updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
-    setIsFlipped(prev => !prev);
-    toast.success(t('flipSuccess'));
-  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t]);
+      updatePreview(canvasToOriginalDataUrl(canvas), canvas.width, canvas.height);
+      setIsFlipped(prev => !prev);
+      toast.success(t('flipSuccess'));
+    } catch {
+      toast.error(t('processFailed'));
+    }
+  }, [previewImage, updatePreview, canvasToOriginalDataUrl, t, loadImageFromUrl]);
 
   const handleToggleHideOriginal = useCallback(() => {
     setHideOriginal(prev => !prev);
@@ -300,6 +328,16 @@ export default function MainPage({ lang }: MainPageProps) {
   const currentOriginal = originalImages[0];
   const hasImages = !!previewImage;
 
+  // 预览与原图的体积变化（正数=更小，负数=更大）；未处理时不显示
+  const sizeDeltaPct = (() => {
+    if (!currentOriginal || !previewImage) return null;
+    if (previewImage.url === currentOriginal.url) return null;
+    const origSize = currentOriginal.size;
+    const prevSize = getDataUrlSize(previewImage.url);
+    if (origSize <= 0 || prevSize <= 0) return null;
+    return Math.round((1 - prevSize / origSize) * 100);
+  })();
+
   // 面板标题
   const panelTitle = activeTab === 'adjust'
     ? t('imageAdjust')
@@ -318,14 +356,7 @@ export default function MainPage({ lang }: MainPageProps) {
       {...dragHandlers}
     >
       {/* 拖拽指示覆盖层 */}
-      {isDragging && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50 pointer-events-none">
-          <div className="bg-card p-8 rounded-xl shadow-2xl border-2 border-dashed border-primary flex flex-col items-center gap-4">
-            <Upload className="w-16 h-16 text-primary" />
-            <p className="text-lg font-semibold">{t('dropHere')}</p>
-          </div>
-        </div>
-      )}
+      {isDragging && <DragOverlay icon={<Upload className="w-14 h-14" />} label={t('dropHere')} />}
 
       {/* 顶部导航栏 */}
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0 z-10">
@@ -336,10 +367,27 @@ export default function MainPage({ lang }: MainPageProps) {
           </a>
         </div>
         <div className="flex items-center gap-1">
+          <a
+            href={lang === 'zh' ? '/zh/gif' : '/gif'}
+            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title={t('gifMaker')}
+            aria-label={t('gifMaker')}
+          >
+            <Film className="w-4.5 h-4.5" />
+          </a>
+          <a
+            href={lang === 'zh' ? '/zh/convert' : '/convert'}
+            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title={t('convert')}
+            aria-label={t('convert')}
+          >
+            <ArrowLeftRight className="w-4.5 h-4.5" />
+          </a>
           <button
             onClick={handleToggleLanguage}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('language')}
+            aria-label={t('language')}
           >
             <Globe className="w-4.5 h-4.5" />
           </button>
@@ -347,6 +395,7 @@ export default function MainPage({ lang }: MainPageProps) {
             onClick={toggleTheme}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('theme')}
+            aria-label={t('theme')}
           >
             {theme === 'dark' ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
           </button>
@@ -360,7 +409,7 @@ export default function MainPage({ lang }: MainPageProps) {
 
         {/* 工具面板侧边栏 */}
         {sidebarOpen && (
-          <aside className="w-56 shrink-0 border-r border-border bg-card flex flex-col transition-all duration-200 ease-out">
+          <aside className="w-56 shrink-0 border-r border-border bg-card flex flex-col animate-in fade-in slide-in-from-left-2 duration-200 ease-out">
             <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30 shrink-0">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {panelTitle}
@@ -397,7 +446,6 @@ export default function MainPage({ lang }: MainPageProps) {
                   imageUrl={currentOriginal.url}
                   imageWidth={currentOriginal.width}
                   imageHeight={currentOriginal.height}
-                  imageSize={currentOriginal.size}
                   onApply={handleApply}
                   resetSignal={resetSignal}
                   isFlipped={isFlipped}
@@ -420,19 +468,19 @@ export default function MainPage({ lang }: MainPageProps) {
               )}
               {activeTab && !currentOriginal && (
                 <div className="flex flex-col items-center justify-center h-32 text-center text-muted-foreground text-sm gap-2">
-                  <UploadZone onFilesSelected={handleFilesSelected} hasExistingImage={false} compact />
+                  <UploadZone onFilesSelected={handleFilesSelected} compact />
                 </div>
               )}
             </ToolPanel>
           </aside>
         )}
 
-        {/* 主内容区 */}
-        <main className="flex-1 flex min-h-0">
+        {/* 主内容区：移动端上下堆叠，桌面端左右分栏 */}
+        <main className="flex-1 flex flex-col md:flex-row min-h-0">
           {/* 原图区域 */}
           {!hideOriginal && (
             <>
-              <div className="flex-1 flex flex-col border-r border-border min-w-0">
+              <div className="flex-1 flex flex-col border-b md:border-b-0 md:border-r border-border min-w-0">
                 <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/20 shrink-0">
                   <span className="text-sm font-semibold tracking-tight">{t('original')}</span>
                 </div>
@@ -474,14 +522,14 @@ export default function MainPage({ lang }: MainPageProps) {
                   ) : (
                     <div className="flex items-center justify-center h-full p-4">
                       <div className="w-full max-w-md">
-                        <UploadZone onFilesSelected={handleFilesSelected} hasExistingImage={false} />
+                        <UploadZone onFilesSelected={handleFilesSelected} />
                       </div>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="w-px bg-border self-stretch" />
+              <div className="hidden md:block w-px bg-border self-stretch" />
             </>
           )}
 
@@ -567,8 +615,27 @@ export default function MainPage({ lang }: MainPageProps) {
                           </button>
                         </div>
                       )}
-                      <div className="text-sm text-muted-foreground">
-                        {t('previewSize')}：{formatFileSize(getDataUrlSize(previewImage.url))}
+                      <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <span>
+                          {t('previewSize')}：{formatFileSize(getDataUrlSize(previewImage.url))}
+                        </span>
+                        {sizeDeltaPct !== null && sizeDeltaPct !== 0 && (
+                          <span
+                            className={cn(
+                              'text-xs font-medium px-1.5 py-0.5 rounded-full animate-in zoom-in-95 fade-in duration-200',
+                              sizeDeltaPct > 0
+                                ? 'bg-green-500/10 text-green-600 dark:text-green-400'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            )}
+                            title={
+                              sizeDeltaPct > 0
+                                ? lang === 'zh' ? '相比原图更小' : 'Smaller than original'
+                                : lang === 'zh' ? '相比原图更大' : 'Larger than original'
+                            }
+                          >
+                            {sizeDeltaPct > 0 ? '-' : '+'}{Math.abs(sizeDeltaPct)}%
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-muted-foreground">
                         {t('previewDimensions')}：{previewImage.width} × {previewImage.height}
@@ -615,8 +682,8 @@ export default function MainPage({ lang }: MainPageProps) {
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                  {t('noImage')}
+                <div className="flex items-center justify-center h-full p-4">
+                  <EmptyState variant="image" title={t('noImage')} description={t('uploadHint')} />
                 </div>
               )}
             </div>
@@ -660,8 +727,8 @@ export default function MainPage({ lang }: MainPageProps) {
 
       {/* 确认弹窗 */}
       {showConfirmDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm">
-          <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-xl">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="bg-card border border-border rounded-xl p-6 max-w-sm mx-4 shadow-xl animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-lg font-bold mb-2">{t('confirmReplace')}</h3>
             <p className="text-sm text-muted-foreground mb-4">
               {t('confirmReplaceDesc')}
@@ -687,13 +754,13 @@ export default function MainPage({ lang }: MainPageProps) {
       {/* 全屏图片预览 */}
       {showFullscreenImage && previewImage && (
         <div
-          className="fixed inset-0 z-1000 bg-black/95 flex items-center justify-center cursor-pointer"
+          className="fixed inset-0 z-1000 bg-black/95 flex items-center justify-center cursor-pointer animate-in fade-in duration-200"
           onClick={() => setShowFullscreenImage(false)}
         >
           <img
             src={previewImage.url}
             alt="Fullscreen Preview"
-            className="max-w-full max-h-full object-contain"
+            className="max-w-full max-h-full object-contain animate-in fade-in zoom-in-95 duration-200"
           />
           <button
             onClick={() => setShowFullscreenImage(false)}
