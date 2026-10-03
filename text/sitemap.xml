@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<url>
+<loc>https://web-text.ale160.com/</loc>
+<xhtml:link rel="alternate" hreflang="en" href="https://web-text.ale160.com/" />
+<xhtml:link rel="alternate" hreflang="zh" href="https://web-text.ale160.com/zh/" />
+<xhtml:link rel="alternate" hreflang="x-default" href="https://web-text.ale160.com/" />
+<lastmod>2026-10-03T12:58:32.166Z</lastmod>
+<changefreq>weekly</changefreq>
+<priority>1</priority>
+</url>
+<url>
+<loc>https://web-text.ale160.com/zh/</loc>
+<xhtml:link rel="alternate" hreflang="en" href="https://web-text.ale160.com/" />
+<xhtml:link rel="alternate" hreflang="zh" href="https://web-text.ale160.com/zh/" />
+<xhtml:link rel="alternate" hreflang="x-default" href="https://web-text.ale160.com/" />
+<lastmod>2026-10-03T12:58:32.166Z</lastmod>
+<changefreq>weekly</changefreq>
+<priority>0.9</priority>
+</url>
+</urlset>
