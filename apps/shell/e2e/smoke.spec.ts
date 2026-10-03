@@ -19,23 +19,12 @@ test('首页正常渲染核心元素', async ({ page }) => {
   await page.goto('/');
   await dismissWelcome(page);
 
-  // 中文为主：根路径默认重定向到 /zh
+  // 单语言路由：根目录即中文站
   await expect(page).toHaveTitle(/ale os/i);
 
   // 搜索框存在且可见，placeholder 正确
   const searchInput = page.getByPlaceholder(/搜索图标或网址|search icons or urls/i);
   await expect(searchInput).toBeVisible();
-});
-
-test('中文路径可访问', async ({ page }) => {
-  await page.goto('/zh');
-  await dismissWelcome(page);
-
-  // /zh 路由的 metadata 标题固定为中文，不随语言偏好变化
-  await expect(page).toHaveTitle(/个人网页操作系统|Ale OS/);
-
-  // 页面能正常渲染出主导航区域
-  await expect(page.getByRole('banner')).toBeVisible();
 });
 
 test('搜索框可输入并清空', async ({ page }) => {

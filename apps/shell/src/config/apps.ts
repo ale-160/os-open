@@ -67,11 +67,3 @@ export function getAppByPath(pathname: string): OsApp | null {
     null
   );
 }
-
-/**
- * 按壳的语言返回应用入口路径：中文为主，中文壳直接打开应用的 /zh/ 路由，
- * 英文壳打开应用根路由（应用内部也有中文为主的默认重定向）
- */
-export function getAppLocalePath(app: OsApp, language: 'zh' | 'en'): string {
-  return language === 'zh' ? `${app.path}zh/` : app.path;
-}

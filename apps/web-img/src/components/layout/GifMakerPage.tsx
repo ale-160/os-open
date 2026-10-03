@@ -239,7 +239,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
       <header className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-card shrink-0 z-10">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push(lang === 'zh' ? '/zh' : '/')}
+            onClick={() => router.push('/')}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

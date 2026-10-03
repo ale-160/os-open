@@ -1,10 +1,9 @@
 import MainPage from '@/components/layout/MainPage';
-import ClientRedirect from '@/components/seo/ClientRedirect';
 import {JsonLd} from '@/components/seo/json-ld';
 import { Metadata } from 'next';
 import { getMetadata } from '@/config/metadata';
 
-export const metadata: Metadata = getMetadata('en');
+export const metadata: Metadata = getMetadata('zh');
 
 const appJsonLd = {
   "@context": "https://schema.org",
@@ -12,10 +11,10 @@ const appJsonLd = {
   name: "Ale OS",
   url: "https://os.ale160.com/",
   description:
-    "A beautiful OS-style browser homepage with drag-and-drop, folders, dark mode, custom wallpapers, and multi-page management. 100% local, privacy-focused.",
+    "美观的操作系统风格个人网页操作系统：桌面、文件夹、暗色模式、自定义壁纸、多页管理，并以内嵌应用的方式集成了图片工具箱与 Markdown 编辑器。完全本地存储，注重隐私。",
   applicationCategory: "BrowserApplication",
   operatingSystem: "Any",
-  inLanguage: "en",
+  inLanguage: "zh-CN",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -28,12 +27,11 @@ const appJsonLd = {
   }
 };
 
-export default function EnglishPage() {
+export default function HomePage() {
   return (
     <>
       <JsonLd data={appJsonLd}/>
-      <ClientRedirect />
-      <MainPage lang="en" />
+      <MainPage lang="zh" />
     </>
   );
 }
