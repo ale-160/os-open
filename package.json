@@ -1,0 +1,7 @@
+{
+  "name": "os-open",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ale160 OS - one site, apps inside (shell + embedded tools)",
+  "scripts": {}
+}
