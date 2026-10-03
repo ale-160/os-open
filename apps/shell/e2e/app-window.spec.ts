@@ -47,7 +47,8 @@ test('Home 键收起应用窗口回桌面', async ({ page }) => {
 
   await page.getByRole('button', { name: /返回桌面|back to home/i }).click();
   await expect(page.locator('[data-os-app-window]')).toHaveCount(0);
-  await expect(page).toHaveURL(/:\/\/localhost:4173\/$/);
+  // 中文为主策略下，桌面收起后回到 / 或重定向后的 /zh/ 均视为回到桌面
+  await expect(page).toHaveURL(/:\/\/localhost:4173\/(zh\/)?$/);
 });
 
 test('Esc 键收起应用窗口', async ({ page }) => {

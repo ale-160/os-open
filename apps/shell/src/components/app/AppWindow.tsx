@@ -9,7 +9,7 @@ import React, {
   useState
 } from 'react';
 import { Home } from 'lucide-react';
-import { getAppByPath, getAppById, OsApp } from '@/config/apps';
+import { getAppByPath, getAppById, getAppLocalePath, OsApp } from '@/config/apps';
 
 /**
  * App 窗口系统：桌面图标通过 openApp 以全屏窗口打开内嵌应用，
@@ -146,7 +146,7 @@ export function AppWindow({ language = 'zh' }: AppWindowProps) {
       <iframe
         data-os-app-frame
         key={rendered.id}
-        src={rendered.path}
+        src={getAppLocalePath(rendered, language)}
         title={language === 'zh' ? rendered.name : rendered.nameEn}
         className="h-full w-full border-0"
         allow="clipboard-read; clipboard-write"
