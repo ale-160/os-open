@@ -12,6 +12,8 @@ import { useContextMenu } from '@/hooks/useContextMenu';
 import { useConfirmDialog } from '@/hooks/useConfirmDialog';
 import { useFolderSelector } from '@/hooks/useFolderSelector';
 import { getIconSizeClass } from '@/utils/ui';
+import { useAppWindow } from '@/components/app/AppWindow';
+import { getAppFromUrl } from '@/config/apps';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -123,6 +125,8 @@ export function Icon({ item, onEdit, onDelete, onMoveToFolder, onMoveToRoot, fol
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
+
+  const { openApp } = useAppWindow();
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showFolderSelector, setShowFolderSelector] = useState(false);
@@ -299,9 +303,15 @@ export function Icon({ item, onEdit, onDelete, onMoveToFolder, onMoveToRoot, fol
 
     // 只有在点击打开方式为单击时，才打开链接
     if (operationMode.openMethod === 'click' && !item.isHidden) {
+      // 内嵌应用（app://<id>）以全屏窗口打开，其余在新标签打开
+      const app = getAppFromUrl(item.url);
+      if (app) {
+        openApp(app);
+        return;
+      }
       window.open(item.url, '_blank');
     }
-  }, [item.url, item.isHidden, config?.operationMode, isMenuOpen, closeMenu, resetLongPressState]);
+  }, [item.url, item.isHidden, config?.operationMode, isMenuOpen, closeMenu, resetLongPressState, openApp]);
   /* eslint-enable react-hooks/exhaustive-deps */
 
   /**
@@ -318,9 +328,14 @@ export function Icon({ item, onEdit, onDelete, onMoveToFolder, onMoveToRoot, fol
 
     // 只有在双击打开方式为双击时，才打开链接
     if (operationMode.openMethod === 'doubleClick' && !item.isHidden) {
+      const app = getAppFromUrl(item.url);
+      if (app) {
+        openApp(app);
+        return;
+      }
       window.open(item.url, '_blank');
     }
-  }, [item.url, item.isHidden, config?.operationMode]);
+  }, [item.url, item.isHidden, config?.operationMode, openApp]);
 
   if (item.isHidden) {
     return null;

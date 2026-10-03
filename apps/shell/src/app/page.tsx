@@ -9,8 +9,8 @@ export const metadata: Metadata = getMetadata('en');
 const appJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "hub-nav",
-  url: "https://hub-nav.ale160.com/",
+  name: "Ale OS",
+  url: "https://os.ale160.com/",
   description:
     "A beautiful OS-style browser homepage with drag-and-drop, folders, dark mode, custom wallpapers, and multi-page management. 100% local, privacy-focused.",
   applicationCategory: "BrowserApplication",

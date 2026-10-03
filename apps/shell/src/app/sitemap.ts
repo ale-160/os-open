@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE_URL = "https://hub-nav.ale160.com";
+const SITE_URL = "https://os.ale160.com";
 
 // 静态导出要求显式声明
 export const dynamic = "force-static";

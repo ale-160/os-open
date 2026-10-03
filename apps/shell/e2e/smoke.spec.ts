@@ -20,7 +20,7 @@ test('首页正常渲染核心元素', async ({ page }) => {
   await dismissWelcome(page);
 
   // 页面标题应包含 hub-nav
-  await expect(page).toHaveTitle(/hub-nav/i);
+  await expect(page).toHaveTitle(/ale os/i);
 
   // 搜索框存在且可见，placeholder 正确
   const searchInput = page.getByPlaceholder(/search icons or urls/i);
@@ -32,7 +32,7 @@ test('中文路径可访问', async ({ page }) => {
   await dismissWelcome(page);
 
   // /zh 路由的 metadata 标题固定为中文，不随语言偏好变化
-  await expect(page).toHaveTitle(/美观的浏览器主页|美观/);
+  await expect(page).toHaveTitle(/个人网页操作系统|Ale OS/);
 
   // 页面能正常渲染出主导航区域
   await expect(page.getByRole('banner')).toBeVisible();

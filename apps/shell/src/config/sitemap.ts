@@ -24,16 +24,16 @@ export function generateSitemapXml(): string {
 
   SITEMAP_PROJECTS.forEach((item) => {
     const loc = item.path
-      ? `https://hub-nav.ale160.com/${item.path}/`
-      : "https://hub-nav.ale160.com/";
+      ? `https://os.ale160.com/${item.path}/`
+      : "https://os.ale160.com/";
 
     xml += `  <url>
     <loc>${loc}</loc>
     <lastmod>${today}</lastmod>
     <changefreq>${item.changefreq}</changefreq>
     <priority>${item.priority}</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://hub-nav.ale160.com/"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://hub-nav.ale160.com/zh/"/>
+    <xhtml:link rel="alternate" hreflang="en" href="https://os.ale160.com/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://os.ale160.com/zh/"/>
   </url>
 `;
   });

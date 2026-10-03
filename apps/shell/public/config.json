@@ -21,37 +21,32 @@
       "iconType": "favicon"
     },
     {
-      "id": "icon-web-text",
-      "name": "web-text",
-      "url": "https://web-text.ale160.com",
-      "folderId": "folder-favorites",
+      "id": "icon-app-web-img",
+      "name": "图片工具箱",
+      "url": "app://web-img",
+      "folderId": null,
       "order": 1,
       "isHidden": false,
-      "iconType": "favicon"
+      "iconType": "custom",
+      "customIconUrl": "/apps/web-img.png"
     },
     {
-      "id": "icon-web-img",
-      "name": "web-img",
-      "url": "https://web-img.ale160.com/",
-      "folderId": "folder-favorites",
+      "id": "icon-app-web-text",
+      "name": "Markdown 编辑器",
+      "url": "app://web-text",
+      "folderId": null,
       "order": 2,
       "isHidden": false,
-      "iconType": "favicon"
+      "iconType": "custom",
+      "customIconUrl": "/apps/web-text.png"
     }
   ],
-  "folders": [
-    {
-      "id": "folder-favorites",
-      "name": "收藏",
-      "parentId": null,
-      "order": 0
-    }
-  ],
+  "folders": [],
   "pages": [
     {
       "id": "page-1",
-      "name": "新页面",
-      "iconIds": ["icon-ale160", "folder-favorites"]
+      "name": "首页",
+      "iconIds": ["icon-ale160", "icon-app-web-img", "icon-app-web-text"]
     },
     {
       "id": "page-2",
@@ -59,7 +54,7 @@
       "iconIds": []
     }
   ],
-  "rootOrder": ["icon-ale160", "folder-favorites"],
+  "rootOrder": ["icon-ale160", "icon-app-web-img", "icon-app-web-text"],
   "version": "0.1.8",
   "searchEngine": "https://www.bing.com/search?q=",
   "operationMode": {

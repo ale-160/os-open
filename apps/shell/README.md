@@ -1,3 +1,5 @@
+> **Ale OS 桌面壳**：本目录是 [os-open](https://github.com/ale-160/os-open) 的桌面壳（`/` 根路径），由 hub-nav 演化而来并作为内嵌应用的启动器（见 `src/config/apps.ts`）。以下为 hub-nav 时期的原始文档，功能说明仍然有效。
+
 # hub-nav-open
 
 [English](./README.en.md) | 中文

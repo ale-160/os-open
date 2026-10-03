@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+    branches: ["master"]
+  push:
+    branches: ["master"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "ci-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Shell lint / typecheck / unit tests
+        run: |
+          pnpm --filter shell lint
+          pnpm --filter shell typecheck
+          pnpm --filter shell test
+
+      - name: Apps lint
+        run: |
+          pnpm --filter web-img lint
+          pnpm --filter web-text lint
+
+      - name: Build all apps + compose
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: pnpm build
+
+      - name: Verify composed site
+        run: |
+          test -f out/index.html
+          test -f out/img/index.html
+          test -f out/text/index.html
+          test -f out/CNAME
+          test -f out/.nojekyll
+
+      - name: Install Playwright browsers
+        run: pnpm --filter shell exec playwright install --with-deps chromium
+
+      - name: E2E (shell)
+        run: pnpm --filter shell e2e
