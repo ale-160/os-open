@@ -7,7 +7,7 @@ export type Language = 'zh' | 'en';
 // 中文文案
 export const STRINGS_ZH = {
   // 应用信息
-  systemName: 'hub-nav',
+  systemName: 'Ale OS',
   appVersion: '开源版',
   
   // 顶部栏
@@ -205,7 +205,7 @@ export const STRINGS_ZH = {
 
   // 首次使用引导
   welcome: '欢迎',
-  welcomeTitle: '欢迎使用 hub-nav',
+  welcomeTitle: '欢迎使用 Ale OS',
   welcomeDesc: '选择您想要的配置初始化方式',
   useDefault: '使用默认配置',
   useDefaultDesc: '使用内置默认配置，您可以在之后自行定制',
@@ -363,7 +363,7 @@ export const STRINGS_ZH = {
 // 英文文案
 export const STRINGS_EN = {
   // App Info
-  systemName: 'hub-nav',
+  systemName: 'Ale OS',
   appVersion: 'Open Source',
   
   // Top Bar
@@ -561,7 +561,7 @@ export const STRINGS_EN = {
 
   // Setup Guide
   welcome: 'Welcome',
-  welcomeTitle: 'Welcome to hub-nav',
+  welcomeTitle: 'Welcome to Ale OS',
   welcomeDesc: 'Choose how you want to initialize your configuration',
   useDefault: 'Use Default Configuration',
   useDefaultDesc: 'Start with the default configuration and customize it later',

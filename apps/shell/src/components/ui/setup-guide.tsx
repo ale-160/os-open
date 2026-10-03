@@ -127,7 +127,7 @@ export function SetupGuide({ isOpen, onComplete }: SetupGuideProps) {
           {/* 欢迎信息 */}
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold text-foreground">
-              {STRINGS.welcomeTitle || 'Welcome to hub-nav'}
+              {STRINGS.welcomeTitle || 'Welcome to Ale OS'}
             </h2>
             <p className="text-sm text-muted-foreground">
               {STRINGS.welcomeDesc || 'Choose how you want to initialize your configuration'}

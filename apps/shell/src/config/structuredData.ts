@@ -29,8 +29,8 @@ export const PERSON_DATA_EN = {
 export const WEBSITE_DATA_ZH = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "hub-nav",
-  url: "https://hub-nav.ale160.com",
+  name: "Ale OS",
+  url: "https://os.ale160.com",
   description: "一个美观的操作系统风格浏览器主页，支持拖拽、文件夹、暗色模式、自定义壁纸和多页管理。",
   author: {
     "@type": "Person",
@@ -41,8 +41,8 @@ export const WEBSITE_DATA_ZH = {
 export const WEBSITE_DATA_EN = {
   "@context": "https://schema.org",
   "@type": "WebSite",
-  name: "hub-nav",
-  url: "https://hub-nav.ale160.com",
+  name: "Ale OS",
+  url: "https://os.ale160.com",
   description: "A beautiful OS-style browser homepage with drag-and-drop, folders, dark mode, custom wallpapers, and multi-page management.",
   author: {
     "@type": "Person",
@@ -54,8 +54,8 @@ export const WEBSITE_DATA_EN = {
 export const WEBAPP_DATA_ZH = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "hub-nav",
-  url: "https://hub-nav.ale160.com",
+  name: "Ale OS",
+  url: "https://os.ale160.com",
   description: "一个美观的操作系统风格浏览器主页，支持拖拽、文件夹、暗色模式、自定义壁纸和多页管理。完全本地存储，注重隐私。",
   applicationCategory: "BrowserExtension",
   operatingSystem: "Web",
@@ -74,8 +74,8 @@ export const WEBAPP_DATA_ZH = {
 export const WEBAPP_DATA_EN = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
-  name: "hub-nav",
-  url: "https://hub-nav.ale160.com",
+  name: "Ale OS",
+  url: "https://os.ale160.com",
   description: "A beautiful OS-style browser homepage with drag-and-drop, folders, dark mode, custom wallpapers, and multi-page management. 100% local, privacy-focused.",
   applicationCategory: "BrowserExtension",
   operatingSystem: "Web",

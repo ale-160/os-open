@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const config: NextConfig = {
     output: 'export',
-    basePath: '',
+    basePath: process.env.APP_BASE_PATH || '',
     trailingSlash: true,
     images: {
         unoptimized: true,

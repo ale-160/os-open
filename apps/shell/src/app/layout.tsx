@@ -11,15 +11,15 @@ import {JsonLd} from "@/components/seo/json-ld";
 export {viewport};
 
 export const metadata: Metadata = {
-    metadataBase: new URL("https://hub-nav.ale160.com"),
+    metadataBase: new URL("https://os.ale160.com"),
 };
 
 const websiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",
-    name: "hub-nav",
-    alternateName: ["hub-nav 浏览器导航", "hub-nav start page"],
-    url: "https://hub-nav.ale160.com/",
+    name: "Ale OS",
+    alternateName: ["Ale OS", "os-open"],
+    url: "https://os.ale160.com/",
     inLanguage: ["en", "zh-CN"],
     description:
         "A beautiful OS-style browser homepage with drag-and-drop, folders, dark mode, custom wallpapers, and multi-page management. 100% local, privacy-focused.",

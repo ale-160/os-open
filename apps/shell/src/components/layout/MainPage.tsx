@@ -14,6 +14,7 @@ import { ThemeToggleIcon } from '@/components/ui/theme-toggle-icon';
 import { extractDomain, generateFaviconCandidates } from '@/utils/url';
 import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
+import { AppWindow, AppWindowProvider } from '@/components/app/AppWindow';
 import { HelpCircle, Globe, Heart } from 'lucide-react';
 
 // 懒加载模态框组件（仅在需要时加载）
@@ -287,6 +288,7 @@ export default function MainPage({ lang }: MainPageProps) {
   }, [handleFolderRename]);
 
   return (
+    <AppWindowProvider>
     <>
       {/* 首次使用引导 */}
       {needsSetup && (
@@ -482,7 +484,7 @@ export default function MainPage({ lang }: MainPageProps) {
       {/* 页脚 */}
       <footer className="shrink-0 flex items-center justify-center gap-4 px-4 py-2 border-t border-gray-200 dark:border-border bg-background/50 text-xs text-muted-foreground">
         <a
-          href="https://github.com/ale-160/hub-nav"
+          href="https://github.com/ale-160/os-open"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 hover:text-foreground transition-colors"
@@ -514,6 +516,10 @@ export default function MainPage({ lang }: MainPageProps) {
         </a>
       </footer>
       </div>
+
+      {/* 内嵌应用全屏窗口（App 化打开 web-img / web-text 等） */}
+      <AppWindow language={activeConfig.theme.language} />
     </>
+    </AppWindowProvider>
   );
 }

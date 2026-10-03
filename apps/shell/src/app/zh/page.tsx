@@ -8,8 +8,8 @@ export const metadata: Metadata = getMetadata('zh');
 const appJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "hub-nav",
-  url: "https://hub-nav.ale160.com/zh/",
+  name: "Ale OS",
+  url: "https://os.ale160.com/zh/",
   description:
     "一个美观的操作系统风格浏览器主页，支持拖拽、文件夹、暗色模式、自定义壁纸和多页管理。完全本地存储，注重隐私。",
   applicationCategory: "BrowserApplication",
