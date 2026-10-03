@@ -1,0 +1,295 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --font-sans: var(--font-sans);
+}
+
+:root {
+  /* 背景/前景 */
+  --background: #fafafa;
+  --foreground: #18181b;
+  --card: #ffffff;
+  --card-foreground: #18181b;
+  --popover: #ffffff;
+  --popover-foreground: #18181b;
+  /* 品牌色 */
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  /* 语义色 */
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  /* 边框/输入/聚焦 */
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #2563eb;
+  /* 圆角 */
+  --radius: 0.6rem;
+}
+
+.dark {
+  /* 背景/前景 */
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+  --card: #18181b;
+  --card-foreground: #fafafa;
+  --popover: #18181b;
+  --popover-foreground: #fafafa;
+  /* 品牌色 */
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  /* 语义色 */
+  --secondary: #27272a;
+  --secondary-foreground: #fafafa;
+  --muted: #27272a;
+  --muted-foreground: #a1a1aa;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
+  /* 边框/输入/聚焦 */
+  --border: #27272a;
+  --input: #27272a;
+  --ring: #3b82f6;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+
+/* 全局 focus 样式 */
+*:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.font-sans {
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+/* 自定义滚动条 */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: var(--muted-foreground);
+  border-radius: 3px;
+  opacity: 0.6;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--foreground);
+}
+
+/* 全局过渡（含 transform，为按压反馈做准备） */
+button, a {
+  transition: background-color 150ms ease, color 150ms ease, border-color 150ms ease, opacity 150ms ease, transform 120ms ease, box-shadow 150ms ease;
+}
+
+/* 按压反馈：所有可点击按钮轻微下压 */
+@media (prefers-reduced-motion: no-preference) {
+  button:not(:disabled):active {
+    transform: scale(0.97);
+  }
+}
+
+/* 图片阴影 */
+img.object-contain.rounded-lg {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+}
+
+/* 输入框样式增强 */
+input[type="text"],
+input[type="number"],
+input[type="range"],
+select {
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+/* 滑块样式 - 确保浅色/深色主题均可见 */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: var(--muted-foreground);
+  opacity: 0.45;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]:hover {
+  opacity: 0.7;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--primary-foreground);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 100ms ease, box-shadow 100ms ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.1);
+}
+
+/* Firefox 滑块 */
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: var(--muted-foreground);
+  opacity: 0.45;
+  border-radius: 3px;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: 2px solid var(--primary-foreground);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+/* dark mode 图片预览背景 */
+.dark img[alt="Original"],
+.dark img[alt="Preview"] {
+  filter: brightness(0.95);
+}
+
+/* ───────────────────────── 动效系统 ───────────────────────── */
+
+/* 悬浮漂浮（空状态插画装饰） */
+@keyframes float-y {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float { animation: float-y 4s ease-in-out infinite; }
+.animate-float-delayed { animation: float-y 4s ease-in-out 1.3s infinite; }
+
+/* 蚂蚁线：拖拽悬停时的虚线边框流动 */
+@keyframes marching-ants {
+  to { stroke-dashoffset: -28; }
+}
+.animate-marching-ants { animation: marching-ants 0.7s linear infinite; }
+
+/* 骨架屏微光扫过 */
+@keyframes shimmer-x {
+  100% { transform: translateX(100%); }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+  animation: shimmer-x 1.6s infinite;
+}
+.dark .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.07), transparent);
+}
+
+/* 不确定进度条（转换中行内底部） */
+@keyframes indeterminate-slide {
+  0% { left: -40%; width: 40%; }
+  50% { left: 30%; width: 50%; }
+  100% { left: 100%; width: 40%; }
+}
+.progress-indeterminate {
+  position: absolute;
+  bottom: 0;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--primary);
+  animation: indeterminate-slide 1.2s ease-in-out infinite;
+}
+
+/* 错误抖动 */
+@keyframes shake-x {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(2px); }
+  30%, 50%, 70% { transform: translateX(-3px); }
+  40%, 60% { transform: translateX(3px); }
+}
+.animate-shake { animation: shake-x 0.5s ease both; }
+
+/* 勾选描边绘制 */
+@keyframes draw-stroke {
+  to { stroke-dashoffset: 0; }
+}
+
+/* 慢速脉冲环（拖拽指示器） */
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.5; }
+  80%, 100% { transform: scale(1.9); opacity: 0; }
+}
+.animate-ping-slow { animation: pulse-ring 1.4s cubic-bezier(0, 0, 0.2, 1) infinite; }
+
+/* 入场动画延迟期间保持初始帧，避免闪烁 */
+.anim-fill-backwards { animation-fill-mode: backwards; }
+
+/* 减少动态偏好：关闭所有动画与过渡 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://web-img.ale160.com/sitemap.xml
