@@ -1,0 +1,66 @@
+{
+  "layout": {
+    "columns": 5,
+    "rows": 4
+  },
+  "theme": {
+    "mode": "light",
+    "primaryColor": "#3b82f6",
+    "iconSize": "medium",
+    "gridSpacing": 16,
+    "language": "en"
+  },
+  "icons": [
+    {
+      "id": "icon-ale160",
+      "name": "ale160",
+      "url": "https://ale160.com",
+      "folderId": null,
+      "order": 0,
+      "isHidden": false,
+      "iconType": "favicon"
+    },
+    {
+      "id": "icon-app-web-img",
+      "name": "Image Toolbox",
+      "url": "app://web-img",
+      "folderId": null,
+      "order": 1,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/web-img.png"
+    },
+    {
+      "id": "icon-app-web-text",
+      "name": "Markdown Editor",
+      "url": "app://web-text",
+      "folderId": null,
+      "order": 2,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/web-text.png"
+    }
+  ],
+  "folders": [],
+  "pages": [
+    {
+      "id": "page-1",
+      "name": "Home",
+      "iconIds": ["icon-ale160", "icon-app-web-img", "icon-app-web-text"]
+    },
+    {
+      "id": "page-2",
+      "name": "New Page",
+      "iconIds": []
+    }
+  ],
+  "rootOrder": ["icon-ale160", "icon-app-web-img", "icon-app-web-text"],
+  "version": "0.1.8",
+  "searchEngine": "https://www.bing.com/search?q=",
+  "operationMode": {
+    "mode": "hybrid",
+    "openMethod": "click",
+    "menuTrigger": "rightClick",
+    "showAddButton": true
+  }
+}
