@@ -1,0 +1,78 @@
+# web-text
+
+English | [中文](README.md)  
+PS: English Version completed with the assistance of translation tools.For more precise details, see the Chinese version of this report .
+
+A simple and elegant online Markdown editor. All data is saved locally in your browser, no privacy concerns.
+
+Live demo: [https://web-text.ale160.com/](https://web-text.ale160.com/)
+
+Personal website: [http://ale160.com/](http://ale160.com/)
+
+## Features
+
+- **Real-time Preview** — Edit on the left, see the rendered result on the right
+- **Syntax Highlighting** — Support for multiple programming languages
+- **Auto-save** — Content automatically saved to browser local storage
+- **History** — Auto-saves last 50 versions, restore anytime
+- **Multiple Documents** — Manage multiple documents in the sidebar with search, rename, and delete
+- **One-click Backup** — Export all data as a JSON file, restore anytime
+- **Drag & Drop Import** — Drop `.md` files to create new documents
+- **Open Local File** — Edit local `.md` files directly, auto-saved back to disk (Chrome/Edge)
+- **Dark Mode** — Toggle light and dark themes
+- **Export** — Export as `.md`, `.html` file or copy to clipboard
+- **Focus Mode** — Distraction-free writing experience
+- **Word Count** — Real-time word and character count
+- **Keyboard Shortcuts** — `Ctrl/⌘+1/2/3` switch views, `Ctrl/⌘+Shift+F` fullscreen, `Ctrl/⌘+S` save
+- **Multi-language** — Supports Chinese and English interfaces
+- **Fullscreen** — Immersive editing experience
+
+## Tech Stack
+
+- Next.js 16
+- React 19
+- TypeScript
+- Tailwind CSS
+- CodeMirror 6
+- shadcn/ui
+
+## Local Development
+
+```bash
+# Clone the repository
+git clone https://github.com/ale-160/web-text.git
+cd web-text
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+
+## Known Issues
+
+### ✅ Chromium Chinese IME Bug Fixed
+
+The previously reported Chromium 149.0.7827.103+ Windows desktop Chinese IME first-input-lost issue has been fixed in **Chromium 149.0.7827.156**.
+
+- **Fixed in**: Google Chrome 149.0.7827.156 and above
+- **Cause**: Regression in Chromium engine's Windows desktop IME composition event dispatch
+- **Historical record**: See [Chromium Issue #523134891](https://issues.chromium.org/issues/523134891)
+
+## License
+
+Apache License 2.0
+
+## Support & Sponsorship 💖
+
+To support the continued development of this project, please visit our unified sponsorship page:
+
+👉 [https://ale160.com/sponsor](https://ale160.com/sponsor)
+
+
+## About
+
+Developed and maintained by [ale-160](http://ale160.com/).

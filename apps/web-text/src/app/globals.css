@@ -1,0 +1,364 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --success: #16a34a;
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --success: #22c55e;
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* CodeMirror Editor Styles */
+.cm-editor {
+  height: 100% !important;
+  border: none !important;
+}
+
+.cm-content {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
+  font-size: 15px !important;
+  line-height: 1.7 !important;
+  padding: 16px !important;
+}
+
+.cm-gutters {
+  display: none !important;
+}
+
+.cm-scroller {
+  overflow: auto !important;
+}
+
+/* CodeMirror light theme syntax highlighting contrast fixes (WCAG 4.5:1) */
+.cm-editor:not(.cm-focused) .cm-content,
+.cm-editor .cm-content {
+  caret-color: #000;
+}
+
+/* Markdown headings, bold */
+.cm-header-1, .cm-header-2, .cm-header-3,
+.cm-header-4, .cm-header-5, .cm-header-6 {
+  color: #1a1a2e !important;
+}
+
+/* Strong/bold text */
+.cm-strong {
+  color: #1a1a2e !important;
+}
+
+/* Emphasis/italic */
+.cm-em {
+  color: #374151 !important;
+}
+
+/* Links */
+.cm-link {
+  color: #1d4ed8 !important;
+}
+
+/* URLs in links */
+.cm-url {
+  color: #2563eb !important;
+}
+
+/* Inline code */
+.cm-monospace {
+  color: #be185d !important;
+}
+
+/* Code blocks / code markers */
+.cm-comment {
+  color: #5c6370 !important;
+}
+
+/* Processing instructions / meta */
+.cm-meta {
+  color: #5c6370 !important;
+}
+
+/* CodeMirror dark theme (oneDark) contrast fixes */
+.cm-editor.cm-dark .cm-header-1,
+.cm-editor.cm-dark .cm-header-2,
+.cm-editor.cm-dark .cm-header-3,
+.cm-editor.cm-dark .cm-header-4,
+.cm-editor.cm-dark .cm-header-5,
+.cm-editor.cm-dark .cm-header-6 {
+  color: #e5e7eb !important;
+}
+
+.cm-editor.cm-dark .cm-strong {
+  color: #f3f4f6 !important;
+}
+
+.cm-editor.cm-dark .cm-link {
+  color: #60a5fa !important;
+}
+
+.cm-editor.cm-dark .cm-url {
+  color: #93c5fd !important;
+}
+
+.cm-editor.cm-dark .cm-monospace {
+  color: #f472b6 !important;
+}
+
+.cm-editor.cm-dark .cm-comment {
+  color: #8b949e !important;
+}
+
+/* highlight.js 预览区代码高亮对比度修复 (WCAG 4.5:1 minimum)
+ * 覆盖 cdnjs.cloudflare.com 的 github.min.css / github-dark.min.css */
+
+/* Light theme: 强制提升白底下所有代码高亮 token 的对比度 */
+.hljs {
+  color: #1f2937 !important;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #5c6370 !important;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-built_in,
+.hljs-attr {
+  color: #a626a4 !important;
+}
+
+.hljs-string,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta-string,
+.hljs-regexp {
+  color: #2f7e2f !important;
+}
+
+.hljs-number,
+.hljs-built_in {
+  color: #986801 !important;
+}
+
+.hljs-title,
+.hljs-function,
+.hljs-function .hljs-title {
+  color: #7c3aed !important;
+}
+
+.hljs-variable,
+.hljs-template-variable,
+.hljs-params,
+.hljs-name,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #b5651d !important;
+}
+
+.hljs-subst {
+  color: #1f2937 !important;
+}
+
+.hljs-tag,
+.hljs-bullet,
+.hljs-deletion,
+.hljs-formula {
+  color: #986801 !important;
+}
+
+.hljs-meta,
+.hljs-meta .hljs-keyword,
+.hljs-meta-string {
+  color: #5c6370 !important;
+}
+
+/* Dark theme: 深色背景下的代码高亮对比度 */
+.dark .hljs {
+  color: #e5e7eb !important;
+}
+
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #8b949e !important;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-literal,
+.dark .hljs-section,
+.dark .hljs-doctag,
+.dark .hljs-type,
+.dark .hljs-class .hljs-title,
+.dark .hljs-built_in,
+.dark .hljs-attr {
+  color: #d2a8ff !important;
+}
+
+.dark .hljs-string,
+.dark .hljs-addition,
+.dark .hljs-attribute,
+.dark .hljs-meta-string,
+.dark .hljs-regexp {
+  color: #7ee787 !important;
+}
+
+.dark .hljs-number,
+.dark .hljs-built_in {
+  color: #ffa657 !important;
+}
+
+.dark .hljs-title,
+.dark .hljs-function,
+.dark .hljs-function .hljs-title {
+  color: #b694f5 !important;
+}
+
+.dark .hljs-variable,
+.dark .hljs-template-variable,
+.dark .hljs-params,
+.dark .hljs-name,
+.dark .hljs-selector-attr,
+.dark .hljs-selector-pseudo {
+  color: #d29922 !important;
+}
+
+.dark .hljs-subst {
+  color: #e5e7eb !important;
+}
+
+.dark .hljs-tag,
+.dark .hljs-bullet,
+.dark .hljs-deletion,
+.dark .hljs-formula {
+  color: #ffa657 !important;
+}
+
+.dark .hljs-meta,
+.dark .hljs-meta .hljs-keyword,
+.dark .hljs-meta-string {
+  color: #8b949e !important;
+}
