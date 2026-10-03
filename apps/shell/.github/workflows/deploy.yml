@@ -1,0 +1,54 @@
+name: Deploy Next.js site to Pages
+
+on:
+  push:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Linux native modules
+        run: npm install --no-save lightningcss-linux-x64-gnu @tailwindcss/oxide-linux-x64-gnu
+
+      - name: Build with Next.js
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+        run: npx next build --webpack
+
+      - name: Add CNAME for custom domain
+        run: echo "hub-nav.ale160.com" > out/CNAME
+
+      # 防止 Jekyll 过滤 _next/ 等以下划线开头的目录（GitHub Pages 分支部署必需）
+      - name: Add .nojekyll
+        run: echo "" > out/.nojekyll
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: out
+          clean: true
+          # 保留各 PR 的预览目录，生产部署只更新根目录
+          clean-exclude: |
+            pr-preview/
