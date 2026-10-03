@@ -7,6 +7,7 @@ export const dynamic = "force-static";
 
 /**
  * 构建时自动生成 sitemap.xml（替代手写 public/sitemap.xml）
+ * 单语言路由：根目录即中文站，无 /zh 变体
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
@@ -17,24 +18,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "weekly",
       priority: 1,
-      alternates: {
-        languages: {
-          en: `${SITE_URL}/`,
-          "zh-CN": `${SITE_URL}/zh/`,
-        },
-      },
-    },
-    {
-      url: `${SITE_URL}/zh/`,
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 0.9,
-      alternates: {
-        languages: {
-          en: `${SITE_URL}/`,
-          "zh-CN": `${SITE_URL}/zh/`,
-        },
-      },
     },
   ];
 }

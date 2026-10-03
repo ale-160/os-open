@@ -14,7 +14,7 @@ import { ThemeToggleIcon } from '@/components/ui/theme-toggle-icon';
 import { extractDomain, generateFaviconCandidates } from '@/utils/url';
 import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
-import { AppWindow, AppWindowProvider } from '@/components/app/AppWindow';
+import { AppWindowProvider } from '@/components/app/AppWindow';
 import { HelpCircle, Globe, Heart } from 'lucide-react';
 
 // 懒加载模态框组件（仅在需要时加载）
@@ -516,9 +516,6 @@ export default function MainPage({ lang }: MainPageProps) {
         </a>
       </footer>
       </div>
-
-      {/* 内嵌应用全屏窗口（App 化打开 web-img / web-text 等） */}
-      <AppWindow language={activeConfig.theme.language} />
     </>
     </AppWindowProvider>
   );

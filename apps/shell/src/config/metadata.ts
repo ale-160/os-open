@@ -22,7 +22,7 @@ export const METADATA_ZH = {
   openGraph: {
     title: "Ale OS · 个人网页操作系统",
     description: "一个美观的操作系统风格浏览器主页，支持拖拽、文件夹、暗色模式、自定义壁纸和多页管理。",
-    url: "https://os.ale160.com/zh",
+    url: "https://os.ale160.com/",
     siteName: "Ale OS",
     locale: "zh_CN",
     type: "website" as const,
@@ -43,11 +43,7 @@ export const METADATA_ZH = {
     creator: "@ale160"
   },
   alternates: {
-    canonical: "https://os.ale160.com/zh/",
-    languages: {
-      "en": "https://os.ale160.com/",
-      "zh-CN": "https://os.ale160.com/zh/"
-    }
+    canonical: "https://os.ale160.com/"
   }
 };
 
@@ -94,11 +90,7 @@ export const METADATA_EN = {
     creator: "@ale160"
   },
   alternates: {
-    canonical: "https://os.ale160.com/",
-    languages: {
-      "en": "https://os.ale160.com/",
-      "zh-CN": "https://os.ale160.com/zh/"
-    }
+    canonical: "https://os.ale160.com/"
   }
 };
 

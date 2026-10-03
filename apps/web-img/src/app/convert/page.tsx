@@ -4,13 +4,13 @@ import { getConvertMetadata } from '@/config/metadata';
 import { StructuredDataScript } from '@/components/ui/StructuredDataScript';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 
-export const metadata: Metadata = getConvertMetadata('en');
+export const metadata: Metadata = getConvertMetadata('zh');
 
 export default function ConvertPage() {
   return (
-    <ClientProviders lang="en">
-      <StructuredDataScript lang="en" />
-      <ConvertMainPage lang="en" />
+    <ClientProviders lang="zh">
+      <StructuredDataScript lang="zh" />
+      <ConvertMainPage lang="zh" />
     </ClientProviders>
   );
 }

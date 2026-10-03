@@ -4,13 +4,13 @@ import { getGifMakerMetadata } from '@/config/metadata';
 import { StructuredDataScript } from '@/components/ui/StructuredDataScript';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 
-export const metadata: Metadata = getGifMakerMetadata('en');
+export const metadata: Metadata = getGifMakerMetadata('zh');
 
 export default function GifPage() {
   return (
-    <ClientProviders lang="en">
-      <StructuredDataScript lang="en" />
-      <GifMakerPage lang="en" />
+    <ClientProviders lang="zh">
+      <StructuredDataScript lang="zh" />
+      <GifMakerPage lang="zh" />
     </ClientProviders>
   );
 }
