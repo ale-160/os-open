@@ -5,7 +5,8 @@ import {
   OS_APPS,
   getAppById,
   getAppByPath,
-  getAppFromUrl
+  getAppFromUrl,
+  getAppLocalePath
 } from './apps';
 
 describe('OS 应用注册表', () => {
@@ -36,5 +37,12 @@ describe('OS 应用注册表', () => {
     expect(getAppByPath('/text/')?.id).toBe('web-text');
     expect(getAppByPath('/')).toBeNull();
     expect(getAppByPath('/image-something')).toBeNull();
+  });
+
+  it('按壳语言返回应用入口路径（中文为主）', () => {
+    const app = getAppById('web-img');
+    expect(app).not.toBeNull();
+    expect(getAppLocalePath(app!, 'zh')).toBe('/img/zh/');
+    expect(getAppLocalePath(app!, 'en')).toBe('/img/');
   });
 });

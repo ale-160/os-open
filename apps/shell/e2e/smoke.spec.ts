@@ -19,11 +19,11 @@ test('首页正常渲染核心元素', async ({ page }) => {
   await page.goto('/');
   await dismissWelcome(page);
 
-  // 页面标题应包含 hub-nav
+  // 中文为主：根路径默认重定向到 /zh
   await expect(page).toHaveTitle(/ale os/i);
 
   // 搜索框存在且可见，placeholder 正确
-  const searchInput = page.getByPlaceholder(/search icons or urls/i);
+  const searchInput = page.getByPlaceholder(/搜索图标或网址|search icons or urls/i);
   await expect(searchInput).toBeVisible();
 });
 
@@ -42,7 +42,7 @@ test('搜索框可输入并清空', async ({ page }) => {
   await page.goto('/');
   await dismissWelcome(page);
 
-  const searchInput = page.getByPlaceholder(/search icons or urls/i);
+  const searchInput = page.getByPlaceholder(/搜索图标或网址|search icons or urls/i);
   await searchInput.fill('github');
   await expect(searchInput).toHaveValue('github');
 
@@ -60,7 +60,7 @@ test('主题切换按钮可切换明暗模式', async ({ page }) => {
   const htmlClass = () => page.evaluate(() => document.documentElement.className);
   const before = await htmlClass();
 
-  await page.getByTitle(/toggle theme/i).click();
+  await page.getByTitle(/切换主题|toggle theme/i).click();
   // @wrksz/themes 以 class 形式挂载明暗模式，点击后 html class 应变化
   await expect.poll(htmlClass, { timeout: 5_000 }).not.toBe(before);
 });
@@ -70,7 +70,7 @@ test('设置面板可打开', async ({ page }) => {
   await dismissWelcome(page);
   await expect(page.getByRole('banner')).toBeVisible();
 
-  await page.getByTitle('Settings').click();
+  await page.getByTitle(/设置|Settings/).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
 
@@ -79,6 +79,6 @@ test('帮助面板可打开', async ({ page }) => {
   await dismissWelcome(page);
   await expect(page.getByRole('banner')).toBeVisible();
 
-  await page.getByTitle('Help').click();
+  await page.getByTitle(/帮助|Help/).click();
   await expect(page.getByRole('dialog')).toBeVisible();
 });
