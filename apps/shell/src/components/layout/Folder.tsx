@@ -316,7 +316,7 @@ export function Folder({
       {/* 删除确认对话框 */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-          <div className="bg-card rounded-lg shadow-lg p-6 max-w-sm w-full mx-4">
+          <div className="glass-strong rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-medium text-card-foreground mb-4">
               {STRINGS.confirmDelete}
             </h3>

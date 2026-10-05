@@ -24,6 +24,12 @@ export interface OsApp {
 /** 桌面图标指向内嵌应用时使用的内部 URL 方案 */
 export const APP_URL_SCHEME = 'app://';
 
+/**
+ * 全系统共享语言键（localStorage）：壳与内嵌应用统一读写，
+ * 通过 storage 事件跨帧实时同步（同源 iframe 收到彼此的变更）
+ */
+export const OS_LANGUAGE_KEY = 'ale-os-language';
+
 export const OS_APPS: readonly OsApp[] = [
   {
     id: 'web-img',
