@@ -183,6 +183,7 @@ export default function MainPage({ lang }: MainPageProps) {
   }, [previewImage, t]);
 
   // ===== Ale OS 系统资产：把当前预览图存入系统图库 / 复制到系统剪贴板 =====
+  // 不做人为大小限制——用户可能正是为大图而来，容量仅受浏览器 IndexedDB 配额约束
   const toPersistableDataUrl = useCallback(async (): Promise<string | null> => {
     if (!previewImage) return null;
     // blob: URL 只在创建它的文档内有效，先转成可持久化的 dataURL
@@ -200,30 +201,35 @@ export default function MainPage({ lang }: MainPageProps) {
         return null;
       }
     }
-    if (getDataUrlSize(dataUrl) > 2 * 1024 * 1024) {
-      return null;
-    }
     return dataUrl;
   }, [previewImage]);
 
   const handleSaveToGallery = useCallback(async () => {
     const dataUrl = await toPersistableDataUrl();
     if (!dataUrl) {
-      toast.error(t('sendTooLarge'));
+      toast.error(t('saveFailed'));
       return;
     }
-    await saveAsset({ name: previewImage?.name ?? 'image', dataUrl });
-    toast.success(t('savedToGallery'));
+    try {
+      await saveAsset({ name: previewImage?.name ?? 'image', dataUrl });
+      toast.success(t('savedToGallery'));
+    } catch {
+      toast.error(t('storageFull'));
+    }
   }, [toPersistableDataUrl, previewImage, t]);
 
   const handleCopyToSystemClipboard = useCallback(async () => {
     const dataUrl = await toPersistableDataUrl();
     if (!dataUrl) {
-      toast.error(t('sendTooLarge'));
+      toast.error(t('saveFailed'));
       return;
     }
-    await setClipboardItem({ type: 'image', dataUrl, name: previewImage?.name ?? 'image' });
-    toast.success(t('copiedToClipboard'));
+    try {
+      await setClipboardItem({ type: 'image', dataUrl, name: previewImage?.name ?? 'image' });
+      toast.success(t('copiedToClipboard'));
+    } catch {
+      toast.error(t('storageFull'));
+    }
   }, [toPersistableDataUrl, previewImage, t]);
 
   const handleApply = useCallback((imageData: string, width: number, height: number) => {

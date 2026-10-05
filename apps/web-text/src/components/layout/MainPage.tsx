@@ -229,7 +229,13 @@ export default function MainPage({ lang }: MainPageProps) {
     if (!doc) return;
     const newContent = contentRef.current;
     const updatedAt = Date.now();
-    await saveDoc({ ...doc, content: newContent, updatedAt });
+    try {
+      await saveDoc({ ...doc, content: newContent, updatedAt });
+    } catch {
+      // 存储配额耗尽等场景：明确告知，不让自动保存静默失败
+      toast.error(t.saveFailed);
+      return;
+    }
     setDocs(prev => prev.map(d => (d.id === doc.id ? { ...d, content: newContent, updatedAt } : d)));
     // 若该文档关联了本地文件，同步写回
     const handle = fileHandlesRef.current.get(doc.id);
