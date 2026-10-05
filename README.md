@@ -59,7 +59,7 @@ pnpm e2e          # 壳的 Playwright e2e（serve out/）
 
 ```bash
 pnpm build                                  # 构建 + compose → out/
-pnpm deploy                                 # wrangler pages deploy out（需 wrangler login）
+pnpm deploy:cf                              # wrangler pages deploy out（需 wrangler login）
 node scripts/attach-domain.mjs              # （仅首次）绑定自定义域
 ```
 

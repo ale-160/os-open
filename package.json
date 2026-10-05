@@ -11,6 +11,6 @@
     "test": "pnpm -r --if-present test",
     "lint": "pnpm -r --if-present lint",
     "e2e": "pnpm --filter shell e2e",
-    "deploy": "wrangler pages deploy out --project-name os-open --branch master --commit-dirty=true"
+    "deploy:cf": "wrangler pages deploy out --project-name os-open --branch master --commit-dirty=true"
   }
 }
