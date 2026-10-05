@@ -53,8 +53,7 @@ jobs:
           test -f out/index.html
           test -f out/img/index.html
           test -f out/text/index.html
-          test -f out/CNAME
-          test -f out/.nojekyll
+          test -f out/sitemap.xml
 
       - name: Install Playwright browsers
         run: pnpm --filter shell exec playwright install --with-deps chromium
