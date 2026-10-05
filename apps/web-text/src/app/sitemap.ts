@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 
 // 站点地图：每次构建自动生成 out/sitemap.xml，无需手动维护
-const BASE_URL = "https://web-text.ale160.com";
+const BASE_URL = "https://os.ale160.com/text";
 
 // output: export 模式要求 metadata 路由显式静态
 export const dynamic = "force-static";

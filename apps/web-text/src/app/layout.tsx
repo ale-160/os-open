@@ -10,7 +10,7 @@ const WEBSITE_JSON_LD = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "web-text",
-  url: "https://web-text.ale160.com/",
+  url: "https://os.ale160.com/text/",
   applicationCategory: "UtilitiesApplication",
   operatingSystem: "Any",
   description:

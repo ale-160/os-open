@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://web-text.ale160.com/sitemap.xml
+Sitemap: https://os.ale160.com/text/sitemap.xml
