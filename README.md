@@ -55,10 +55,15 @@ pnpm e2e          # 壳的 Playwright e2e（serve out/）
 
 ## 部署（Cloudflare Pages）
 
-1. Cloudflare Dashboard → Workers & Pages → 创建 Pages 项目，连接本 Git 仓库；
-2. 构建配置：**构建命令** `pnpm build`，**构建输出目录** `out`；
-3. 环境变量：`NODE_VERSION` = `22`（或 20），`PNPM_VERSION` = `10`；
-4. 项目绑定自定义域 `os.ale160.com`；推送 `master` 自动构建上线。
+项目通过 wrangler 直传部署（Pages 项目名 `os-open`，自定义域 `os.ale160.com`）：
+
+```bash
+pnpm build                                  # 构建 + compose → out/
+pnpm deploy                                 # wrangler pages deploy out（需 wrangler login）
+node scripts/attach-domain.mjs              # （仅首次）绑定自定义域
+```
+
+推送仓库后 GitHub Actions 运行 CI 门禁（lint / 单测 / 构建 / e2e），部署为手动直传。
 
 ## 许可
 
