@@ -11,7 +11,8 @@ import Link from 'next/link';
  * - hub-nav：localStorage（hub-nav-config / hub-nav-theme）
  * - web-text：localStorage + IndexedDB web-text-db（docs / history）
  * - web-img：localStorage（主题 / 预设等 5 键）
- * 写入策略：目标键/库已有数据时默认跳过，不覆盖。
+ * 写入策略：默认覆盖本站已有数据（迁移的意图就是带回旧数据），可在卡片上取消勾选；
+ * hub-nav 旧配置里的应用外链（旧子域名）会自动改写为系统原生应用（app://）。
  */
 
 type AppId = 'hub-nav' | 'web-text' | 'web-img';
@@ -23,6 +24,61 @@ interface MigrationSource {
   /** 迁移内容描述 */
   detail: string;
   origin: string;
+}
+
+/** 旧配置中的应用外链 → 系统原生应用 改写表 */
+const APP_REWRITES = [
+  { host: 'web-img.ale160.com', appId: 'web-img' as const, icon: '/apps/web-img.png', name: '图片工具箱' },
+  { host: 'web-text.ale160.com', appId: 'web-text' as const, icon: '/apps/web-text.png', name: 'Markdown 编辑器' }
+];
+
+/**
+ * 把 hub-nav 旧配置中的应用外链改写为 app:// 原生应用图标，
+ * 并确保注册过的系统应用都出现在桌面（旧配置可能缺应用图标）。
+ */
+function rewriteHubNavConfig(raw: string): { config: string; rewritten: number } {
+  try {
+    const config = JSON.parse(raw) as {
+      icons?: Array<{ id: string; name?: string; url: string; iconType?: string; iconUrl?: string; customIconUrl?: string; folderId?: string | null; order?: number; isHidden?: boolean }>;
+      pages?: Array<{ iconIds?: string[] }>;
+      rootOrder?: string[];
+    };
+    let rewritten = 0;
+    for (const icon of config.icons ?? []) {
+      if (typeof icon.url !== 'string') continue;
+      const match = APP_REWRITES.find(r => icon.url.includes(r.host));
+      if (match) {
+        icon.url = `app://${match.appId}`;
+        icon.iconType = 'custom';
+        icon.customIconUrl = match.icon;
+        delete icon.iconUrl;
+        rewritten += 1;
+      }
+    }
+    for (const r of APP_REWRITES) {
+      const appUrl = `app://${r.appId}`;
+      if ((config.icons ?? []).some(i => i.url === appUrl)) continue;
+      const id = `icon-app-${r.appId}-${Date.now()}`;
+      config.icons = config.icons ?? [];
+      config.icons.push({
+        id,
+        name: r.name,
+        url: appUrl,
+        folderId: null,
+        order: config.icons.length,
+        isHidden: false,
+        iconType: 'custom',
+        customIconUrl: r.icon
+      });
+      if (config.pages?.[0]) config.pages[0].iconIds = [...(config.pages[0].iconIds ?? []), id];
+      if (Array.isArray(config.rootOrder)) config.rootOrder.push(id);
+      rewritten += 1;
+    }
+    return { config: JSON.stringify(config), rewritten };
+  } catch {
+    // 配置解析失败时原样保留
+    return { config: raw, rewritten: 0 };
+  }
 }
 
 const SOURCES: MigrationSource[] = [
@@ -62,6 +118,12 @@ export default function MigrateClient() {
     'web-img': { state: 'idle' }
   });
   const [overall, setOverall] = useState<'idle' | 'running' | 'done'>('idle');
+  // 覆盖开关：迁移意图通常是带回旧数据，故默认覆盖本站已有数据
+  const [overwrite, setOverwrite] = useState<Record<AppId, boolean>>({
+    'hub-nav': true,
+    'web-text': true,
+    'web-img': true
+  });
   const iframesRef = useRef<Record<AppId, HTMLIFrameElement | null>>({
     'hub-nav': null,
     'web-text': null,
@@ -72,13 +134,13 @@ export default function MigrateClient() {
     document.documentElement.lang = 'zh-CN';
   }, []);
 
-  /** 写入 localStorage 键（目标已有则跳过），返回 {written, skipped} */
-  const writeLocalStorage = useCallback((entries: Record<string, string>) => {
+  /** 写入 localStorage 键；overwrite=false 时目标已有则跳过 */
+  const writeLocalStorage = useCallback((entries: Record<string, string>, overwrite: boolean) => {
     let written = 0;
     let skipped = 0;
     for (const [key, value] of Object.entries(entries)) {
       try {
-        if (localStorage.getItem(key) !== null) {
+        if (!overwrite && localStorage.getItem(key) !== null) {
           skipped += 1;
           continue;
         }
@@ -91,9 +153,9 @@ export default function MigrateClient() {
     return { written, skipped };
   }, []);
 
-  /** 写入 web-text 的 IndexedDB（本地 docs 非空则整体跳过） */
+  /** 写入 web-text 的 IndexedDB；overwrite=true 时清空本站文档后写入 */
   const writeWebTextIdb = useCallback(
-    (idb: { docs?: unknown[]; history?: unknown[] }) => {
+    (idb: { docs?: unknown[]; history?: unknown[] }, overwrite: boolean) => {
       return new Promise<{ written: number; skipped: string | null }>(resolve => {
         try {
           const request = indexedDB.open('web-text-db', 1);
@@ -112,14 +174,18 @@ export default function MigrateClient() {
             const tx = db.transaction('docs', 'readonly');
             const countRequest = tx.objectStore('docs').count();
             countRequest.onsuccess = () => {
-              if (countRequest.result > 0) {
+              if (!overwrite && countRequest.result > 0) {
                 db.close();
-                resolve({ written: 0, skipped: '本站已有文档，未覆盖' });
+                resolve({ written: 0, skipped: '本站已有文档（勾选覆盖可替换）' });
                 return;
               }
               const writeTx = db.transaction(['docs', 'history'], 'readwrite');
               const docsStore = writeTx.objectStore('docs');
               const historyStore = writeTx.objectStore('history');
+              if (overwrite) {
+                docsStore.clear();
+                historyStore.clear();
+              }
               for (const doc of idb.docs ?? []) docsStore.put(doc);
               for (const entry of idb.history ?? []) historyStore.put(entry);
               writeTx.oncomplete = () => {
@@ -149,8 +215,8 @@ export default function MigrateClient() {
 
   /** 拉取单个旧站数据并写入 */
   const migrateOne = useCallback(
-    (source: MigrationSource): Promise<{ state: 'done' | 'skipped' | 'error'; summary?: string; message?: string }> => {
-      return new Promise<{ state: 'done' | 'skipped' | 'error'; summary?: string; message?: string }>(resolve => {
+    (source: MigrationSource, overwrite: boolean): Promise<{ state: 'done' | 'skipped' | 'error'; summary?: string; message?: string }> => {
+      return new Promise(resolve => {
         const iframe = iframesRef.current[source.appId];
         if (!iframe || !iframe.contentWindow) {
           resolve({ state: 'error', message: '迁移助手未加载（旧站不可达？）' });
@@ -173,13 +239,20 @@ export default function MigrateClient() {
           clearTimeout(timer);
 
           const payload = data.payload ?? {};
-          const lsResult = writeLocalStorage(payload.localStorage ?? {});
+          const entries = { ...payload.localStorage };
+          let appNote = '';
+          if (data.app === 'hub-nav' && entries['hub-nav-config']) {
+            const { config, rewritten } = rewriteHubNavConfig(entries['hub-nav-config']);
+            entries['hub-nav-config'] = config;
+            if (rewritten > 0) appNote = `，${rewritten} 个应用转为系统原生应用`;
+          }
+          const lsResult = writeLocalStorage(entries, overwrite);
           const parts: string[] = [];
-          if (lsResult.written > 0) parts.push(`${lsResult.written} 项设置`);
+          if (lsResult.written > 0) parts.push(`${lsResult.written} 项设置${appNote}`);
           if (lsResult.skipped > 0) parts.push(`${lsResult.skipped} 项已存在跳过`);
 
           if (data.app === 'web-text' && payload.idb) {
-            void writeWebTextIdb(payload.idb).then(idbResult => {
+            void writeWebTextIdb(payload.idb, overwrite).then(idbResult => {
               if (idbResult.skipped) {
                 parts.push(idbResult.skipped);
               } else if (idbResult.written > 0) {
@@ -220,11 +293,11 @@ export default function MigrateClient() {
     setOverall('running');
     for (const source of SOURCES) {
       setStatuses(prev => ({ ...prev, [source.appId]: { state: 'pulling' } }));
-      const result = await migrateOne(source);
+      const result = await migrateOne(source, overwrite[source.appId]);
       setStatuses(prev => ({ ...prev, [source.appId]: result }));
     }
     setOverall('done');
-  }, [migrateOne]);
+  }, [migrateOne, overwrite]);
 
   const allSettled = useMemo(
     () => Object.values(statuses).every(status => status.state !== 'idle' && status.state !== 'pulling'),
@@ -259,6 +332,16 @@ export default function MigrateClient() {
                     {status.state === 'skipped' && <span className="text-muted-foreground">— {status.summary}</span>}
                     {status.state === 'error' && <span className="text-red-600 dark:text-red-400">✕ {status.message}</span>}
                   </div>
+                  <label className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={overwrite[source.appId]}
+                      onChange={e => setOverwrite(prev => ({ ...prev, [source.appId]: e.target.checked }))}
+                      disabled={overall === 'running'}
+                      className="accent-[var(--primary)]"
+                    />
+                    覆盖本站已有数据
+                  </label>
                 </div>
               </div>
             );
