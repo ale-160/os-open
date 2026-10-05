@@ -59,7 +59,7 @@ export function FormatManagerModal({ isOpen, onClose, formats, onFormatsChange }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="glass-strong rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <h3 className="font-semibold text-sm">
             {language === 'zh' ? '目标格式管理' : 'Format Manager'}
