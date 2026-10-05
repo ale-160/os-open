@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart, ArrowLeftRight, Film } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart, ArrowLeftRight, Film, Images, ClipboardCopy } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage, zhStrings, enStrings } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
@@ -18,6 +18,7 @@ import { AdjustPanel } from '@/components/features/CompressPanel';
 import { WatermarkPanel } from '@/components/features/WatermarkPanel';
 import { MergePanel } from '@/components/features/MergePanel';
 import { downloadFile, formatFileSize } from '@/utils/file';
+import { saveAsset, setClipboardItem } from '@/utils/osAssets';
 import { isPdfFile } from '@/utils/pdfToImage';
 import { normalizeImageFiles } from '@/utils/heicDecode';
 import type { ToolTab } from '@/data/presets';
@@ -180,6 +181,50 @@ export default function MainPage({ lang }: MainPageProps) {
     downloadFile(previewImage.url, baseName);
     toast.success(t('download'));
   }, [previewImage, t]);
+
+  // ===== Ale OS 系统资产：把当前预览图存入系统图库 / 复制到系统剪贴板 =====
+  const toPersistableDataUrl = useCallback(async (): Promise<string | null> => {
+    if (!previewImage) return null;
+    // blob: URL 只在创建它的文档内有效，先转成可持久化的 dataURL
+    let dataUrl = previewImage.url;
+    if (dataUrl.startsWith('blob:')) {
+      try {
+        const blob = await (await fetch(dataUrl)).blob();
+        dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(reader.error);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return null;
+      }
+    }
+    if (getDataUrlSize(dataUrl) > 2 * 1024 * 1024) {
+      return null;
+    }
+    return dataUrl;
+  }, [previewImage]);
+
+  const handleSaveToGallery = useCallback(async () => {
+    const dataUrl = await toPersistableDataUrl();
+    if (!dataUrl) {
+      toast.error(t('sendTooLarge'));
+      return;
+    }
+    await saveAsset({ name: previewImage?.name ?? 'image', dataUrl });
+    toast.success(t('savedToGallery'));
+  }, [toPersistableDataUrl, previewImage, t]);
+
+  const handleCopyToSystemClipboard = useCallback(async () => {
+    const dataUrl = await toPersistableDataUrl();
+    if (!dataUrl) {
+      toast.error(t('sendTooLarge'));
+      return;
+    }
+    await setClipboardItem({ type: 'image', dataUrl, name: previewImage?.name ?? 'image' });
+    toast.success(t('copiedToClipboard'));
+  }, [toPersistableDataUrl, previewImage, t]);
 
   const handleApply = useCallback((imageData: string, width: number, height: number) => {
     updatePreview(imageData, width, height);
@@ -667,6 +712,24 @@ export default function MainPage({ lang }: MainPageProps) {
                         >
                           <RotateCcw className="w-4 h-4" />
                           {t('reset')}
+                        </button>
+                        <button
+                          onClick={handleSaveToGallery}
+                          disabled={!hasImages}
+                          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
+                          title={t('saveToGallery')}
+                        >
+                          <Images className="w-4 h-4" />
+                          <span>{t('saveToGallery')}</span>
+                        </button>
+                        <button
+                          onClick={handleCopyToSystemClipboard}
+                          disabled={!hasImages}
+                          className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
+                          title={t('copyToClipboard')}
+                        >
+                          <ClipboardCopy className="w-4 h-4" />
+                          <span>{t('copyToClipboard')}</span>
                         </button>
                         <button
                           onClick={handleDownload}

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Moon, Sun, Download, Copy, History, HelpCircle, Globe, Split, Edit, Eye, Maximize, Minimize, Heart, Menu, X, Focus, FileText, FolderUp, FolderOpen, PanelLeftClose, PanelLeftOpen, type LucideIcon } from 'lucide-react';
+import { Moon, Sun, Download, Copy, History, HelpCircle, Globe, Split, Edit, Eye, Maximize, Minimize, Heart, Menu, X, Focus, FileText, FolderUp, FolderOpen, PanelLeftClose, PanelLeftOpen, ImagePlus, type LucideIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
@@ -14,6 +14,7 @@ import { MarkdownEditor } from '@/components/MarkdownEditor';
 import { MarkdownPreview } from '@/components/MarkdownPreview';
 import { getDefaultContent } from '@/data/defaultContent';
 import { getStrings } from '@/data/i18n';
+import { GalleryPickerModal } from '@/components/ui/GalleryPickerModal';
 import {
   Doc,
   HistoryEntry,
@@ -118,6 +119,7 @@ export default function MainPage({ lang }: MainPageProps) {
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showGalleryPicker, setShowGalleryPicker] = useState(false);
   const [showExport, setShowExport] = useState(false);
   const [showRename, setShowRename] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -274,6 +276,21 @@ export default function MainPage({ lang }: MainPageProps) {
       }, 1500);
     },
     [currentDocId, flushSave]
+  );
+
+  // ===== Ale OS 系统资产：从系统图库 / 系统剪贴板插入图片到当前文档 =====
+  const handleInsertFromGallery = useCallback(
+    (dataUrl: string, name: string) => {
+      const safeName = name.replace(/[[\]]/g, '');
+      const markdownImage = `![${safeName}](${dataUrl})`;
+      const next = contentRef.current
+        ? `${contentRef.current}\n\n${markdownImage}\n`
+        : `${markdownImage}\n`;
+      handleContentChange(next);
+      setShowGalleryPicker(false);
+      toast.success(t.imageInserted);
+    },
+    [handleContentChange, t.imageInserted]
   );
 
   // 切换文档
@@ -822,6 +839,14 @@ export default function MainPage({ lang }: MainPageProps) {
                 <History className="w-5 h-5" />
               </button>
               <button
+                onClick={() => setShowGalleryPicker(true)}
+                className="p-2 rounded-lg hover:bg-muted transition-colors"
+                title={t.insertImage}
+                aria-label={t.insertImage}
+              >
+                <ImagePlus className="w-5 h-5" />
+              </button>
+              <button
                 onClick={handleCopy}
                 className="p-2 rounded-lg hover:bg-muted transition-colors"
                 title={t.copy}
@@ -982,6 +1007,11 @@ export default function MainPage({ lang }: MainPageProps) {
         )}
       </div>
 
+      <GalleryPickerModal
+        isOpen={showGalleryPicker}
+        onClose={() => setShowGalleryPicker(false)}
+        onInsert={handleInsertFromGallery}
+      />
       <HistoryModal
         isOpen={showHistory}
         onClose={() => setShowHistory(false)}

@@ -53,6 +53,11 @@ export interface Translations {
   undo: string;
   redo: string;
   download: string;
+  saveToGallery: string;
+  savedToGallery: string;
+  copyToClipboard: string;
+  copiedToClipboard: string;
+  sendTooLarge: string;
   downloadAll: string;
   clearAll: string;
   processing: string;
@@ -194,6 +199,11 @@ export const zhStrings: Record<keyof Translations, string> = {
   undo: '撤回',
   redo: '重做',
   download: '下载',
+  saveToGallery: '保存到图库',
+  savedToGallery: '已保存到系统图库',
+  copyToClipboard: '复制到系统剪贴板',
+  copiedToClipboard: '已复制到系统剪贴板',
+  sendTooLarge: '图片过大（超过 2MB），请压缩后再试',
   downloadAll: '批量下载',
   clearAll: '清空',
   processing: '处理中...',
@@ -335,6 +345,11 @@ export const enStrings: Record<keyof Translations, string> = {
   undo: 'Undo',
   redo: 'Redo',
   download: 'Download',
+  saveToGallery: 'Save to gallery',
+  savedToGallery: 'Saved to system gallery',
+  copyToClipboard: 'Copy to system clipboard',
+  copiedToClipboard: 'Copied to system clipboard',
+  sendTooLarge: 'Image too large (over 2MB), compress it first',
   downloadAll: 'Batch Download',
   clearAll: 'Clear',
   processing: 'Processing...',

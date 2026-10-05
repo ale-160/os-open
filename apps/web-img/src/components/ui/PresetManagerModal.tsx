@@ -610,7 +610,7 @@ export function PresetManagerModal({ isOpen, onClose, presets, onPresetsChange }
 
   return (
     <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-card border border-border rounded-xl shadow-xl w-full max-w-xl max-h-[88vh] overflow-hidden flex flex-col">
+      <div className="glass-strong rounded-2xl shadow-2xl w-full max-w-xl max-h-[88vh] overflow-hidden flex flex-col">
         {/* 标题栏 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
           <h3 className="font-semibold text-sm">

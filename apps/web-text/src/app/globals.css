@@ -362,3 +362,21 @@
 .dark .hljs-meta-string {
   color: #8b949e !important;
 }
+
+/* ============================================================
+   Ale OS 毛玻璃统一风格（与桌面壳共用同一套 token）
+   ============================================================ */
+
+.glass {
+  background: color-mix(in oklab, var(--background) 72%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+}
+
+.glass-strong {
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+}

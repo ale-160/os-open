@@ -50,7 +50,7 @@ export const ExportModal = ({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <div className="bg-card rounded-xl shadow-xl max-w-md w-full">
+      <div className="glass-strong rounded-2xl shadow-2xl max-w-md w-full">
         <div className="flex items-center justify-between p-4 border-b border-border">
           <h3 className="font-semibold">{t.exportFile}</h3>
           <button
