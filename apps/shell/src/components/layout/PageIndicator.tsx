@@ -21,7 +21,7 @@ export function PageIndicator({ pages, currentPageIndex, onPageChange, language 
   }
 
   return (
-    <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-40 flex gap-2 bg-background/80 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
+    <div className="glass fixed bottom-20 left-1/2 transform -translate-x-1/2 z-40 flex gap-2 px-4 py-2 rounded-full shadow-lg">
       {pages.map((page, index) => (
         <button
           key={page.id}

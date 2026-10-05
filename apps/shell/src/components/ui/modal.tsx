@@ -41,7 +41,7 @@ export function Modal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={`${sizeClasses[size]} bg-card`} showCloseButton={!hideCloseButton}>
+      <DialogContent className={`${sizeClasses[size]} glass-strong rounded-2xl`} showCloseButton={!hideCloseButton}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description ? (

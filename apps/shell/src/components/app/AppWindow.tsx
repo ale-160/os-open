@@ -229,7 +229,7 @@ function AppWindowView({
       {!activeApp && runningApps.length > 0 && (
         <div
           data-os-dock
-          className="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2.5 rounded-2xl border border-border/60 bg-background/85 p-2.5 shadow-xl backdrop-blur"
+          className="glass fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2.5 rounded-2xl p-2.5 shadow-xl"
         >
           {runningApps.map(app => (
             <div key={app.id} className="group relative">

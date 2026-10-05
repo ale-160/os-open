@@ -188,3 +188,45 @@ body {
 .dark [data-folder-item][data-over]:not([data-drop-target]):not([data-ready-to-drop]) {
   background-color: rgb(30 58 138 / 0.2); /* blue-900/20 */
 }
+/* ============================================================
+   Ale OS 毛玻璃统一风格
+   ============================================================ */
+
+/* 标准毛玻璃层：顶栏 / 底栏 / dock / 浮层统一使用 */
+.glass {
+  background: color-mix(in oklab, var(--background) 72%, transparent);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid color-mix(in oklab, var(--border) 55%, transparent);
+}
+
+/* 强毛玻璃层：模态弹窗等内容面板 */
+.glass-strong {
+  background: color-mix(in oklab, var(--background) 88%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+  backdrop-filter: blur(28px) saturate(180%);
+  border: 1px solid color-mix(in oklab, var(--border) 65%, transparent);
+}
+
+/* 桌面默认渐变底：无壁纸时也有一颗柔和的极光渐变，让毛玻璃可感知 */
+.os-desktop-bg {
+  background:
+    radial-gradient(1100px 700px at 12% -5%, oklch(0.93 0.055 255 / 0.55), transparent 60%),
+    radial-gradient(900px 650px at 92% 100%, oklch(0.94 0.06 330 / 0.4), transparent 55%),
+    radial-gradient(700px 500px at 75% 15%, oklch(0.95 0.05 180 / 0.35), transparent 55%),
+    var(--background);
+}
+
+.dark .os-desktop-bg {
+  background:
+    radial-gradient(1100px 700px at 12% -5%, oklch(0.32 0.09 265 / 0.45), transparent 60%),
+    radial-gradient(900px 650px at 92% 100%, oklch(0.3 0.08 320 / 0.38), transparent 55%),
+    radial-gradient(700px 500px at 75% 15%, oklch(0.28 0.06 185 / 0.3), transparent 55%),
+    var(--background);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .os-desktop-bg {
+    background-attachment: initial;
+  }
+}

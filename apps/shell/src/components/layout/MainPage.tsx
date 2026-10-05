@@ -14,7 +14,8 @@ import { ThemeToggleIcon } from '@/components/ui/theme-toggle-icon';
 import { extractDomain, generateFaviconCandidates } from '@/utils/url';
 import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
-import { AppWindowProvider } from '@/components/app/AppWindow';
+import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
+import { OS_LANGUAGE_KEY } from '@/config/apps';
 import { HelpCircle, Globe, Heart } from 'lucide-react';
 
 // 懒加载模态框组件（仅在需要时加载）
@@ -125,6 +126,33 @@ export default function MainPage({ lang }: MainPageProps) {
         language: newLanguage
       }
     });
+  }, [activeConfig.theme, handleConfigUpdate]);
+
+  // ===== 统一语言管理：壳与内嵌应用共享 ale-os-language =====
+  const { runningApps } = useAppWindow();
+
+  // 壳的语言变更写入共享键，内嵌应用通过 storage 事件实时跟随
+  useEffect(() => {
+    try {
+      localStorage.setItem(OS_LANGUAGE_KEY, activeConfig.theme.language);
+    } catch {
+      // 隐私模式等场景下写入失败可忽略
+    }
+  }, [activeConfig.theme.language]);
+
+  // 应用内切换语言时，壳通过 storage 事件反向跟随
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== OS_LANGUAGE_KEY || !event.newValue) return;
+      const lang = event.newValue;
+      if (lang !== 'zh' && lang !== 'en') return;
+      if (lang === activeConfig.theme.language) return;
+      handleConfigUpdate({
+        theme: { ...activeConfig.theme, language: lang }
+      });
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, [activeConfig.theme, handleConfigUpdate]);
 
   // 使用图标和文件夹管理 Hook（Service 层）
@@ -308,17 +336,17 @@ export default function MainPage({ lang }: MainPageProps) {
       ))}
 
       <div
-        className="h-screen overflow-hidden flex flex-col"
+        className={`h-screen overflow-hidden flex flex-col ${activeConfig.theme.wallpaperUrl ? '' : 'os-desktop-bg'}`}
         style={{
           background: activeConfig.theme.wallpaperUrl
             ? activeConfig.theme.wallpaperUrl.startsWith('linear-gradient')
               ? activeConfig.theme.wallpaperUrl
               : `url(${activeConfig.theme.wallpaperUrl}) center/cover fixed`
-            : 'var(--bg-primary)'
+            : undefined
         }}
       >
-      {/* 顶部栏 */}
-            <header className={`border-b border-gray-200 dark:border-border sticky top-0 z-40 shrink-0 ${activeConfig.theme.wallpaperUrl ? 'bg-background/80 backdrop-blur-sm' : 'bg-(--bg-secondary)'}`}>
+      {/* 顶部栏（毛玻璃） */}
+            <header className="glass border-b sticky top-0 z-40 shrink-0 rounded-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center h-16 gap-2 md:gap-4">
             {/* 左侧：Logo */}
@@ -398,7 +426,7 @@ export default function MainPage({ lang }: MainPageProps) {
       </header>
 
       {/* 主体区域 - 内部滚动 */}
-      <main className="flex-1 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto animate-in fade-in duration-700 motion-reduce:animate-none">
         {isMounted ? (
           <PageContainer
               icons={activeConfig.icons}
@@ -481,8 +509,10 @@ export default function MainPage({ lang }: MainPageProps) {
         language={activeConfig.theme.language}
       />
 
-      {/* 页脚 */}
-      <footer className="shrink-0 flex items-center justify-center gap-4 px-4 py-2 border-t border-gray-200 dark:border-border bg-background/50 text-xs text-muted-foreground">
+      {/* 页脚（毛玻璃；dock 出现时为其让位） */}
+      <footer
+        className={`glass border-t rounded-none shrink-0 flex items-center justify-center gap-4 px-4 py-2 text-xs text-muted-foreground transition-[margin] ${runningApps.length > 0 ? 'mb-[76px]' : ''}`}
+      >
         <a
           href="https://github.com/ale-160/os-open"
           target="_blank"
