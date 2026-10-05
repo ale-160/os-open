@@ -15,8 +15,9 @@ import { extractDomain, generateFaviconCandidates } from '@/utils/url';
 import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
 import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
-import { OS_LANGUAGE_KEY } from '@/config/apps';
-import { HelpCircle, Globe, Heart } from 'lucide-react';
+import { AppStoreModal } from '@/components/app/AppStoreModal';
+import { OS_LANGUAGE_KEY, type OsApp } from '@/config/apps';
+import { HelpCircle, Globe, Heart, Store } from 'lucide-react';
 
 // 懒加载模态框组件（仅在需要时加载）
 const SettingsModal = dynamic(
@@ -129,7 +130,7 @@ export default function MainPage({ lang }: MainPageProps) {
   }, [activeConfig.theme, handleConfigUpdate]);
 
   // ===== 统一语言管理：壳与内嵌应用共享 ale-os-language =====
-  const { runningApps } = useAppWindow();
+  const { runningApps, killApp } = useAppWindow();
 
   // 壳的语言变更写入共享键，内嵌应用通过 storage 事件实时跟随
   useEffect(() => {
@@ -173,6 +174,7 @@ export default function MainPage({ lang }: MainPageProps) {
   const [addModalFolderId, setAddModalFolderId] = useState<string | undefined>(undefined);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [editItem, setEditItem] = useState<IconItem | null>(null);
 
@@ -184,6 +186,27 @@ export default function MainPage({ lang }: MainPageProps) {
     searchedFolderIds,
     filteredPageIconIds
   } = useSearch({ config: activeConfig, currentPageIndex });
+
+  /**
+   * 应用商城：从注册表添加/移除桌面应用图标
+   */
+  const handleStoreAdd = useCallback((app: OsApp) => {
+    addIconWithPage({
+      name: activeConfig.theme.language === 'zh' ? app.name : app.nameEn,
+      url: `app://${app.id}`,
+      iconType: 'custom',
+      customIconUrl: app.icon
+    }, currentPageIndex);
+  }, [activeConfig.theme.language, addIconWithPage, currentPageIndex]);
+
+  const handleStoreRemove = useCallback((app: OsApp) => {
+    const icon = activeConfig.icons.find(item => item.url === `app://${app.id}`);
+    if (icon) {
+      deleteIcon(icon.id);
+    }
+    // 若应用正在运行，一并卸载其窗口
+    killApp(app.id);
+  }, [activeConfig.icons, deleteIcon, killApp]);
 
   /**
    * 处理添加项目提交（由 AddItemModal 调用）
@@ -407,6 +430,17 @@ export default function MainPage({ lang }: MainPageProps) {
                 <ThemeToggleIcon />
               </Button>
 
+              {/* 应用商城按钮 */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsStoreModalOpen(true)}
+                title={S.appStore}
+                className="shrink-0 w-8 h-8 sm:w-9 sm:h-9"
+              >
+                <Store className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Button>
+
               {/* 设置按钮 */}
               <Button
                 variant="ghost"
@@ -489,6 +523,16 @@ export default function MainPage({ lang }: MainPageProps) {
         onSubmit={handleEditItemSubmit}
         item={editItem}
         language={activeConfig.theme.language || lang}
+      />
+
+      {/* 应用商城 */}
+      <AppStoreModal
+        isOpen={isStoreModalOpen}
+        onClose={() => setIsStoreModalOpen(false)}
+        language={activeConfig.theme.language}
+        installedUrls={activeConfig.icons.map(icon => icon.url)}
+        onAdd={handleStoreAdd}
+        onRemove={handleStoreRemove}
       />
 
       {/* 设置面板 */}

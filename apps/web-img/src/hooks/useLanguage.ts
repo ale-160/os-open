@@ -57,7 +57,8 @@ export interface Translations {
   savedToGallery: string;
   copyToClipboard: string;
   copiedToClipboard: string;
-  sendTooLarge: string;
+  saveFailed: string;
+  storageFull: string;
   downloadAll: string;
   clearAll: string;
   processing: string;
@@ -203,7 +204,8 @@ export const zhStrings: Record<keyof Translations, string> = {
   savedToGallery: '已保存到系统图库',
   copyToClipboard: '复制到系统剪贴板',
   copiedToClipboard: '已复制到系统剪贴板',
-  sendTooLarge: '图片过大（超过 2MB），请压缩后再试',
+  saveFailed: '保存失败，请重试',
+  storageFull: '浏览器存储空间不足，请在图库中清理后重试',
   downloadAll: '批量下载',
   clearAll: '清空',
   processing: '处理中...',
@@ -349,7 +351,8 @@ export const enStrings: Record<keyof Translations, string> = {
   savedToGallery: 'Saved to system gallery',
   copyToClipboard: 'Copy to system clipboard',
   copiedToClipboard: 'Copied to system clipboard',
-  sendTooLarge: 'Image too large (over 2MB), compress it first',
+  saveFailed: 'Save failed, please retry',
+  storageFull: 'Browser storage is full — clean up the gallery and retry',
   downloadAll: 'Batch Download',
   clearAll: 'Clear',
   processing: 'Processing...',

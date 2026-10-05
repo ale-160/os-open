@@ -98,6 +98,13 @@ export const STRINGS_ZH = {
   apps: '应用',
   
   // 设置面板
+  appStore: '应用商城',
+  storeAdd: '添加',
+  storeRemove: '移除',
+  storeInstalledTag: '已添加',
+  storeMoreComing: '更多应用即将上架——欢迎开源作者接入',
+
+  // 设置面板
   settings: '设置',
   appearance: '外观',
   search: '搜索',
@@ -454,6 +461,12 @@ export const STRINGS_EN = {
   apps: 'Apps',
   
   // Settings Panel
+  appStore: 'App Store',
+  storeAdd: 'Add',
+  storeRemove: 'Remove',
+  storeInstalledTag: 'Added',
+  storeMoreComing: 'More apps coming soon — open-source authors welcome',
+
   settings: 'Settings',
   appearance: 'Appearance',
   search: 'Search',

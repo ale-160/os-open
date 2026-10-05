@@ -11,8 +11,6 @@ const DB_VERSION = 1;
 const STORE_ASSETS = 'assets';
 const STORE_CLIPBOARD = 'clipboard';
 const CLIPBOARD_KEY = 'current';
-/** 图库容量上限（条数），超出时淘汰最旧的 */
-const MAX_ASSETS = 100;
 
 export interface GalleryAsset {
   id: string;
@@ -55,7 +53,7 @@ function requestToPromise<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
-/** 保存图片到系统图库（超出容量上限时淘汰最旧的） */
+/** 保存图片到系统图库（容量仅受浏览器 IndexedDB 配额限制，不做人为上限） */
 export async function saveAsset(input: { name: string; dataUrl: string }): Promise<GalleryAsset> {
   const db = await openDb();
   const asset: GalleryAsset = {
@@ -66,17 +64,7 @@ export async function saveAsset(input: { name: string; dataUrl: string }): Promi
     createdAt: Date.now()
   };
   const tx = db.transaction(STORE_ASSETS, 'readwrite');
-  const store = tx.objectStore(STORE_ASSETS);
-  store.put(asset);
-  const all = await requestToPromise(store.getAll()) as GalleryAsset[];
-  if (all.length > MAX_ASSETS) {
-    const oldest = all
-      .sort((a, b) => a.createdAt - b.createdAt)
-      .slice(0, all.length - MAX_ASSETS);
-    for (const item of oldest) {
-      store.delete(item.id);
-    }
-  }
+  tx.objectStore(STORE_ASSETS).put(asset);
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
