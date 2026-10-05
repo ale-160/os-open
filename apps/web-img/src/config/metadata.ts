@@ -27,7 +27,7 @@ export const METADATA_ZH = {
   openGraph: {
     title: "web-img · 在线图片处理工具",
     description: "纯前端在线图片处理工具箱，支持压缩、水印、格式转换。所有图片本地处理，保护隐私。",
-    url: "https://web-img.ale160.com/zh/",
+    url: "https://os.ale160.com/img/",
     siteName: "web-img 官方网站",
     locale: "zh_CN",
     type: "website",
@@ -48,12 +48,7 @@ export const METADATA_ZH = {
     creator: "@ale160"
   },
   alternates: {
-    canonical: "https://web-img.ale160.com/zh/",
-    languages: {
-      "en": "https://web-img.ale160.com/",
-      "zh-CN": "https://web-img.ale160.com/zh/",
-      "x-default": "https://web-img.ale160.com/"
-    }
+    canonical: "https://os.ale160.com/img/"
   }
 };
 
@@ -84,7 +79,7 @@ export const METADATA_EN = {
   openGraph: {
     title: "web-img · Online Image Tool",
     description: "A privacy-focused online image toolbox with compression, watermark, and format conversion. All images processed locally.",
-    url: "https://web-img.ale160.com/",
+    url: "https://os.ale160.com/img/",
     siteName: "web-img Official Website",
     locale: "en_US",
     type: "website",
@@ -105,12 +100,7 @@ export const METADATA_EN = {
     creator: "@ale160"
   },
   alternates: {
-    canonical: "https://web-img.ale160.com/",
-    languages: {
-      "en": "https://web-img.ale160.com/",
-      "zh-CN": "https://web-img.ale160.com/zh/",
-      "x-default": "https://web-img.ale160.com/"
-    }
+    canonical: "https://os.ale160.com/img/"
   }
 };
 
@@ -236,7 +226,7 @@ export function getPdfMetadata(lang: string = "en"): Metadata {
       ...base.openGraph,
       title: pdfMeta.title,
       description: pdfMeta.description,
-      url: lang === "en" ? "https://web-img.ale160.com/pdf/" : "https://web-img.ale160.com/zh/pdf/",
+      url: lang === "en" ? "https://os.ale160.com/img/pdf/" : "https://os.ale160.com/img/pdf/",
       locale: lang === "en" ? "en_US" : "zh_CN",
     },
     twitter: {
@@ -252,11 +242,7 @@ export function getPdfMetadata(lang: string = "en"): Metadata {
       "max-video-preview": -1,
     },
     alternates: {
-      canonical: lang === "en" ? "https://web-img.ale160.com/pdf/" : "https://web-img.ale160.com/zh/pdf/",
-      languages: {
-        "en": "https://web-img.ale160.com/pdf/",
-        "zh-CN": "https://web-img.ale160.com/zh/pdf/",
-      },
+      canonical: lang === "en" ? "https://os.ale160.com/img/pdf/" : "https://os.ale160.com/img/pdf/",
     },
   };
 }
@@ -264,7 +250,7 @@ export function getPdfMetadata(lang: string = "en"): Metadata {
 export function getConvertMetadata(lang: string = "en"): Metadata {
   const convertMeta = lang === "en" ? CONVERT_METADATA_EN : CONVERT_METADATA_ZH;
   const base = lang === "en" ? METADATA_EN : METADATA_ZH;
-  const url = lang === "en" ? "https://web-img.ale160.com/convert/" : "https://web-img.ale160.com/zh/convert/";
+  const url = lang === "en" ? "https://os.ale160.com/img/convert/" : "https://os.ale160.com/img/convert/";
 
   return {
     title: convertMeta.title,
@@ -301,10 +287,6 @@ export function getConvertMetadata(lang: string = "en"): Metadata {
     },
     alternates: {
       canonical: url,
-      languages: {
-        "en": "https://web-img.ale160.com/convert/",
-        "zh-CN": "https://web-img.ale160.com/zh/convert/",
-      },
     },
   };
 }
@@ -321,7 +303,7 @@ export function getGifMakerMetadata(lang: string = "en"): Metadata {
     ? ["GIF合成", "GIF动画制作", "图片转GIF", "GIF生成器", "动图制作", "在线GIF工具", "web-img"]
     : ["GIF maker", "animated GIF", "image to GIF", "GIF generator", "online GIF tool", "web-img"];
   const base = lang === "en" ? METADATA_EN : METADATA_ZH;
-  const url = isZh ? "https://web-img.ale160.com/zh/gif/" : "https://web-img.ale160.com/gif/";
+  const url = isZh ? "https://os.ale160.com/img/gif/" : "https://os.ale160.com/img/gif/";
 
   return {
     title,
@@ -349,10 +331,6 @@ export function getGifMakerMetadata(lang: string = "en"): Metadata {
     },
     alternates: {
       canonical: url,
-      languages: {
-        "en": "https://web-img.ale160.com/gif/",
-        "zh-CN": "https://web-img.ale160.com/zh/gif/",
-      },
     },
   };
 }

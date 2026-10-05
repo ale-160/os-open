@@ -5,7 +5,7 @@
  *   apps/web-text/out  → out/text/     （Markdown 编辑器，/text/）
  * 并写入 GitHub Pages 所需的 .nojekyll 与 CNAME。
  */
-import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +31,4 @@ for (const [src, dest] of parts) {
   console.log(`已合入 ${src} → out/${dest === '.' ? '' : dest + '/'}`);
 }
 
-writeFileSync(path.join(outDir, '.nojekyll'), '');
-writeFileSync(path.join(outDir, 'CNAME'), 'os.ale160.com\n');
 console.log('compose 完成 → out/');

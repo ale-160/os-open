@@ -30,7 +30,7 @@ export const WEBSITE_DATA_ZH = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "web-img",
-  url: "https://web-img.ale160.com",
+  url: "https://os.ale160.com/img",
   description: "纯前端在线图片处理工具箱，支持压缩、水印、格式转换",
   author: {
     "@type": "Person",
@@ -38,7 +38,7 @@ export const WEBSITE_DATA_ZH = {
   },
   potentialAction: {
     "@type": "SearchAction",
-    target: "https://web-img.ale160.com?q={search_term_string}",
+    target: "https://os.ale160.com/img?q={search_term_string}",
     "query-input": "required name=search_term_string"
   }
 };
@@ -47,7 +47,7 @@ export const WEBSITE_DATA_EN = {
   "@context": "https://schema.org",
   "@type": "WebSite",
   name: "web-img",
-  url: "https://web-img.ale160.com",
+  url: "https://os.ale160.com/img",
   description: "A privacy-focused online image toolbox with compression, watermark, and format conversion",
   author: {
     "@type": "Person",
@@ -55,7 +55,7 @@ export const WEBSITE_DATA_EN = {
   },
   potentialAction: {
     "@type": "SearchAction",
-    target: "https://web-img.ale160.com?q={search_term_string}",
+    target: "https://os.ale160.com/img?q={search_term_string}",
     "query-input": "required name=search_term_string"
   }
 };
@@ -65,7 +65,7 @@ export const WEBAPP_DATA_ZH = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "web-img",
-  url: "https://web-img.ale160.com",
+  url: "https://os.ale160.com/img",
   description: "纯前端在线图片处理工具箱，支持图片压缩、格式转换、水印、裁剪、旋转等功能",
   applicationCategory: "MultimediaApplication",
   operatingSystem: "Web",
@@ -85,7 +85,7 @@ export const WEBAPP_DATA_EN = {
   "@context": "https://schema.org",
   "@type": "WebApplication",
   name: "web-img",
-  url: "https://web-img.ale160.com",
+  url: "https://os.ale160.com/img",
   description: "A privacy-focused online image toolbox with compression, format conversion, watermark, crop, and rotation",
   applicationCategory: "MultimediaApplication",
   operatingSystem: "Web",
