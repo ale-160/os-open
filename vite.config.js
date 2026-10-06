@@ -2,8 +2,12 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
+// APP_BASE_PATH：作为 Ale OS 子应用嵌入时的部署子路径（如 /chat）
+const APP_BASE_PATH = process.env.APP_BASE_PATH || '/'
+
 // https://vite.dev/config/
 export default defineConfig({
+  base: APP_BASE_PATH,
   plugins: [vue()],
   resolve: {
     alias: {
@@ -28,6 +32,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2020',
-    sourcemap: false
+    sourcemap: false,
+    outDir: 'out'
   }
 })
