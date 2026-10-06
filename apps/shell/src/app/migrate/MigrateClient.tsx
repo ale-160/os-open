@@ -32,6 +32,13 @@ const APP_REWRITES = [
   { host: 'web-text.ale160.com', appId: 'web-text' as const, icon: '/apps/web-text.png', name: 'Markdown 编辑器' }
 ];
 
+/** 迁移后应确保出现在桌面的系统应用 */
+const ENSURE_APPS = [
+  ...APP_REWRITES,
+  { appId: 'nchat' as const, icon: '/apps/nchat.png', name: 'P2P 聊天室' },
+  { appId: 'gallery' as const, icon: '/apps/gallery.png', name: '系统图库' }
+];
+
 /**
  * 把 hub-nav 旧配置中的应用外链改写为 app:// 原生应用图标，
  * 并确保注册过的系统应用都出现在桌面（旧配置可能缺应用图标）。
@@ -55,7 +62,7 @@ function rewriteHubNavConfig(raw: string): { config: string; rewritten: number }
         rewritten += 1;
       }
     }
-    for (const r of APP_REWRITES) {
+    for (const r of ENSURE_APPS) {
       const appUrl = `app://${r.appId}`;
       if ((config.icons ?? []).some(i => i.url === appUrl)) continue;
       const id = `icon-app-${r.appId}-${Date.now()}`;

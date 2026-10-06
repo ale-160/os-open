@@ -16,6 +16,7 @@ import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
 import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
 import { AppStoreModal } from '@/components/app/AppStoreModal';
+import { BootSplash } from '@/components/layout/BootSplash';
 import { OS_LANGUAGE_KEY, type OsApp } from '@/config/apps';
 import { HelpCircle, Globe, Heart, Store } from 'lucide-react';
 
