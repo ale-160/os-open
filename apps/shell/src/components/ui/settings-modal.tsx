@@ -47,13 +47,20 @@ interface SettingsModalProps {
  */
 const WALLPAPERS = [
   { id: 'none', name: '', url: '' },
-  { id: 'gradient1', name: '', url: 'linear-gradient(to bottom, #667eea 0%, #764ba2 100%)' },
-  { id: 'gradient2', name: '', url: 'linear-gradient(to bottom, #a78bfa 0%, #7c3aed 100%)' },
-  { id: 'gradient3', name: '', url: 'linear-gradient(to bottom, #fbbf24 0%, #f59e0b 100%)' },
-  { id: 'gradient4', name: '', url: 'linear-gradient(to bottom, #10b981 0%, #059669 100%)' },
-  { id: 'unsplash1', name: '', url: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800' },
-  { id: 'unsplash2', name: '', url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800' },
-  { id: 'unsplash3', name: '', url: 'https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=800' }
+  { id: 'aurora', name: '极光黎明 · Aurora Dawn', url: 'radial-gradient(at 15% 15%, #93c5fd 0px, transparent 55%), radial-gradient(at 85% 10%, #c4b5fd 0px, transparent 50%), radial-gradient(at 80% 90%, #f9a8d4 0px, transparent 55%), linear-gradient(to bottom, #eef2ff, #e0e7ff)' },
+  { id: 'dusk', name: '暮光紫 · Dusk Purple', url: 'radial-gradient(at 30% 20%, #c084fc 0px, transparent 55%), radial-gradient(at 75% 80%, #818cf8 0px, transparent 55%), linear-gradient(to bottom, #6d28d9, #4c1d95)' },
+  { id: 'amber', name: '琥珀日落 · Amber Sunset', url: 'radial-gradient(at 70% 15%, #fcd34d 0px, transparent 55%), radial-gradient(at 20% 85%, #fb923c 0px, transparent 55%), linear-gradient(to bottom, #f59e0b, #b45309)' },
+  { id: 'emerald', name: '翡翠晨雾 · Emerald Mist', url: 'radial-gradient(at 25% 25%, #6ee7b7 0px, transparent 55%), radial-gradient(at 80% 75%, #34d399 0px, transparent 50%), linear-gradient(to bottom, #ecfdf5, #d1fae5)' },
+  { id: 'deepsea', name: '深海 · Deep Sea', url: 'radial-gradient(at 20% 20%, #1e40af 0px, transparent 55%), radial-gradient(at 80% 80%, #0e7490 0px, transparent 55%), linear-gradient(to bottom, #0f172a, #020617)' },
+  { id: 'sakura', name: '樱粉云 · Sakura Cloud', url: 'radial-gradient(at 20% 20%, #fbcfe8 0px, transparent 55%), radial-gradient(at 80% 30%, #fda4af 0px, transparent 50%), linear-gradient(to bottom, #fff1f2, #fce7f3)' },
+  { id: 'graphite', name: '石墨星夜 · Graphite Night', url: 'radial-gradient(at 75% 15%, #334155 0px, transparent 55%), radial-gradient(at 20% 85%, #1e293b 0px, transparent 55%), linear-gradient(to bottom, #0f172a, #1e293b)' },
+  { id: 'peach', name: '蜜桃奶油 · Peach Cream', url: 'radial-gradient(at 25% 20%, #fecaca 0px, transparent 55%), radial-gradient(at 80% 80%, #fed7aa 0px, transparent 50%), linear-gradient(to bottom, #fff7ed, #ffedd5)' },
+  { id: 'polar', name: '极地蓝 · Polar Blue', url: 'radial-gradient(at 20% 20%, #7dd3fc 0px, transparent 55%), radial-gradient(at 85% 85%, #38bdf8 0px, transparent 50%), linear-gradient(to bottom, #f0f9ff, #e0f2fe)' },
+  { id: 'rosegold', name: '玫瑰金 · Rose Gold', url: 'radial-gradient(at 30% 20%, #fda4af 0px, transparent 55%), radial-gradient(at 75% 85%, #fbbf24 0px, transparent 50%), linear-gradient(to bottom, #fda4af, #be185d)' },
+  { id: 'lime', name: '青柠汽水 · Lime Soda', url: 'radial-gradient(at 20% 25%, #bef264 0px, transparent 55%), radial-gradient(at 85% 75%, #a3e635 0px, transparent 50%), linear-gradient(to bottom, #f7fee7, #ecfccb)' },
+  { id: 'unsplash1', name: '自然风光 · Nature', url: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=800' },
+  { id: 'unsplash2', name: '城市夜景 · City Night', url: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?w=800' },
+  { id: 'unsplash3', name: '抽象艺术 · Abstract', url: 'https://images.unsplash.com/photo-1550684376-efcbd6e3f031?w=800' }
 ];
 
 /**
@@ -599,14 +606,7 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
                           ? `url(${wallpaper.url}) center/cover`
                           : 'transparent'
                       }}
-                      title={wallpaper.id === 'none' ? STRINGS.noWallpaper :
-                             wallpaper.id === 'gradient1' ? STRINGS.gradientBlue :
-                             wallpaper.id === 'gradient2' ? STRINGS.gradientPurple :
-                             wallpaper.id === 'gradient3' ? STRINGS.gradientOrange :
-                             wallpaper.id === 'gradient4' ? STRINGS.gradientGreen :
-                             wallpaper.id === 'unsplash1' ? STRINGS.naturalLandscape :
-                             wallpaper.id === 'unsplash2' ? STRINGS.cityNight :
-                             STRINGS.abstractArt}
+                      title={wallpaper.id === 'none' ? STRINGS.noWallpaper : wallpaper.name}
                     >
                       {wallpaper.id === 'none' && (
                         <div className="w-full h-full flex items-center justify-center text-muted-foreground">

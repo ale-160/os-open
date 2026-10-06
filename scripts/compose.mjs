@@ -15,7 +15,8 @@ const outDir = path.join(rootDir, 'out');
 const parts = [
   ['apps/shell/out', '.'],
   ['apps/web-img/out', 'img'],
-  ['apps/web-text/out', 'text']
+  ['apps/web-text/out', 'text'],
+  ['apps/nchat/out', 'chat']
 ];
 
 rmSync(outDir, { recursive: true, force: true });

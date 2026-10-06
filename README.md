@@ -2,6 +2,13 @@
 
 > 一个站点，多个应用。OS 式桌面作壳，工具以 App 图标嵌入——像手机主屏一样点击打开。
 
+![Ale OS 桌面](docs/screenshot-desktop.png)
+
+<details>
+<summary>应用窗口（多任务）</summary>
+<img src="docs/screenshot-app.png" alt="Ale OS 应用窗口" width="800" />
+</details>
+
 线上：**[os.ale160.com](https://os.ale160.com)**（Cloudflare Pages）
 
 ## 系统能力

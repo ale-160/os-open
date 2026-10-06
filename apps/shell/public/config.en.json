@@ -39,6 +39,26 @@
       "isHidden": false,
       "iconType": "custom",
       "customIconUrl": "/apps/web-text.png"
+    },
+    {
+      "id": "icon-app-nchat",
+      "name": "P2P Chat",
+      "url": "app://nchat",
+      "folderId": null,
+      "order": 3,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/nchat.png"
+    },
+    {
+      "id": "icon-app-gallery",
+      "name": "Gallery",
+      "url": "app://gallery",
+      "folderId": null,
+      "order": 4,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/gallery.png"
     }
   ],
   "folders": [],
@@ -46,7 +66,13 @@
     {
       "id": "page-1",
       "name": "Home",
-      "iconIds": ["icon-ale160", "icon-app-web-img", "icon-app-web-text"]
+      "iconIds": [
+        "icon-ale160",
+        "icon-app-web-img",
+        "icon-app-web-text",
+        "icon-app-nchat",
+        "icon-app-gallery"
+      ]
     },
     {
       "id": "page-2",
@@ -54,7 +80,13 @@
       "iconIds": []
     }
   ],
-  "rootOrder": ["icon-ale160", "icon-app-web-img", "icon-app-web-text"],
+  "rootOrder": [
+    "icon-ale160",
+    "icon-app-web-img",
+    "icon-app-web-text",
+    "icon-app-nchat",
+    "icon-app-gallery"
+  ],
   "version": "0.1.8",
   "searchEngine": "https://www.bing.com/search?q=",
   "operationMode": {

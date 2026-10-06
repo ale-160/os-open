@@ -43,6 +43,26 @@ export const OS_APPS: readonly OsApp[] = [
     repository: 'https://github.com/ale-160/web-img'
   },
   {
+    id: 'gallery',
+    name: '系统图库',
+    nameEn: 'Gallery',
+    path: '/gallery/',
+    icon: '/apps/gallery.png',
+    description: '浏览和管理系统资产库：预览、下载应用产物，或复制到系统剪贴板',
+    descriptionEn: 'Browse and manage the system asset library: preview, download, copy to clipboard',
+    repository: 'https://github.com/ale-160/os-open'
+  },
+  {
+    id: 'nchat',
+    name: 'P2P 聊天室',
+    nameEn: 'P2P Chat',
+    path: '/chat/',
+    icon: '/apps/nchat.png',
+    description: '去中心化 P2P 聊天室：Ed25519 公钥身份、端到端私聊、文件传输（Beta）',
+    descriptionEn: 'Decentralized P2P chat: Ed25519 identity, E2E DM, file transfer (Beta)',
+    repository: 'https://github.com/ale-160/nchat'
+  },
+  {
     id: 'web-text',
     name: 'Markdown 编辑器',
     nameEn: 'Markdown Editor',
