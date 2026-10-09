@@ -165,14 +165,20 @@ export default function MigrateClient() {
     (idb: { docs?: unknown[]; history?: unknown[] }, overwrite: boolean) => {
       return new Promise<{ written: number; skipped: string | null }>(resolve => {
         try {
-          const request = indexedDB.open('web-text-db', 1);
+          const request = indexedDB.open('web-text-db', 2);
           request.onupgradeneeded = () => {
             const db = request.result;
             if (!db.objectStoreNames.contains('docs')) {
               db.createObjectStore('docs', { keyPath: 'id' });
             }
             if (!db.objectStoreNames.contains('history')) {
-              db.createObjectStore('history', { keyPath: 'id' });
+              const historyStore = db.createObjectStore('history', { keyPath: 'id' });
+              historyStore.createIndex('docId', 'docId', { unique: false });
+            } else {
+              const historyStore = request.transaction!.objectStore('history');
+              if (!historyStore.indexNames.contains('docId')) {
+                historyStore.createIndex('docId', 'docId', { unique: false });
+              }
             }
           };
           request.onerror = () => resolve({ written: 0, skipped: '存储打开失败' });

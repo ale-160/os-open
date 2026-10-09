@@ -43,7 +43,7 @@ export interface BackupData {
 }
 
 const DB_NAME = 'web-text-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_DOCS = 'docs';
 const STORE_HISTORY = 'history';
 
@@ -81,6 +81,12 @@ function openDB(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_HISTORY)) {
         const store = db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
         store.createIndex('docId', 'docId', { unique: false });
+      } else {
+        // v2：修复迁移页早期版本创建的 history store 缺少 docId 索引的问题
+        const store = req.transaction!.objectStore(STORE_HISTORY);
+        if (!store.indexNames.contains('docId')) {
+          store.createIndex('docId', 'docId', { unique: false });
+        }
       }
     };
     req.onsuccess = () => resolve(req.result);
