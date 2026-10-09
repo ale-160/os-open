@@ -352,7 +352,12 @@ export default function MainPage({ lang }: MainPageProps) {
   // 删除文档（连带历史）——先弹应用内确认，确认后执行
   const executeDeleteDoc = useCallback(
     async (doc: Doc) => {
-      await deleteDocWithHistory(doc.id);
+      try {
+        await deleteDocWithHistory(doc.id);
+      } catch {
+        toast.error(t.deleteDocFailed);
+        return;
+      }
       const remaining = docs.filter(d => d.id !== doc.id);
       setDocs(remaining);
       toast.success(t.deleteDoc);
@@ -378,7 +383,7 @@ export default function MainPage({ lang }: MainPageProps) {
         }
       }
     },
-    [docs, currentDocId, t, handleNewDoc]
+    [docs, currentDocId, t, t.deleteDocFailed, handleNewDoc]
   );
 
   const handleDeleteDoc = useCallback((doc: Doc) => {
