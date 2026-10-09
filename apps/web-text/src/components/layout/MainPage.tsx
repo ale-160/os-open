@@ -11,10 +11,12 @@ import { RenameModal } from '@/components/ui/RenameModal';
 import { HelpModal } from '@/components/ui/HelpModal';
 import { DocSidebar } from '@/components/layout/DocSidebar';
 import { MarkdownEditor } from '@/components/MarkdownEditor';
+import type { EditorView } from '@codemirror/view';
 import { MarkdownPreview } from '@/components/MarkdownPreview';
 import { getDefaultContent } from '@/data/defaultContent';
 import { getStrings } from '@/data/i18n';
 import { GalleryPickerModal } from '@/components/ui/GalleryPickerModal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import {
   Doc,
   HistoryEntry,
@@ -114,37 +116,15 @@ export default function MainPage({ lang }: MainPageProps) {
 
   const { t, toggleLanguage, isMounted: langMounted } = useLanguage(lang);
   const { theme, toggleTheme, isMounted: themeMounted } = useTheme();
-  // Ale OS 迁移公告（默认隐藏，挂载后读取，避免 SSR 闪烁）
-  const [migrationNoticeDismissed, setMigrationNoticeDismissed] = useState(true);
-  useEffect(() => {
-    setMigrationNoticeDismissed(localStorage.getItem('ale-migration-notice-dismissed') === '1');
-  }, []);
-  const dismissMigrationNotice = useCallback(() => {
-    setMigrationNoticeDismissed(true);
-    try { localStorage.setItem('ale-migration-notice-dismissed', '1'); } catch {}
-  }, []);
-  const migrationNotice = !migrationNoticeDismissed && (
-    <div className="flex items-center gap-2 px-4 py-2 text-sm border-b border-border bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-      <span className="flex-1 min-w-0 truncate">
-        📦 web-text 已全面升级为 Ale OS——你的文档与历史版本可一键迁移到新家
-      </span>
-      <a
-        href="https://os.ale160.com/migrate"
-        target="_blank"
-        rel="noreferrer"
-        className="shrink-0 underline underline-offset-2 hover:opacity-80 font-medium"
-      >
-        立即迁移 →
-      </a>
-      <button
-        onClick={dismissMigrationNotice}
-        aria-label="关闭公告"
-        className="shrink-0 w-6 h-6 rounded hover:bg-amber-100 dark:hover:bg-amber-900/40 flex items-center justify-center"
-      >
-        ✕
-      </button>
-    </div>
-  );
+  // 应用内确认（替代 window.confirm——原生弹窗在 iframe 内会被浏览器抑制）
+  // 分屏滚动同步：编辑器（CodeMirror）与预览按比例互相同步
+  const editorViewRef = useRef<EditorView | null>(null);
+  const previewScrollRef = useRef<HTMLDivElement | null>(null);
+  const scrollSyncSourceRef = useRef<'editor' | 'preview' | null>(null);
+
+  const [pendingConfirm, setPendingConfirm] = useState<
+    { kind: 'deleteDoc'; doc: Doc } | { kind: 'importBackup' } | null
+  >(null);
   const [content, setContent] = useState('');
   const [docs, setDocs] = useState<Doc[]>([]);
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
@@ -368,10 +348,9 @@ export default function MainPage({ lang }: MainPageProps) {
     setSearch('');
   }, [flushSave, t]);
 
-  // 删除文档（连带历史）
-  const handleDeleteDoc = useCallback(
+  // 删除文档（连带历史）——先弹应用内确认，确认后执行
+  const executeDeleteDoc = useCallback(
     async (doc: Doc) => {
-      if (!window.confirm(t.deleteDocConfirm.replace('{name}', doc.name))) return;
       await deleteDocWithHistory(doc.id);
       const remaining = docs.filter(d => d.id !== doc.id);
       setDocs(remaining);
@@ -400,6 +379,36 @@ export default function MainPage({ lang }: MainPageProps) {
     },
     [docs, currentDocId, t, handleNewDoc]
   );
+
+  const handleDeleteDoc = useCallback((doc: Doc) => {
+    setPendingConfirm({ kind: 'deleteDoc', doc });
+  }, []);
+
+  useEffect(() => {
+    if (viewMode !== 'split') return;
+    const scroller = editorViewRef.current?.scrollDOM;
+    const preview = previewScrollRef.current;
+    if (!scroller || !preview) return;
+
+    const sync = (from: HTMLElement, to: HTMLElement) => {
+      if (scrollSyncSourceRef.current && scrollSyncSourceRef.current !== (from === scroller ? 'editor' : 'preview')) return;
+      scrollSyncSourceRef.current = from === scroller ? 'editor' : 'preview';
+      const fromMax = from.scrollHeight - from.clientHeight;
+      const toMax = to.scrollHeight - to.clientHeight;
+      if (fromMax > 0 && toMax > 0) {
+        to.scrollTop = (from.scrollTop / fromMax) * toMax;
+      }
+      requestAnimationFrame(() => { scrollSyncSourceRef.current = null; });
+    };
+    const onEditorScroll = () => sync(scroller, preview);
+    const onPreviewScroll = () => sync(preview, scroller);
+    scroller.addEventListener('scroll', onEditorScroll, { passive: true });
+    preview.addEventListener('scroll', onPreviewScroll, { passive: true });
+    return () => {
+      scroller.removeEventListener('scroll', onEditorScroll);
+      preview.removeEventListener('scroll', onPreviewScroll);
+    };
+  }, [viewMode]);
 
   // 重命名文档 / 历史版本
   const handleRename = useCallback((target: Doc | HistoryEntry) => {
@@ -470,8 +479,8 @@ export default function MainPage({ lang }: MainPageProps) {
     toast.success(t.backupSuccess);
   }, [flushSave, t.backupSuccess]);
 
-  const handleImportBackup = useCallback(() => {
-    if (!window.confirm(t.importBackupConfirm)) return;
+  // 导入备份：先弹应用内确认，确认后再打开文件选择
+  const openImportPicker = useCallback(() => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.json,application/json';
@@ -503,6 +512,20 @@ export default function MainPage({ lang }: MainPageProps) {
     };
     input.click();
   }, [t]);
+
+  const handleImportBackup = useCallback(() => {
+    setPendingConfirm({ kind: 'importBackup' });
+  }, []);
+
+  const handleConfirmAction = useCallback(() => {
+    if (!pendingConfirm) return;
+    if (pendingConfirm.kind === 'deleteDoc') {
+      void executeDeleteDoc(pendingConfirm.doc);
+    } else if (pendingConfirm.kind === 'importBackup') {
+      openImportPicker();
+    }
+    setPendingConfirm(null);
+  }, [pendingConfirm, executeDeleteDoc, openImportPicker]);
 
   // 导入 .md 文件 → 新建文档
   const handleImportFiles = useCallback(
@@ -758,12 +781,14 @@ export default function MainPage({ lang }: MainPageProps) {
               value={content}
               onChange={handleContentChange}
               theme={theme}
+              onViewReady={view => { editorViewRef.current = view; }}
             />
           </div>
           <div className="flex-1 min-w-0">
             <MarkdownPreview
               content={content}
               theme={theme}
+              scrollRef={previewScrollRef}
             />
           </div>
         </div>
@@ -802,7 +827,6 @@ export default function MainPage({ lang }: MainPageProps) {
             </button>
           </div>
         </header>
-        {migrationNotice}
         </>
       ) : (
         <>
@@ -931,7 +955,6 @@ export default function MainPage({ lang }: MainPageProps) {
             </button>
           </div>
         </header>
-        {migrationNotice}
         </>
       )}
 
@@ -1050,6 +1073,19 @@ export default function MainPage({ lang }: MainPageProps) {
         )}
       </div>
 
+      <ConfirmDialog
+        isOpen={pendingConfirm !== null}
+        title={pendingConfirm?.kind === 'deleteDoc' ? t.deleteDoc : t.importBackup}
+        description={
+          pendingConfirm?.kind === 'deleteDoc'
+            ? t.deleteDocConfirm.replace('{name}', pendingConfirm.doc.name)
+            : t.importBackupConfirm
+        }
+        confirmLabel={pendingConfirm?.kind === 'deleteDoc' ? t.delete : t.confirm}
+        cancelLabel={t.cancel}
+        onConfirm={handleConfirmAction}
+        onCancel={() => setPendingConfirm(null)}
+      />
       <GalleryPickerModal
         isOpen={showGalleryPicker}
         onClose={() => setShowGalleryPicker(false)}

@@ -10,9 +10,11 @@ import rehypeSanitize from 'rehype-sanitize';
 interface MarkdownPreviewProps {
   content: string;
   theme: 'light' | 'dark';
+  /** 滚动容器 ref（用于分屏滚动同步） */
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-export function MarkdownPreview({ content, theme }: MarkdownPreviewProps) {
+export function MarkdownPreview({ content, theme, scrollRef }: MarkdownPreviewProps) {
   const [, setHljsCssLoaded] = useState(false);
 
   useEffect(() => {
@@ -37,7 +39,9 @@ export function MarkdownPreview({ content, theme }: MarkdownPreviewProps) {
     setHljsCssLoaded(true);
   }, [theme]);
   return (
-    <div className={`h-full w-full overflow-y-auto ${
+    <div
+      ref={scrollRef}
+      className={`h-full w-full overflow-y-auto ${
       theme === 'dark' ? 'bg-gray-950' : 'bg-[#fdf6e3]'}`}>
       <div className={`max-w-none px-6 py-8 prose ${
         theme === 'dark' ? 'prose-invert' : ''}`}>

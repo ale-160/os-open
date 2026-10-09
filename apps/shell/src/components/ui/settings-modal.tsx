@@ -102,6 +102,7 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
   const [serverConfigUrl, setServerConfigUrl] = useState('');
   const [serverConfigTesting, setServerConfigTesting] = useState(false);
   const [serverConfigApplying, setServerConfigApplying] = useState(false);
+  const [serverConfigPendingConfirm, setServerConfigPendingConfirm] = useState(false);
   const [hasLocalConfig, setHasLocalConfig] = useState(false);
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -455,19 +456,8 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
   /**
    * 应用服务器配置
    */
-  const handleApplyServerConfig = useCallback(async () => {
-    if (!serverConfigUrl.trim()) {
-      return;
-    }
-
-    // 如果存在本地配置，显示警告
-    if (hasLocalConfig) {
-      const confirmed = window.confirm(STRINGS.serverConfigOverwriteConfirm);
-      if (!confirmed) {
-        return;
-      }
-    }
-
+  const doApplyServerConfig = useCallback(async () => {
+    setServerConfigPendingConfirm(false);
     setServerConfigApplying(true);
     try {
       const success = await ConfigManager.applyServerConfig();
@@ -485,7 +475,21 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
     } finally {
       setServerConfigApplying(false);
     }
-  }, [serverConfigUrl, hasLocalConfig, STRINGS]);
+  }, [STRINGS]);
+
+  const handleApplyServerConfig = useCallback(async () => {
+    if (!serverConfigUrl.trim()) {
+      return;
+    }
+
+    // 存在本地配置时先走应用内确认（原生 confirm 在 iframe 内会被浏览器抑制）
+    if (hasLocalConfig) {
+      setServerConfigPendingConfirm(true);
+      return;
+    }
+
+    await doApplyServerConfig();
+  }, [serverConfigUrl, hasLocalConfig, doApplyServerConfig]);
 
   /**
    * 切换云端同步
@@ -1152,6 +1156,31 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
                     >
                       🔄 {STRINGS.serverConfigApply}
                     </Button>
+                  )}
+
+                  {/* 覆盖本地配置的应用内确认 */}
+                  {serverConfigPendingConfirm && (
+                    <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 space-y-2">
+                      <p className="text-xs text-amber-700 dark:text-amber-300">
+                        ⚠️ {STRINGS.serverConfigOverwriteConfirm}
+                      </p>
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setServerConfigPendingConfirm(false)}
+                        >
+                          {STRINGS.cancel}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={() => void doApplyServerConfig()}
+                        >
+                          {STRINGS.confirm}
+                        </Button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

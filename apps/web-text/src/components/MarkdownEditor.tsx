@@ -11,9 +11,11 @@ interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   theme: 'light' | 'dark';
+  /** 编辑器就绪回调（用于分屏滚动同步等外部集成） */
+  onViewReady?: (view: EditorView) => void;
 }
 
-export function MarkdownEditor({ value, onChange, theme }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, theme, onViewReady }: MarkdownEditorProps) {
   const handleChange = useCallback((val: string) => {
     onChange(val);
   }, [onChange]);
@@ -29,6 +31,7 @@ export function MarkdownEditor({ value, onChange, theme }: MarkdownEditorProps) 
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({ 'aria-label': 'Markdown Input' }),
         ]}
+        onCreateEditor={onViewReady}
         onChange={handleChange}
         basicSetup={{
           lineNumbers: false,
