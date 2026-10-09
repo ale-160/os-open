@@ -117,8 +117,9 @@ export default function MainPage({ lang }: MainPageProps) {
   const { t, toggleLanguage, isMounted: langMounted } = useLanguage(lang);
   const { theme, toggleTheme, isMounted: themeMounted } = useTheme();
   // 应用内确认（替代 window.confirm——原生弹窗在 iframe 内会被浏览器抑制）
-  // 分屏滚动同步：编辑器（CodeMirror）与预览按比例互相同步
-  const editorViewRef = useRef<EditorView | null>(null);
+  // 分屏滚动同步：编辑器（CodeMirror）与预览按比例互相同步。
+  // view 用 state：CodeMirror 异步创建视图，就绪后触发同步 effect 重跑
+  const [editorView, setEditorView] = useState<EditorView | null>(null);
   const previewScrollRef = useRef<HTMLDivElement | null>(null);
   const scrollSyncSourceRef = useRef<'editor' | 'preview' | null>(null);
 
@@ -386,7 +387,7 @@ export default function MainPage({ lang }: MainPageProps) {
 
   useEffect(() => {
     if (viewMode !== 'split') return;
-    const scroller = editorViewRef.current?.scrollDOM;
+    const scroller = editorView?.scrollDOM;
     const preview = previewScrollRef.current;
     if (!scroller || !preview) return;
 
@@ -408,7 +409,7 @@ export default function MainPage({ lang }: MainPageProps) {
       scroller.removeEventListener('scroll', onEditorScroll);
       preview.removeEventListener('scroll', onPreviewScroll);
     };
-  }, [viewMode]);
+  }, [viewMode, editorView]);
 
   // 重命名文档 / 历史版本
   const handleRename = useCallback((target: Doc | HistoryEntry) => {
@@ -781,7 +782,7 @@ export default function MainPage({ lang }: MainPageProps) {
               value={content}
               onChange={handleContentChange}
               theme={theme}
-              onViewReady={view => { editorViewRef.current = view; }}
+              onViewReady={setEditorView}
             />
           </div>
           <div className="flex-1 min-w-0">
