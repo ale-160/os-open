@@ -7,6 +7,7 @@
 ### 新增
 
 - **格式转换新增 AVIF 与 TIFF 两种目标格式**（现共 8 种：JPEG/PNG/WebP/AVIF/TIFF/GIF/BMP/ICO）
+- **TIFF 输入解码**：Chrome/Firefox 的 `<img>` 无法解码 TIFF（此前拖入 .tif/.tiff 会被静默跳过），现基于纯 JS 的 `utif`（Photopea，MIT，约 100KB，按需加载）补齐——导入时自动解码为 PNG（无损保留 alpha，多页取第一页），批量进度 toast 与成功/失败计数，模式与 HEIC 解码一致；转换页输入矩阵补齐最后一块
   - **AVIF 导出**：基于 `@jsquash/avif`（libavif WASM，Apache-2.0）——各主流浏览器 canvas 原生均不支持 AVIF 编码（`toBlob` 会静默回退 PNG 产出扩展名不符的文件），WASM 编码器仅在选中 AVIF 时按需加载（约 3.5MB，其他格式零开销），质量滑条 1-100 全平台可用；转换页浏览器端到端验证产出真实 `image/avif`
   - **TIFF 导出**：自研零依赖未压缩基线编码器（`imageEncoders.ts` 的 `encodeTIFF`，小端 II，单条带，72 DPI）——像素全不透明时写 3 采样 RGB，存在透明像素时自动写 4 采样 RGBA（ExtraSamples=2 未关联 alpha），补齐 BMP 不支持透明的无损位图场景；Worker 与主线程兜底路径均可用
 - **转换页接入系统图库**：转换结果一键「存入图库」（写入共享资产库 `ale-os-assets`，系统图库 App 与其他应用即时可见），与主编辑器保存体验对齐
