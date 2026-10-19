@@ -21,6 +21,8 @@
     "preview": "npx serve out"
   },
   "dependencies": {
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@jsquash/avif": "^2.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -40,6 +42,7 @@
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
+    "@ffmpeg/core": "0.12.10",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pako": "^3.0.0",
