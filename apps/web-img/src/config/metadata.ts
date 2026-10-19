@@ -401,6 +401,70 @@ export function getSheetMetadata(lang: string = "zh"): Metadata {
   };
 }
 
+
+// 音视频转换页元数据（ffmpeg.wasm 本地转码）
+export const MEDIA_METADATA_ZH = {
+  title: "web-img · 音视频转换 - MP3 WAV OGG FLAC M4A MP4 WebM GIF 本地转码",
+  description: "免费在线音视频转换工具：转换为 MP3、M4A、WAV、OGG、FLAC 音频与 MP4、WebM、GIF，支持从视频提取音轨。基于 WebAssembly 的 ffmpeg 本地转码，文件不会上传服务器（首次使用需联网加载解码核心）。",
+  keywords: [
+    "音视频转换",
+    "视频转MP3",
+    "MP4转MP3",
+    "音频转换器",
+    "视频转GIF",
+    "WAV转MP3",
+    "MP4转WebM",
+    "提取音轨",
+    "本地转码",
+    "web-img",
+  ],
+};
+
+export const MEDIA_METADATA_EN = {
+  title: "web-img · Media Converter - MP3 WAV OGG FLAC M4A MP4 WebM GIF",
+  description: "Free online media converter: convert to MP3, M4A, WAV, OGG, FLAC audio and MP4, WebM, GIF video, extract audio tracks from video. Powered by in-browser WebAssembly ffmpeg — files never leave your device (first use downloads the ~31MB core from a CDN).",
+  keywords: [
+    "media converter",
+    "video to mp3",
+    "mp4 to mp3",
+    "audio converter",
+    "video to gif",
+    "wav to mp3",
+    "mp4 to webm",
+    "extract audio",
+    "local transcoding",
+    "web-img",
+  ],
+};
+
+export function getMediaMetadata(lang: string = "zh"): Metadata {
+  const mediaMeta = lang === "en" ? MEDIA_METADATA_EN : MEDIA_METADATA_ZH;
+  const base = lang === "en" ? METADATA_EN : METADATA_ZH;
+
+  return {
+    title: mediaMeta.title,
+    description: mediaMeta.description,
+    keywords: mediaMeta.keywords,
+    openGraph: {
+      ...base.openGraph,
+      title: mediaMeta.title,
+      description: mediaMeta.description,
+      url: "https://os.ale160.com/img/media/",
+    },
+    twitter: { ...base.twitter, title: mediaMeta.title, description: mediaMeta.description },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+    alternates: {
+      canonical: "https://os.ale160.com/img/media/",
+    },
+  };
+}
+
 export const viewport = {
   width: "device-width",
   initialScale: 1,

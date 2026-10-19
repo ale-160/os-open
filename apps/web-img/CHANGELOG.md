@@ -6,6 +6,13 @@
 
 ### 新增
 
+- **音视频转换页（/media）**：格式转换进入媒体领域，格式版图最大一次扩张
+  - 基于 ffmpeg.wasm（@ffmpeg/ffmpeg 0.12 + @ffmpeg/core 0.12.10）在浏览器本地转码，文件不上传
+  - 音频目标：MP3 / M4A / WAV / OGG / FLAC（任意输入含视频自动提取音轨）；视频目标：MP4（H.264+AAC）/ WebM（VP8+Vorbis）/ GIF 动图（10fps 等比缩放）
+  - 核心约 31MB 超过 Cloudflare Pages 单文件 25MiB 上限无法自托管——首次使用从 jsdelivr（锁定版本）加载并经 Cache API 持久缓存，之后离线可用；页面明示加载来源与本地转码承诺
+  - 单 ffmpeg 实例全局串行化转码；实时进度条与逐条完成状态；批量 ZIP 下载
+  - 首页新增「音视频转换」入口，sitemap 收录；浏览器端到端验证 WAV→MP3（产物 ID3 魔数校验通过）
+
 - **数据转换页（/sheet）**：格式转换从图片扩展到文档/数据领域
   - **表格互转**：XLSX / XLS / CSV / TSV / ODS / JSON 六种格式互转（基于 SheetJS 官方 CDN 构建版 0.20.3，含 npm 0.18.5 之后的安全修复；纯 JS 零依赖按需加载）
   - 多表工作簿导出 CSV/TSV/JSON/HTML 时按表拆分为多个文件（ZIP 打包下载），导出 XLSX/ODS 保留全部表；CSV/TSV 自动加 UTF-8 BOM，Excel 直接打开不乱码
