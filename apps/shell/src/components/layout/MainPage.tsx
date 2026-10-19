@@ -16,13 +16,18 @@ import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
 import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
 import { AppStoreModal } from '@/components/app/AppStoreModal';
-import { BootSplash } from '@/components/layout/BootSplash';
 import { OS_LANGUAGE_KEY, type OsApp } from '@/config/apps';
-import { HelpCircle, Globe, Heart, Store } from 'lucide-react';
+import { HelpCircle, Globe, Heart, Search, Store } from 'lucide-react';
 
 // 懒加载模态框组件（仅在需要时加载）
 const SettingsModal = dynamic(
   () => import('@/components/ui/settings-modal').then(mod => ({ default: mod.SettingsModal })),
+  { loading: () => null }
+);
+
+// 全局命令面板（Spotlight，Ctrl/⌘+K）
+const CommandPalette = dynamic(
+  () => import('@/components/app/CommandPalette').then(mod => ({ default: mod.CommandPalette })),
   { loading: () => null }
 );
 
@@ -47,10 +52,23 @@ const SetupGuide = dynamic(
 );
 
 interface MainPageProps {
-  lang: 'en' | 'zh';
+  lang: 'zh' | 'en';
 }
 
+/**
+ * 外层仅提供窗口系统 Provider；内容组件必须在 Provider 内部，
+ * 才能拿到真实的多任务 context（openApp/goHome/killApp/runningApps），
+ * 否则会命中兜底实现（应用在新标签打开、dock 状态失真）。
+ */
 export default function MainPage({ lang }: MainPageProps) {
+  return (
+    <AppWindowProvider>
+      <MainPageContent lang={lang} />
+    </AppWindowProvider>
+  );
+}
+
+function MainPageContent({ lang }: MainPageProps) {
   // 动态设置 <html lang> 属性
   useEffect(() => {
     document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
@@ -131,6 +149,7 @@ export default function MainPage({ lang }: MainPageProps) {
   }, [activeConfig.theme, handleConfigUpdate]);
 
   // ===== 统一语言管理：壳与内嵌应用共享 ale-os-language =====
+  // MainPageContent 在 AppWindowProvider 内部，拿到的是真实多任务 context
   const { runningApps, killApp } = useAppWindow();
 
   // 壳的语言变更写入共享键，内嵌应用通过 storage 事件实时跟随
@@ -176,6 +195,7 @@ export default function MainPage({ lang }: MainPageProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [editItem, setEditItem] = useState<IconItem | null>(null);
 
@@ -340,7 +360,6 @@ export default function MainPage({ lang }: MainPageProps) {
   }, [handleFolderRename]);
 
   return (
-    <AppWindowProvider>
     <>
       {/* 首次使用引导 */}
       {needsSetup && (
@@ -397,6 +416,18 @@ export default function MainPage({ lang }: MainPageProps) {
                 className="w-full px-3 py-2 border border-gray-300 dark:border-border rounded-lg bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent"
               />
               </div>
+
+              {/* 全局命令面板入口（Spotlight，Ctrl/⌘+K） */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsCommandPaletteOpen(true)}
+                title={S.commandSearch}
+                aria-keyshortcuts="Control+K Meta+K"
+                className="shrink-0 w-8 h-8 sm:w-9 sm:h-9"
+              >
+                <Search className="w-4 h-4 sm:w-5 sm:h-5" />
+              </Button>
 
               {/* 帮助按钮 */}
               <Button
@@ -547,6 +578,20 @@ export default function MainPage({ lang }: MainPageProps) {
         language={activeConfig.theme.language}
       />
 
+      {/* 全局命令面板（Spotlight，Ctrl/⌘+K）；应用启动/回桌面由面板走窗口系统 context */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onOpenChange={setIsCommandPaletteOpen}
+        config={activeConfig}
+        handlers={{
+          toggleTheme: toggleMode,
+          toggleLanguage: handleToggleLanguage,
+          openSettings: () => setIsSettingsModalOpen(true),
+          openStore: () => setIsStoreModalOpen(true),
+          openHelp: () => setIsHelpModalOpen(true)
+        }}
+      />
+
       {/* 帮助模态框 */}
       <OnboardingGuide
         isOpen={isHelpModalOpen}
@@ -592,6 +637,5 @@ export default function MainPage({ lang }: MainPageProps) {
       </footer>
       </div>
     </>
-    </AppWindowProvider>
   );
 }

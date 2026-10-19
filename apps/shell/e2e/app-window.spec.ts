@@ -92,3 +92,16 @@ test('Esc 键最小化应用窗口回桌面', async ({ page }) => {
   await expect(page.locator('[data-os-app-window="web-text"]')).toHaveAttribute('data-active', 'false');
   await expect(page.locator('[data-os-dock]')).toBeVisible();
 });
+
+test('键盘 Home 键最小化应用窗口回桌面（应用保活）', async ({ page }) => {
+  await page.goto('/');
+  await dismissWelcome(page);
+
+  await page.locator('[data-icon-item][data-id="icon-app-web-text"]').click();
+  await expect(page.locator('[data-os-app-window="web-text"]')).toHaveAttribute('data-active', 'true');
+
+  await page.keyboard.press('Home');
+  await expect(page.locator('[data-os-app-window="web-text"]')).toHaveAttribute('data-active', 'false');
+  await expect(page.locator('[data-os-app-window="web-text"]')).toHaveCount(1);
+  await expect(page.locator('[data-os-dock]')).toBeVisible();
+});

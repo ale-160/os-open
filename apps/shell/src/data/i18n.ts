@@ -15,6 +15,20 @@ export const STRINGS_ZH = {
   themeToggle: '切换主题',
   exportConfig: '导出配置',
   importConfig: '导入配置',
+
+  // 命令面板（Spotlight）
+  commandSearch: '全局搜索 (Ctrl+K)',
+  commandPaletteTitle: '命令面板',
+  commandPaletteDescription: '搜索应用、桌面图标或系统操作',
+  commandPlaceholder: '搜索应用、图标或操作...',
+  commandNoResults: '没有匹配的结果',
+  commandGroupApps: '系统应用',
+  commandGroupIcons: '桌面图标',
+  commandGroupActions: '系统操作',
+  commandGroupWeb: '网络搜索',
+  webSearchLabel: '在网络中搜索',
+  backToDesktop: '回到桌面',
+  actionToggleLanguage: '切换语言',
   
   // 空状态
   emptyTitle: '还没有任何内容',
@@ -378,6 +392,20 @@ export const STRINGS_EN = {
   themeToggle: 'Toggle Theme',
   exportConfig: 'Export Config',
   importConfig: 'Import Config',
+
+  // Command Palette (Spotlight)
+  commandSearch: 'Global Search (Ctrl+K)',
+  commandPaletteTitle: 'Command Palette',
+  commandPaletteDescription: 'Search apps, desktop icons or system actions',
+  commandPlaceholder: 'Search apps, icons or actions...',
+  commandNoResults: 'No matching results',
+  commandGroupApps: 'Apps',
+  commandGroupIcons: 'Desktop Icons',
+  commandGroupActions: 'Actions',
+  commandGroupWeb: 'Web Search',
+  webSearchLabel: 'Search the web for',
+  backToDesktop: 'Back to Desktop',
+  actionToggleLanguage: 'Toggle Language',
   
   // Empty State
   emptyTitle: 'No content yet',

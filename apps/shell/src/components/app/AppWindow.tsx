@@ -158,11 +158,30 @@ function AppWindowView({
   const { runningApps, activeApp, goHome, killApp, openApp } = useAppWindow();
   const language = 'zh';
 
-  // Esc 收起当前应用回桌面
+  // Esc / Home 键收起当前应用回桌面（输入控件内按键除外，避免干扰文本编辑）
   useEffect(() => {
     if (!activeApp) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') goHome();
+      if (event.key === 'Escape') {
+        goHome();
+        return;
+      }
+      if (
+        event.key === 'Home' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.shiftKey
+      ) {
+        const target = event.target as HTMLElement | null;
+        const isEditable =
+          !!target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable);
+        if (!isEditable) goHome();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
