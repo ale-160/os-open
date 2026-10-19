@@ -10,6 +10,7 @@
 
 - **图片压缩** — 支持 PNG、JPEG、WebP 等格式，可调节压缩质量
 - **图片水印** — 为图片添加文字水印
+- **数据转换（/sheet）** — XLSX / XLS / CSV / TSV / ODS / JSON 表格互转 + PDF 提取文本为 TXT，多表按表拆分打包下载，纯 JS 本地转换
 - **批量格式转换** — 批量转换为 JPG / PNG / WebP / **AVIF**（libavif WASM 按需加载）/ **TIFF**（自研零依赖，支持透明）/ GIF / BMP / ICO 共 8 种，支持 AVIF、TIFF、SVG、HEIC 等输入，可调质量与尺寸，打包 ZIP 下载或存入系统图库；常规转换在 Web Worker 线程池中并发执行，不阻塞界面
 - **GIF 动画合成** — 多张图片合成为可循环播放的 GIF 动图，帧排序、帧延时可调，实时预览动画效果
 - **图片裁剪** — 自定义裁剪区域

@@ -335,6 +335,72 @@ export function getGifMakerMetadata(lang: string = "en"): Metadata {
   };
 }
 
+
+// 数据转换页元数据（表格互转 + PDF 提取文本）
+export const SHEET_METADATA_ZH = {
+  title: "web-img · 数据转换 - XLSX CSV JSON ODS 表格互转 + PDF 提取文本",
+  description: "免费在线数据转换工具：XLSX、XLS、CSV、TSV、ODS、JSON 表格格式互转（多表工作簿按表拆分，CSV 带 UTF-8 BOM），并支持 PDF 提取文字为 TXT。纯前端本地处理，文件不会上传服务器。",
+  keywords: [
+    "数据转换",
+    "表格转换",
+    "XLSX转CSV",
+    "CSV转XLSX",
+    "Excel转JSON",
+    "JSON转Excel",
+    "ODS转换",
+    "PDF提取文本",
+    "PDF转TXT",
+    "在线表格转换器",
+    "web-img",
+  ],
+};
+
+export const SHEET_METADATA_EN = {
+  title: "web-img · Data Converter - XLSX CSV JSON ODS + PDF to Text",
+  description: "Free online data converter: convert between XLSX, XLS, CSV, TSV, ODS and JSON (multi-sheet workbooks split per sheet, CSV with UTF-8 BOM), and extract PDF text to TXT. All processed locally — files never leave your device.",
+  keywords: [
+    "data converter",
+    "spreadsheet converter",
+    "xlsx to csv",
+    "csv to xlsx",
+    "excel to json",
+    "json to excel",
+    "ods converter",
+    "pdf to text",
+    "pdf text extraction",
+    "online spreadsheet converter",
+    "web-img",
+  ],
+};
+
+export function getSheetMetadata(lang: string = "zh"): Metadata {
+  const sheetMeta = lang === "en" ? SHEET_METADATA_EN : SHEET_METADATA_ZH;
+  const base = lang === "en" ? METADATA_EN : METADATA_ZH;
+
+  return {
+    title: sheetMeta.title,
+    description: sheetMeta.description,
+    keywords: sheetMeta.keywords,
+    openGraph: {
+      ...base.openGraph,
+      title: sheetMeta.title,
+      description: sheetMeta.description,
+      url: "https://os.ale160.com/img/sheet/",
+    },
+    twitter: { ...base.twitter, title: sheetMeta.title, description: sheetMeta.description },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+    alternates: {
+      canonical: "https://os.ale160.com/img/sheet/",
+    },
+  };
+}
+
 export const viewport = {
   width: "device-width",
   initialScale: 1,

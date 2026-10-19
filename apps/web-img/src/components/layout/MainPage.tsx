@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart, ArrowLeftRight, Film, Images, ClipboardCopy } from 'lucide-react';
+import { Moon, Sun, Download, Trash2, Globe, Edit2, Check, X, RotateCcw, Maximize, Minimize, Eye, EyeOff, RotateCw, FlipHorizontal, Upload, Heart, ArrowLeftRight, Film, Images, ClipboardCopy, Table2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage, zhStrings, enStrings } from '@/hooks/useLanguage';
 import { useTheme } from '@/hooks/useTheme';
@@ -78,9 +78,8 @@ export default function MainPage({ lang }: MainPageProps) {
     const hasPdf = fileArray.some(isPdfFile);
 
     if (hasPdf) {
-      // 根据当前语言跳转到对应的 PDF 处理页面
-      const pdfPath = lang === 'zh' ? '/zh/pdf' : '/pdf';
-      router.push(pdfPath);
+      // 根路由即中文站，PDF 处理页面固定在 /pdf
+      router.push('/pdf');
     } else {
       // 普通图片文件；HEIC 先解码为浏览器可处理的 JPEG
       const normalized = await normalizeImageFiles(fileArray, lang);
@@ -419,7 +418,7 @@ export default function MainPage({ lang }: MainPageProps) {
         </div>
         <div className="flex items-center gap-1">
           <a
-            href={lang === 'zh' ? '/zh/gif' : '/gif'}
+            href="/gif"
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('gifMaker')}
             aria-label={t('gifMaker')}
@@ -427,12 +426,20 @@ export default function MainPage({ lang }: MainPageProps) {
             <Film className="w-4.5 h-4.5" />
           </a>
           <a
-            href={lang === 'zh' ? '/zh/convert' : '/convert'}
+            href="/convert"
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t('convert')}
             aria-label={t('convert')}
           >
             <ArrowLeftRight className="w-4.5 h-4.5" />
+          </a>
+          <a
+            href="/sheet"
+            className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            title={t('sheetTool')}
+            aria-label={t('sheetTool')}
+          >
+            <Table2 className="w-4.5 h-4.5" />
           </a>
           <button
             onClick={handleToggleLanguage}
