@@ -1,18 +1,28 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { IconClose, IconDownload } from '../icons'
+import { IconClose, IconDownload, IconImage, IconCheck } from '../icons'
 
 const props = defineProps({
   file: { type: Object, default: null },
   downloading: { type: Boolean, default: false },
   downloadFailed: { type: Boolean, default: false },
+  gallerySaved: { type: Set, default: () => new Set() },
+  gallerySaving: { type: Set, default: () => new Set() },
 })
 
-const emit = defineEmits(['close', 'retry', 'download'])
+const emit = defineEmits(['close', 'retry', 'download', 'save-gallery'])
 
 function fileSrc(file) {
   return file?.blobUrl || file?.dataUrl || ''
 }
+
+const inGallery = computed(() => !!(props.file?.fileId && props.gallerySaved.has(props.file.fileId)))
+const savingToGallery = computed(() => !!(props.file?.fileId && props.gallerySaving.has(props.file.fileId)))
+const galleryTitle = computed(() => {
+  if (savingToGallery.value) return '正在存入系统图库…'
+  if (inGallery.value) return '已存入系统图库'
+  return props.file?.dataUrl || props.file?.blobUrl ? '存入系统图库' : '加载原图后存入系统图库'
+})
 
 function isImage(type) {
   return ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'].includes(type)
@@ -60,7 +70,12 @@ function formatSize(bytes) {
         </div>
       </div>
       <div class="lightbox-foot">
-        <button class="btn primary" @click="emit('download')">
+        <button class="btn primary" @click="emit('save-gallery')" :title="galleryTitle">
+          <IconCheck v-if="inGallery" :size="16" />
+          <IconImage v-else :size="16" />
+          <span>存入图库</span>
+        </button>
+        <button class="btn" @click="emit('download')">
           <IconDownload :size="16" />
           <span>下载</span>
         </button>
