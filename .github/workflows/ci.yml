@@ -50,6 +50,8 @@ jobs:
           node scripts/test-gif-encoder.mjs
           node node_modules/typescript/bin/tsc src/utils/imageEncoders.ts --outDir .test-tmp --module commonjs --target es2020
           node scripts/test-tiff-encoder.mjs
+          node node_modules/typescript/bin/tsc src/utils/sheetConvert.ts --outDir .test-tmp --module es2020 --target es2020 --moduleResolution bundler --skipLibCheck
+          node scripts/test-sheet-convert.mjs
 
       - name: nchat unit tests
         run: pnpm --filter nchat test

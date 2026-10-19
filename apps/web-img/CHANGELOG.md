@@ -6,6 +6,13 @@
 
 ### 新增
 
+- **数据转换页（/sheet）**：格式转换从图片扩展到文档/数据领域
+  - **表格互转**：XLSX / XLS / CSV / TSV / ODS / JSON 六种格式互转（基于 SheetJS 官方 CDN 构建版 0.20.3，含 npm 0.18.5 之后的安全修复；纯 JS 零依赖按需加载）
+  - 多表工作簿导出 CSV/TSV/JSON/HTML 时按表拆分为多个文件（ZIP 打包下载），导出 XLSX/ODS 保留全部表；CSV/TSV 自动加 UTF-8 BOM，Excel 直接打开不乱码
+  - **PDF 提取文本**：逐页提取文字为 TXT（复用项目内 pdfjs-dist，多页带页码标记），扫描件无文字层时得到空文本提示
+  - 首页新增「数据转换」入口，sitemap 同步收录；**顺修预存 bug**——首页工具卡在中文语言下指向不存在的 /zh/* 路由导致 404
+- **表格转换核心测试**：`scripts/test-sheet-convert.mjs` 6 个用例——XLSX 整簿往返、多表拆分文件名、UTF-8 BOM 字节校验、JSON 行对象一致性、ODS 读回、非法 JSON 输入拒绝，已接入 CI
+
 - **格式转换新增 AVIF 与 TIFF 两种目标格式**（现共 8 种：JPEG/PNG/WebP/AVIF/TIFF/GIF/BMP/ICO）
 - **TIFF 输入解码**：Chrome/Firefox 的 `<img>` 无法解码 TIFF（此前拖入 .tif/.tiff 会被静默跳过），现基于纯 JS 的 `utif`（Photopea，MIT，约 100KB，按需加载）补齐——导入时自动解码为 PNG（无损保留 alpha，多页取第一页），批量进度 toast 与成功/失败计数，模式与 HEIC 解码一致；转换页输入矩阵补齐最后一块
   - **AVIF 导出**：基于 `@jsquash/avif`（libavif WASM，Apache-2.0）——各主流浏览器 canvas 原生均不支持 AVIF 编码（`toBlob` 会静默回退 PNG 产出扩展名不符的文件），WASM 编码器仅在选中 AVIF 时按需加载（约 3.5MB，其他格式零开销），质量滑条 1-100 全平台可用；转换页浏览器端到端验证产出真实 `image/avif`
