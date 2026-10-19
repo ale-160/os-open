@@ -11,6 +11,7 @@ import type { ConvertRequest, ConvertSuccess } from '@/workers/protocol';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { saveAsset } from '@/utils/osAssets';
 import { normalizeImageFiles } from '@/utils/heicDecode';
+import { normalizeTiffFiles } from '@/utils/tiffDecode';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DragOverlay } from '@/components/ui/DragOverlay';
@@ -123,8 +124,9 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     }
     setError(null);
 
-    // HEIC 先解码为 JPEG，保证后续 Worker 转换路径可用
-    const normalized = await normalizeImageFiles(valid, lang);
+    // HEIC 先解码为 JPEG、TIFF 解码为 PNG（浏览器原生无法解码），保证后续 Worker 转换路径可用
+    const normalizedHeic = await normalizeImageFiles(valid, lang);
+    const normalized = await normalizeTiffFiles(normalizedHeic, lang);
 
     for (const file of normalized) {
       try {
