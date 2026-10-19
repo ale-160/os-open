@@ -1,7 +1,7 @@
 /**
  * 主线程 ⇄ 转换 Worker 的消息协议（两侧共用）。
  */
-export type ConvertFormat = 'jpeg' | 'png' | 'webp' | 'gif' | 'bmp' | 'ico';
+export type ConvertFormat = 'jpeg' | 'png' | 'webp' | 'avif' | 'gif' | 'bmp' | 'tiff' | 'ico';
 
 export interface ConvertRequest {
   id: string;
@@ -36,8 +36,10 @@ export function buildFilename(originalName: string, format: ConvertFormat): stri
     jpeg: '.jpg',
     png: '.png',
     webp: '.webp',
+    avif: '.avif',
     gif: '.gif',
     bmp: '.bmp',
+    tiff: '.tiff',
     ico: '.ico',
   };
   const baseName = originalName.replace(/\.[^/.]+$/, '');

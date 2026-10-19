@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useDragDrop } from '@/hooks/useDragDrop';
 import { useConversionPool } from '@/hooks/useConversionPool';
 import { loadImage } from '@/utils/canvas';
-import { canvasToBMP, encodeICO } from '@/utils/imageEncoders';
+import { canvasToBMP, encodeAVIF, encodeICO, encodeTIFF } from '@/utils/imageEncoders';
 import { encodeGIF } from '@/utils/gifEncoder';
 import type { ConvertRequest, ConvertSuccess } from '@/workers/protocol';
 import { downloadFile, formatFileSize } from '@/utils/file';
+import { saveAsset } from '@/utils/osAssets';
 import { normalizeImageFiles } from '@/utils/heicDecode';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -16,6 +17,7 @@ import { DragOverlay } from '@/components/ui/DragOverlay';
 import {
   FileImage, ArrowLeft, X, Loader2, Download, Trash2,
   PackageCheck, CheckCircle2, XCircle, Circle, Repeat, Film,
+  ImagePlus, Check,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { cn } from '@/lib/utils';
@@ -24,7 +26,7 @@ interface ConvertMainPageProps {
   lang: 'en' | 'zh';
 }
 
-type TargetFormat = 'jpeg' | 'png' | 'webp' | 'gif' | 'bmp' | 'ico';
+type TargetFormat = 'jpeg' | 'png' | 'webp' | 'avif' | 'gif' | 'bmp' | 'tiff' | 'ico';
 
 type ItemStatus = 'pending' | 'converting' | 'done' | 'error';
 
@@ -48,6 +50,8 @@ const FORMATS: { id: TargetFormat; ext: string; quality: boolean; note: { zh: st
   { id: 'jpeg', ext: '.jpg', quality: true, note: { zh: '有损压缩，体积小', en: 'Lossy, small size' } },
   { id: 'png', ext: '.png', quality: false, note: { zh: '无损，支持透明', en: 'Lossless, transparency' } },
   { id: 'webp', ext: '.webp', quality: true, note: { zh: '比 JPEG 小 25-35%', en: '25-35% smaller than JPEG' } },
+  { id: 'avif', ext: '.avif', quality: true, note: { zh: '新一代有损，比 WebP 更小', en: 'Next-gen lossy, smaller than WebP' } },
+  { id: 'tiff', ext: '.tiff', quality: false, note: { zh: '无损位图，支持透明', en: 'Lossless, supports alpha' } },
   { id: 'gif', ext: '.gif', quality: false, note: { zh: '索引色，最大 256 色，支持透明', en: 'Indexed ≤256 colors, transparency' } },
   { id: 'bmp', ext: '.bmp', quality: false, note: { zh: '无压缩位图，不支持透明', en: 'Uncompressed, no alpha' } },
   { id: 'ico', ext: '.ico', quality: false, note: { zh: '多尺寸图标（16-256px）', en: 'Multi-size icon (16-256px)' } },
@@ -208,6 +212,23 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
       return { blob: encodeGIF(imageData), width: targetW, height: targetH, filename };
     }
 
+    if (format === 'tiff') {
+      // TIFF 支持 alpha 透明，不做白底合成
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      return { blob: encodeTIFF(imageData), width: targetW, height: targetH, filename };
+    }
+
+    if (format === 'avif') {
+      // AVIF：原生 canvas 不支持编码，走 libavif WASM（懒加载）
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      return {
+        blob: await encodeAVIF(imageData, quality),
+        width: targetW,
+        height: targetH,
+        filename,
+      };
+    }
+
     if (format === 'bmp') {
       const blob = canvasToBMP(canvas);
       if (!blob) throw new Error('BMP encode failed');
@@ -244,17 +265,28 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     const ids = new Set(pending.map(i => i.id));
     setItems(prev => prev.map(i => (ids.has(i.id) ? { ...i, status: 'converting', result: undefined } : i)));
 
+    const convertItem = async (item: ConvertItem): Promise<ConvertSuccess> => {
+      const req: ConvertRequest = {
+        id: item.id,
+        file: item.file,
+        format,
+        quality,
+        maxWidth: limitSize && parseInt(maxWidth) > 0 ? parseInt(maxWidth) : null,
+        maxHeight: limitSize && parseInt(maxHeight) > 0 ? parseInt(maxHeight) : null,
+      };
+      if (format === 'avif') {
+        // AVIF 编码器为 libavif WASM 懒加载，固定在主线程执行（避免 Worker 打包 WASM 资产）
+        const result = await convertOne(item.file);
+        if (!result) throw new Error('convert failed');
+        return { id: req.id, ok: true, ...result };
+      }
+      return convertViaPool.run(req);
+    };
+
     // 并发派发：Worker 池内多线程并行，结果逐个返回时更新对应条目
     await Promise.all(pending.map(async item => {
       try {
-        const res = await convertViaPool.run({
-          id: item.id,
-          file: item.file,
-          format,
-          quality,
-          maxWidth: limitSize && parseInt(maxWidth) > 0 ? parseInt(maxWidth) : null,
-          maxHeight: limitSize && parseInt(maxHeight) > 0 ? parseInt(maxHeight) : null,
-        });
+        const res = await convertItem(item);
         setItems(prev =>
           prev.map(i =>
             i.id === item.id
@@ -268,9 +300,40 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     }));
 
     setIsConverting(false);
-  }, [items, convertViaPool, format, quality, limitSize, maxWidth, maxHeight, settingsKey]);
+  }, [items, convertViaPool, convertOne, format, quality, limitSize, maxWidth, maxHeight, settingsKey]);
 
   const doneItems = items.filter(i => i.status === 'done' && i.result);
+
+  // ── 系统图库：转换产物一键入库（ale-os-assets，供系统图库 App 与其他应用取用）──
+  const [gallerySavedIds, setGallerySavedIds] = useState<Set<string>>(new Set());
+  const [gallerySavingIds, setGallerySavingIds] = useState<Set<string>>(new Set());
+
+  const blobToDataUrl = useCallback(async (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+  }, []);
+
+  const handleSaveToGallery = useCallback(async (item: ConvertItem) => {
+    if (!item.result) return;
+    try {
+      setGallerySavingIds(prev => new Set(prev).add(item.id));
+      const dataUrl = await blobToDataUrl(item.result.blob);
+      await saveAsset({ name: item.result.filename, dataUrl });
+      setGallerySavedIds(prev => new Set(prev).add(item.id));
+    } catch {
+      // 存储不可用（如隐私模式）时静默失败，按钮保持未保存态
+    } finally {
+      setGallerySavingIds(prev => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }, [blobToDataUrl]);
 
   // 设置在转换后发生变更 → 已有结果视为过期
   const hasStaleResults = doneItems.length > 0 && settingsKey !== lastConvertSettings;
@@ -334,6 +397,9 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     privacyNote: lang === 'zh'
       ? '所有转换在浏览器本地完成，文件不会上传到服务器'
       : 'All conversions run locally in your browser — files never leave your device',
+    saveGallery: lang === 'zh' ? '存入系统图库' : 'Save to system gallery',
+    savedGallery: lang === 'zh' ? '已存入系统图库' : 'Saved to system gallery',
+    savingGallery: lang === 'zh' ? '正在存入图库…' : 'Saving to gallery…',
   };
 
   const doneCount = doneItems.length;
@@ -573,13 +639,33 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
                   {/* 操作 */}
                   <div className="flex items-center gap-1 shrink-0">
                     {item.status === 'done' && item.result && (
-                      <button
-                        onClick={() => downloadFile(item.result!.blob, item.result!.filename)}
-                        className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        title={t.downloadAll}
-                      >
-                        <Download className="w-4 h-4" />
-                      </button>
+                      <>
+                        <button
+                          onClick={() => void handleSaveToGallery(item)}
+                          disabled={gallerySavingIds.has(item.id)}
+                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-60"
+                          title={
+                            gallerySavedIds.has(item.id)
+                              ? t.savedGallery
+                              : gallerySavingIds.has(item.id)
+                                ? t.savingGallery
+                                : t.saveGallery
+                          }
+                        >
+                          {gallerySavedIds.has(item.id) ? (
+                            <Check className="w-4 h-4 text-green-500" />
+                          ) : (
+                            <ImagePlus className="w-4 h-4" />
+                          )}
+                        </button>
+                        <button
+                          onClick={() => downloadFile(item.result!.blob, item.result!.filename)}
+                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          title={t.downloadAll}
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => handleRemoveItem(item.id)}

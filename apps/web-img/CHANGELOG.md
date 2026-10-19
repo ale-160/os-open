@@ -6,6 +6,13 @@
 
 ### 新增
 
+- **格式转换新增 AVIF 与 TIFF 两种目标格式**（现共 8 种：JPEG/PNG/WebP/AVIF/TIFF/GIF/BMP/ICO）
+  - **AVIF 导出**：基于 `@jsquash/avif`（libavif WASM，Apache-2.0）——各主流浏览器 canvas 原生均不支持 AVIF 编码（`toBlob` 会静默回退 PNG 产出扩展名不符的文件），WASM 编码器仅在选中 AVIF 时按需加载（约 3.5MB，其他格式零开销），质量滑条 1-100 全平台可用；转换页浏览器端到端验证产出真实 `image/avif`
+  - **TIFF 导出**：自研零依赖未压缩基线编码器（`imageEncoders.ts` 的 `encodeTIFF`，小端 II，单条带，72 DPI）——像素全不透明时写 3 采样 RGB，存在透明像素时自动写 4 采样 RGBA（ExtraSamples=2 未关联 alpha），补齐 BMP 不支持透明的无损位图场景；Worker 与主线程兜底路径均可用
+- **转换页接入系统图库**：转换结果一键「存入图库」（写入共享资产库 `ale-os-assets`，系统图库 App 与其他应用即时可见），与主编辑器保存体验对齐
+- **TIFF 编码器测试**：`scripts/test-tiff-encoder.mjs` 3 个用例——用按 TIFF 6.0 规范独立实现的参考解析器校验文件头/IFD 结构/字对齐/RATIONAL 布局，并逐像素往返比对 RGB 与 RGBA（含 ExtraSamples）场景，已接入 CI
+- **构建切换**：web-img 构建从 Turbopack 切回 `next build --webpack`——Turbopack 处理 `@jsquash/avif` 的 WASM 资产时构建挂起（复现于 worker 与主线程两种引入方式），webpack 正常产出 `avif_enc.*.wasm` 静态资产
+
 - **HEIC/HEIF 输入解码**：iPhone 照片可直接拖入全站所有功能（主编辑器、批量转换、GIF 合成、图片转 PDF）
   - 基于开源 `heic-to`（libheif WASM，LGPL-3.0），解码器约 3MB 仅在真正导入 HEIC 时按需加载，其他格式零开销
   - 统一转为 JPEG（质量 0.92）后进入后续流程，转换页 Worker 线程池路径同样可用
