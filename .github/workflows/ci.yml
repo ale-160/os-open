@@ -43,6 +43,17 @@ jobs:
           pnpm --filter web-img lint
           pnpm --filter web-text lint
 
+      - name: web-img encoder tests (GIF/TIFF roundtrip)
+        run: |
+          cd apps/web-img
+          node node_modules/typescript/bin/tsc src/utils/gifEncoder.ts --outDir .test-tmp --module commonjs --target es2020
+          node scripts/test-gif-encoder.mjs
+          node node_modules/typescript/bin/tsc src/utils/imageEncoders.ts --outDir .test-tmp --module commonjs --target es2020
+          node scripts/test-tiff-encoder.mjs
+
+      - name: nchat unit tests
+        run: pnpm --filter nchat test
+
       - name: Build all apps + compose
         env:
           NEXT_TELEMETRY_DISABLED: 1
