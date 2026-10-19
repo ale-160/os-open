@@ -31,6 +31,13 @@ import {
   updateBackup,
   type BackupEntry,
 } from '@/utils/config/backup';
+import {
+  deleteWallpaper,
+  isWallpaperAssetRef,
+  saveWallpaper,
+  wallpaperIdFromRef,
+  WALLPAPER_ASSET_SCHEME
+} from '@/utils/osAssets';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -174,8 +181,14 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
 
   /**
    * 处理壁纸选择
+   * 壁纸引用的唯一持有者是配置：替换/清除时回收被替换的壁纸资产（IndexedDB）
    */
   const handleWallpaperSelect = useCallback((wallpaperUrl: string) => {
+    const previous = config.theme.wallpaperUrl;
+    if (previous && previous !== wallpaperUrl && isWallpaperAssetRef(previous)) {
+      const previousId = wallpaperIdFromRef(previous);
+      if (previousId) deleteWallpaper(previousId).catch(() => {});
+    }
     onConfigUpdate({
       theme: {
         ...config.theme,
@@ -271,13 +284,15 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
 
   /**
    * 处理本地上传壁纸
+   * 壁纸入库 IndexedDB（壁纸库），配置只存 asset://<id> 引用——不再挤占 localStorage 配额；
+   * 入库失败（如隐私模式）时退回 data: 内联的旧行为（MainPage 的迁移逻辑会再次尝试入库）
    */
   const handleWallpaperUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // 检查文件大小（限制2MB）
-    if (file.size > 2 * 1024 * 1024) {
+    // 检查文件大小（放宽到 8MB：存储走 IndexedDB，不再受 localStorage 5MB 约束）
+    if (file.size > 8 * 1024 * 1024) {
       toast.error(STRINGS.imageTooLarge);
       return;
     }
@@ -292,7 +307,9 @@ export function SettingsModal({ isOpen, onClose, config, onConfigUpdate, onImpor
     reader.onload = (e) => {
       const dataUrl = e.target?.result as string;
       setUploadedWallpaper(dataUrl);
-      handleWallpaperSelect(dataUrl);
+      saveWallpaper({ name: file.name, dataUrl })
+        .then(asset => handleWallpaperSelect(`${WALLPAPER_ASSET_SCHEME}${asset.id}`))
+        .catch(() => handleWallpaperSelect(dataUrl));
     };
     reader.readAsDataURL(file);
   }, [handleWallpaperSelect, STRINGS.imageTooLarge, STRINGS.pleaseSelectImage]);
