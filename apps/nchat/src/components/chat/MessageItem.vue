@@ -27,9 +27,11 @@ const props = defineProps({
   starredIds: { type: Array, default: () => [] },
   multiSelect: { type: Boolean, default: false },
   selected: { type: Boolean, default: false },
+  gallerySaved: { type: Set, default: () => new Set() },
+  gallerySaving: { type: Set, default: () => new Set() },
 })
 
-const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select', 'retry-message'])
+const emit = defineEmits(['edit', 'save-edit', 'update-draft', 'cancel-edit', 'recall', 'toggle-pin', 'react', 'download', 'save-gallery', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select', 'retry-message'])
 
 const reactPicker = ref(false)
 const presetEmojis = ['👍', '❤️', '😂', '😮', '🎉', '🔥']
@@ -118,6 +120,18 @@ function fileIcon(type) {
 
 function fileSrc(file) {
   return file.blobUrl || file.dataUrl || ''
+}
+
+function inGallery(file) {
+  return !!(file?.fileId && props.gallerySaved.has(file.fileId))
+}
+function savingToGallery(file) {
+  return !!(file?.fileId && props.gallerySaving.has(file.fileId))
+}
+function galleryTitle(file) {
+  if (savingToGallery(file)) return '正在存入系统图库…'
+  if (inGallery(file)) return '已存入系统图库'
+  return file?.dataUrl || file?.blobUrl ? '存入系统图库' : '加载原图后存入系统图库'
 }
 
 function isImage(type) {
@@ -269,6 +283,15 @@ function escapeHtml(s) {
             </span>
             <span class="file-name" :title="msg.file.name">{{ msg.file.name }}</span>
             <span class="file-size">{{ formatSize(msg.file.size) }}</span>
+            <button
+              v-if="isImage(msg.file.type)"
+              class="btn-mini icon-only-btn"
+              :title="galleryTitle(msg.file)"
+              @click="$emit('save-gallery', msg.file)"
+            >
+              <IconCheck v-if="inGallery(msg.file)" :size="16" />
+              <IconImage v-else :size="16" />
+            </button>
           </div>
           <a
             v-if="msg.file.thumbDataUrl"
@@ -299,6 +322,14 @@ function escapeHtml(s) {
           <div class="file-meta">
             <span class="file-name" :title="msg.file.name">{{ msg.file.name }}</span>
             <span class="file-size">{{ formatSize(msg.file.size) }}</span>
+            <button
+              class="btn-mini icon-only-btn"
+              :title="galleryTitle(msg.file)"
+              @click="$emit('save-gallery', msg.file)"
+            >
+              <IconCheck v-if="inGallery(msg.file)" :size="16" />
+              <IconImage v-else :size="16" />
+            </button>
           </div>
         </div>
         <div v-else-if="isVideo(msg.file.type)" class="file-video-wrap">

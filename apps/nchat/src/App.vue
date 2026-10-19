@@ -644,13 +644,10 @@ function onCloseTopology() {
 
         <SettingsPanel
           v-else-if="showSettings"
-          :capabilities="capabilities"
-          :role-stats="roleStats"
           :domains="topologyDomains"
           :current-server="currentServerLabel"
           :own-name="state.ownName"
           :peer-id="state.peerId"
-          @save-role="onSaveRole"
           @rename="setOwnName"
           @add-server="onAddServer"
           @remove-server="onRemoveServer"
@@ -662,8 +659,6 @@ function onCloseTopology() {
         <TopologyView
           v-else-if="showTopology"
           :domains="topologyDomains"
-          :peers="peers"
-          :connections="connections"
           @close="onCloseTopology"
         />
 
@@ -712,8 +707,6 @@ function onCloseTopology() {
     <TopologyView
       v-if="showTopology"
       :domains="topologyDomains"
-      :peers="peers"
-      :connections="connections"
       @close="onCloseTopology"
     />
 
@@ -750,13 +743,10 @@ function onCloseTopology() {
 
     <SettingsPanel
       v-if="showSettings"
-      :capabilities="capabilities"
-      :role-stats="roleStats"
       :domains="topologyDomains"
       :current-server="currentServerLabel"
       :own-name="state.ownName"
       :peer-id="state.peerId"
-      @save-role="onSaveRole"
       @rename="setOwnName"
       @add-server="onAddServer"
       @remove-server="onRemoveServer"

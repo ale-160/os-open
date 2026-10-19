@@ -1,6 +1,14 @@
 // nchat Service Worker — 仅缓存应用外壳（应用本身无中心数据可缓存）
-const CACHE = 'nchat-v1'
-const PRECACHE = ['/', '/index.html', '/manifest.json', '/favicon.png']
+// 基路径从注册 scope 推导：根路径部署为 /，嵌入 OS 壳时为 /chat/，两种部署下离线兜底均可用
+const CACHE = 'nchat-v2'
+
+const withBase = (() => {
+  const scopePath = new URL(self.registration.scope).pathname
+  const base = scopePath.endsWith('/') ? scopePath : scopePath + '/'
+  return (p) => base + p.replace(/^\//, '')
+})()
+
+const PRECACHE = [withBase(''), withBase('index.html'), withBase('manifest.json'), withBase('favicon.png')]
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -25,16 +33,20 @@ self.addEventListener('fetch', (event) => {
   // 仅拦截同源请求
   if (url.origin !== self.location.origin) return
 
-  // 导航请求：网络优先，失败回退缓存
+  // 导航请求：网络优先，失败回退缓存的外壳页
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((res) => {
           const copy = res.clone()
-          caches.open(CACHE).then((c) => c.put('/index.html', copy)).catch(() => {})
+          caches.open(CACHE).then((c) => c.put(withBase('index.html'), copy)).catch(() => {})
           return res
         })
-        .catch(() => caches.match('/index.html').then((r) => r || caches.match('/')))
+        .catch(() =>
+          caches
+            .match(withBase('index.html'))
+            .then((r) => r || caches.match(withBase('')))
+        )
     )
     return
   }
