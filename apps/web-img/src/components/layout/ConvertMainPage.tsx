@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useDragDrop } from '@/hooks/useDragDrop';
 import { useConversionPool } from '@/hooks/useConversionPool';
 import { loadImage } from '@/utils/canvas';
-import { canvasToBMP, encodeAVIF, encodeICO, encodeTIFF } from '@/utils/imageEncoders';
+import { canvasToBMP, encodeAVIF, encodeICO, encodeJXL, encodeTIFF } from '@/utils/imageEncoders';
 import { encodeGIF } from '@/utils/gifEncoder';
 import type { ConvertRequest, ConvertSuccess } from '@/workers/protocol';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { saveAsset } from '@/utils/osAssets';
 import { normalizeImageFiles } from '@/utils/heicDecode';
 import { normalizeTiffFiles } from '@/utils/tiffDecode';
+import { normalizeJxlFiles } from '@/utils/jxlDecode';
 import { SliderWithInput } from '@/components/ui/SliderWithInput';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { DragOverlay } from '@/components/ui/DragOverlay';
@@ -27,7 +28,7 @@ interface ConvertMainPageProps {
   lang: 'en' | 'zh';
 }
 
-type TargetFormat = 'jpeg' | 'png' | 'webp' | 'avif' | 'gif' | 'bmp' | 'tiff' | 'ico';
+type TargetFormat = 'jpeg' | 'png' | 'webp' | 'avif' | 'jxl' | 'gif' | 'bmp' | 'tiff' | 'ico';
 
 type ItemStatus = 'pending' | 'converting' | 'done' | 'error';
 
@@ -52,6 +53,7 @@ const FORMATS: { id: TargetFormat; ext: string; quality: boolean; note: { zh: st
   { id: 'png', ext: '.png', quality: false, note: { zh: '无损，支持透明', en: 'Lossless, transparency' } },
   { id: 'webp', ext: '.webp', quality: true, note: { zh: '比 JPEG 小 25-35%', en: '25-35% smaller than JPEG' } },
   { id: 'avif', ext: '.avif', quality: true, note: { zh: '新一代有损，比 WebP 更小', en: 'Next-gen lossy, smaller than WebP' } },
+  { id: 'jxl', ext: '.jxl', quality: true, note: { zh: 'JPEG XL，质量 100 为无损', en: 'JPEG XL, lossless at 100' } },
   { id: 'tiff', ext: '.tiff', quality: false, note: { zh: '无损位图，支持透明', en: 'Lossless, supports alpha' } },
   { id: 'gif', ext: '.gif', quality: false, note: { zh: '索引色，最大 256 色，支持透明', en: 'Indexed ≤256 colors, transparency' } },
   { id: 'bmp', ext: '.bmp', quality: false, note: { zh: '无压缩位图，不支持透明', en: 'Uncompressed, no alpha' } },
@@ -61,7 +63,7 @@ const FORMATS: { id: TargetFormat; ext: string; quality: boolean; note: { zh: st
 /** 浏览器可解码的图片扩展名（含原生解码的 avif/svg；heic 由归一化层转换） */
 const SUPPORTED_EXTENSIONS = [
   '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp',
-  '.svg', '.ico', '.avif', '.tif', '.tiff', '.heic', '.heif',
+  '.svg', '.ico', '.avif', '.jxl', '.tif', '.tiff', '.heic', '.heif',
 ];
 
 const isSupportedImage = (file: File): boolean => {
@@ -124,9 +126,10 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
     }
     setError(null);
 
-    // HEIC 先解码为 JPEG、TIFF 解码为 PNG（浏览器原生无法解码），保证后续 Worker 转换路径可用
+    // HEIC→JPEG、TIFF→PNG、JXL→PNG（浏览器原生无法解码），保证后续转换路径可用
     const normalizedHeic = await normalizeImageFiles(valid, lang);
-    const normalized = await normalizeTiffFiles(normalizedHeic, lang);
+    const normalizedTiff = await normalizeTiffFiles(normalizedHeic, lang);
+    const normalized = await normalizeJxlFiles(normalizedTiff, lang);
 
     for (const file of normalized) {
       try {
@@ -231,6 +234,17 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
       };
     }
 
+    if (format === 'jxl') {
+      // JPEG XL：原生 canvas 不支持编码，走 libjxl WASM（懒加载）
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      return {
+        blob: await encodeJXL(imageData, quality),
+        width: targetW,
+        height: targetH,
+        filename,
+      };
+    }
+
     if (format === 'bmp') {
       const blob = canvasToBMP(canvas);
       if (!blob) throw new Error('BMP encode failed');
@@ -276,8 +290,8 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
         maxWidth: limitSize && parseInt(maxWidth) > 0 ? parseInt(maxWidth) : null,
         maxHeight: limitSize && parseInt(maxHeight) > 0 ? parseInt(maxHeight) : null,
       };
-      if (format === 'avif') {
-        // AVIF 编码器为 libavif WASM 懒加载，固定在主线程执行（避免 Worker 打包 WASM 资产）
+      if (format === 'avif' || format === 'jxl') {
+        // AVIF/JXL 编码器为 WASM 懒加载，固定在主线程执行（避免 Worker 打包 WASM 资产）
         const result = await convertOne(item.file);
         if (!result) throw new Error('convert failed');
         return { id: req.id, ok: true, ...result };
@@ -573,7 +587,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
                 >
                   <EmptyState variant="convert" title={t.uploadTitle} description={t.uploadHint} />
                   <div className="flex flex-wrap justify-center gap-1.5 mt-5 px-4">
-                    {['JPG', 'PNG', 'WebP', 'GIF', 'BMP', 'SVG', 'ICO', 'AVIF'].map((ext) => (
+                    {['JPG', 'PNG', 'WebP', 'GIF', 'BMP', 'SVG', 'ICO', 'AVIF', 'JXL', 'TIFF'].map((ext) => (
                       <span
                         key={ext}
                         className="px-2 py-0.5 text-xs font-mono rounded-md bg-muted text-muted-foreground transition-colors hover:text-foreground"

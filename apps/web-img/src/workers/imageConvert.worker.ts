@@ -15,7 +15,7 @@ import { buildFilename } from './protocol';
 interface ConvertRequest {
   id: string;
   file: File;
-  format: 'jpeg' | 'png' | 'webp' | 'avif' | 'gif' | 'bmp' | 'tiff' | 'ico';
+  format: 'jpeg' | 'png' | 'webp' | 'avif' | 'jxl' | 'gif' | 'bmp' | 'tiff' | 'ico';
   quality?: number;
   maxWidth?: number | null;
   maxHeight?: number | null;
@@ -77,9 +77,9 @@ workerCtx.addEventListener('message', async (event: MessageEvent<ConvertRequest>
     bitmap.close();
 
     let outBlob: Blob;
-    if (format === 'avif') {
-      // 防御：AVIF 请求由页面侧固定走主线程（WASM 不进 Worker），不应到达这里
-      throw new Error('AVIF encoding runs on the main thread');
+    if (format === 'avif' || format === 'jxl') {
+      // 防御：AVIF/JXL 请求由页面侧固定走主线程（WASM 不进 Worker），不应到达这里
+      throw new Error('AVIF/JXL encoding runs on the main thread');
     } else if (format === 'gif' || format === 'bmp' || format === 'tiff') {
       const imageData = ctx.getImageData(0, 0, targetW, targetH);
       outBlob =

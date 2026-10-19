@@ -6,6 +6,12 @@
 
 ### 新增
 
+- **JPEG XL（JXL）双向支持**：目标格式增至 9 种，输入矩阵同步补齐
+  - **JXL 导出**：`@jsquash/jxl`（libjxl WASM，约 1MB 按需懒加载，主线程与 AVIF 同路径）；质量滑条 1-100 同语义，100 即数学无损
+  - **JXL 输入**：所有主流浏览器均无法解码 JXL，导入时经 libjxl WASM 解码归一化为 PNG（保留 alpha，进度 toast），与 HEIC/TIFF 解码层一致
+  - 浏览器端到端验证：PNG→JXL（产物 0xFF 0x0A 裸码流魔数）→JXL 输入归一化往返
+- **格式转换版图总览（本轮格式转换迭代收尾）**：目标 9 种图片格式（JPEG/PNG/WebP/AVIF/JXL/TIFF/GIF/BMP/ICO）+ 数据页 6 种表格格式互转 + PDF 提取文本 + 媒体页 8 种音视频目标（输入覆盖 ffmpeg 全部可解码容器）
+
 - **音视频转换页（/media）**：格式转换进入媒体领域，格式版图最大一次扩张
   - 基于 ffmpeg.wasm（@ffmpeg/ffmpeg 0.12 + @ffmpeg/core 0.12.10）在浏览器本地转码，文件不上传
   - 音频目标：MP3 / M4A / WAV / OGG / FLAC（任意输入含视频自动提取音轨）；视频目标：MP4（H.264+AAC）/ WebM（VP8+Vorbis）/ GIF 动图（10fps 等比缩放）

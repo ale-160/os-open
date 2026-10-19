@@ -67,6 +67,17 @@ export function canvasToBMP(canvas: HTMLCanvasElement): Blob | null {
 }
 
 /**
+ * 将 ImageData 编码为 JPEG XL Blob（@jsquash/jxl，libjxl WASM）。
+ * 浏览器 canvas 原生不支持 JXL 编码，走 WASM（按需懒加载，约 1MB）；
+ * quality 1-100 与滑条同语义（100 = 无损），effort 7 取速度/压缩平衡。
+ */
+export async function encodeJXL(imageData: ImageData, quality = 90): Promise<Blob> {
+  const { encode } = await import('@jsquash/jxl');
+  const buffer = await encode(imageData, { quality, effort: 7 });
+  return new Blob([buffer], { type: 'image/jxl' });
+}
+
+/**
  * 将 ImageData 编码为 AVIF Blob（@jsquash/avif，libavif WASM）。
  *
  * 各主流浏览器的 canvas 原生均不支持 AVIF 编码（toBlob 会静默回退 PNG，
