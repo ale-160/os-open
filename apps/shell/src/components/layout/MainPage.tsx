@@ -12,6 +12,8 @@ import { useImportExport } from '@/hooks/useImportExport';
 import { Button } from '@/components/ui/button';
 import { ThemeToggleIcon } from '@/components/ui/theme-toggle-icon';
 import { extractDomain, generateFaviconCandidates } from '@/utils/url';
+import { saveWallpaper, WALLPAPER_ASSET_SCHEME } from '@/utils/osAssets';
+import { useResolvedWallpaper } from '@/hooks/useWallpaper';
 import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
 import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
@@ -175,6 +177,31 @@ function MainPageContent({ lang }: MainPageProps) {
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, [activeConfig.theme, handleConfigUpdate]);
+
+  // ===== 壁纸迁移：旧配置里的 base64 壁纸（data:）迁入 IndexedDB 壁纸库，配置只留 asset:// 引用 =====
+  // 导入的旧配置同样会经过这里被迁移；IndexedDB 不可用（如隐私模式）时保留 data: 内联，退回旧行为
+  useEffect(() => {
+    const url = activeConfig.theme.wallpaperUrl;
+    if (!url || !url.startsWith('data:')) return;
+    let cancelled = false;
+    saveWallpaper({ name: 'uploaded-wallpaper', dataUrl: url })
+      .then(asset => {
+        if (cancelled) return;
+        handleConfigUpdate({
+          theme: { ...activeConfig.theme, wallpaperUrl: `${WALLPAPER_ASSET_SCHEME}${asset.id}` }
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [activeConfig.theme, handleConfigUpdate]);
+
+  // 壁纸引用解析为可直接用于 CSS 背景的值（asset:// 查库，带缓存）
+  const resolvedWallpaper = useResolvedWallpaper(activeConfig.theme.wallpaperUrl);
+  const wallpaperIsGradient =
+    !!resolvedWallpaper &&
+    (resolvedWallpaper.startsWith('linear-gradient') || resolvedWallpaper.startsWith('radial-gradient'));
 
   // 使用图标和文件夹管理 Hook（Service 层）
   const {
@@ -379,12 +406,12 @@ function MainPageContent({ lang }: MainPageProps) {
       ))}
 
       <div
-        className={`h-screen overflow-hidden flex flex-col ${activeConfig.theme.wallpaperUrl ? '' : 'os-desktop-bg'}`}
+        className={`h-screen overflow-hidden flex flex-col ${resolvedWallpaper ? '' : 'os-desktop-bg'}`}
         style={{
-          background: activeConfig.theme.wallpaperUrl
-            ? activeConfig.theme.wallpaperUrl.startsWith('linear-gradient')
-              ? activeConfig.theme.wallpaperUrl
-              : `url(${activeConfig.theme.wallpaperUrl}) center/cover fixed`
+          background: resolvedWallpaper
+            ? wallpaperIsGradient
+              ? resolvedWallpaper
+              : `url(${resolvedWallpaper}) center/cover fixed`
             : undefined
         }}
       >
