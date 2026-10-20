@@ -338,8 +338,8 @@ export function getGifMakerMetadata(lang: string = "en"): Metadata {
 
 // 数据转换页元数据（表格互转 + PDF 提取文本）
 export const SHEET_METADATA_ZH = {
-  title: "web-img · 数据转换 - XLSX CSV JSON ODS 表格互转 + PDF 提取文本",
-  description: "免费在线数据转换工具：XLSX、XLS、CSV、TSV、ODS、JSON 表格格式互转（多表工作簿按表拆分，CSV 带 UTF-8 BOM），并支持 PDF 提取文字为 TXT。纯前端本地处理，文件不会上传服务器。",
+  title: "web-img · 数据转换 - XLSX CSV JSON YAML TOML ODS 表格互转 + PDF 提取文本",
+  description: "免费在线数据转换工具：XLSX、XLS、CSV、TSV、ODS、JSON、YAML、TOML、HTML 表格格式互转（多表工作簿按表拆分，CSV 带 UTF-8 BOM），并支持 PDF 提取文字为 TXT。纯前端本地处理，文件不会上传服务器。",
   keywords: [
     "数据转换",
     "表格转换",
@@ -356,8 +356,8 @@ export const SHEET_METADATA_ZH = {
 };
 
 export const SHEET_METADATA_EN = {
-  title: "web-img · Data Converter - XLSX CSV JSON ODS + PDF to Text",
-  description: "Free online data converter: convert between XLSX, XLS, CSV, TSV, ODS and JSON (multi-sheet workbooks split per sheet, CSV with UTF-8 BOM), and extract PDF text to TXT. All processed locally — files never leave your device.",
+  title: "web-img · Data Converter - XLSX CSV JSON YAML TOML ODS + PDF to Text",
+  description: "Free online data converter: convert between XLSX, XLS, CSV, TSV, ODS, JSON, YAML, TOML and HTML tables (multi-sheet workbooks split per sheet, CSV with UTF-8 BOM), and extract PDF text to TXT. All processed locally — files never leave your device.",
   keywords: [
     "data converter",
     "spreadsheet converter",
