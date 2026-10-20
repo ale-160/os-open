@@ -51,6 +51,10 @@ const MIME: Record<MediaOutputFormat, string> = {
 export interface MediaConvertOptions {
   /** 视频高度上限（原始分辨率缩放到该高度，等宽自适应；不传保持原始） */
   maxHeight?: number;
+  /** 剪辑起始秒（输入侧快速 seek，-ss） */
+  trimStartSec?: number;
+  /** 剪辑时长秒（-t，从起始点截取；不传到结尾） */
+  trimDurationSec?: number;
   /** 视频质量档位（mp4 走 CRF，webm 走码率） */
   videoQuality?: 'high' | 'medium' | 'low';
   /** 有损音频码率（mp3/m4a/ogg 及视频音轨） */
@@ -165,7 +169,14 @@ export async function convertMedia(
     ff.on('progress', progressHandler);
     try {
       await ff.writeFile(inName, await fetchFile(file));
-      await ff.exec(['-i', inName, ...outArgs, outName]);
+      // 输入侧剪辑：-ss 放在 -i 前为快速 seek；-t 截取时长放在输出侧
+      const inputArgs: string[] = [];
+      if (options?.trimStartSec && options.trimStartSec > 0) {
+        inputArgs.push('-ss', String(options.trimStartSec));
+      }
+      const trimArgs =
+        options?.trimDurationSec && options.trimDurationSec > 0 ? ['-t', String(options.trimDurationSec)] : [];
+      await ff.exec([...inputArgs, '-i', inName, ...outArgs, ...trimArgs, outName]);
       const data = await ff.readFile(outName);
       const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
       if (!bytes.length) throw new Error('转码输出为空（输入可能损坏或格式不受支持）');
