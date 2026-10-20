@@ -31,6 +31,8 @@ export default function MediaMainPage() {
   const [maxHeight, setMaxHeight] = useState<number | null>(null);
   const [videoQuality, setVideoQuality] = useState<'high' | 'medium' | 'low'>('medium');
   const [audioBitrate, setAudioBitrate] = useState('192k');
+  const [trimStart, setTrimStart] = useState('');
+  const [trimDuration, setTrimDuration] = useState('');
   const [isConverting, setIsConverting] = useState(false);
   const [isLoadingCore, setIsLoadingCore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,6 +81,8 @@ export default function MediaMainPage() {
           ...(maxHeight ? { maxHeight } : {}),
           ...(MEDIA_OUTPUT_PRESETS.find((p) => p.id === target)?.kind === 'video' && target !== 'gif' ? { videoQuality } : {}),
           ...(target !== 'gif' ? { audioBitrate } : {}),
+          ...(parseFloat(trimStart) > 0 ? { trimStartSec: parseFloat(trimStart) } : {}),
+          ...(parseFloat(trimDuration) > 0 ? { trimDurationSec: parseFloat(trimDuration) } : {}),
         };
         const blob = await convertMedia(item.file, target, (ratio) => {
           setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, progress: ratio } : i)));
@@ -92,7 +96,7 @@ export default function MediaMainPage() {
       }
     }
     setIsConverting(false);
-  }, [items, isConverting, target, maxHeight, videoQuality, audioBitrate]);
+  }, [items, isConverting, target, maxHeight, videoQuality, audioBitrate, trimStart, trimDuration]);
 
   const handleDownloadAll = useCallback(async () => {
     const done = items.filter((i) => i.status === 'done' && i.result);
@@ -178,6 +182,30 @@ export default function MediaMainPage() {
             {/* 转码参数 */}
             <div className="space-y-2">
               <label className="block text-sm font-medium">{lang === 'zh' ? '参数' : 'Options'}</label>
+              <label className="block text-xs text-muted-foreground">{lang === 'zh' ? '剪辑（可选）' : 'Trim (optional)'}</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={trimStart}
+                  onChange={(e) => setTrimStart(e.target.value)}
+                  placeholder={lang === 'zh' ? '开始（秒）' : 'Start (s)'}
+                  disabled={isConverting}
+                  className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-sm disabled:opacity-50"
+                />
+                <span className="text-muted-foreground text-xs">→</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={trimDuration}
+                  onChange={(e) => setTrimDuration(e.target.value)}
+                  placeholder={lang === 'zh' ? '时长（秒）' : 'Duration (s)'}
+                  disabled={isConverting}
+                  className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-sm disabled:opacity-50"
+                />
+              </div>
               <label className="block text-xs text-muted-foreground">{lang === 'zh' ? '音频码率' : 'Audio bitrate'}</label>
               <select
                 value={audioBitrate}
