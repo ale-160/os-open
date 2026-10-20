@@ -6,6 +6,11 @@
 
 ### 新增
 
+- **EPUB → TXT 提取**：「文档转文本」面板从 PDF 扩展到 EPUB 电子书
+  - 复用项目内 JSZip 解包 + 浏览器原生 DOMParser，零新依赖
+  - 按 OPF spine 阅读顺序逐章提取 XHTML 文本（块级元素边界转换行、剥离 script/style），带书名与章节标记；manifest href 相对 OPF 目录解析并解码百分号编码
+  - 浏览器端到端验证：双章节 EPUB（含内联样式）提取 TXT，章节标记与文本完整、样式内容剥离
+
 - **表格转换格式再扩充（8 种目标 / 11 种输入扩展名）**：新增 YAML 与 TOML 双向、HTML 表格输入
   - **YAML 输入/输出**（js-yaml）：顶层数组按行表解析；配置对象自动转「键/值」两列表（嵌套值序列化 JSON）；导出为行对象 YAML
   - **TOML 输入/输出**（smol-toml）：`[[items]]` 表数组按行表解析；其他顶层对象转键值表；导出为 `[[items]]` 表数组（null 单元格自动净化，TOML 无 null）

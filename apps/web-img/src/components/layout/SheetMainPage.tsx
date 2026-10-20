@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { convertSheetFile, SHEET_OUTPUT_FORMATS, SHEET_INPUT_EXTENSIONS, type SheetOutputFormat, type SheetConversion } from '@/utils/sheetConvert';
 import { extractPdfText } from '@/utils/pdfText';
+import { extractEpubText } from '@/utils/epubText';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { cn } from '@/lib/utils';
 import {
@@ -72,11 +73,13 @@ export default function SheetMainPage() {
   const sheetInputRef = useRef<HTMLInputElement>(null);
 
   // ── PDF 提取文本 ──
-  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
-  const [pdfResults, setPdfResults] = useState<ResultItem[]>([]);
+  const [docFiles, setDocFiles] = useState<File[]>([]);
+  const [docResults, setDocResults] = useState<ResultItem[]>([]);
   const [isExtracting, setIsExtracting] = useState(false);
   const [pdfProgress, setPdfProgress] = useState('');
   const pdfInputRef = useRef<HTMLInputElement>(null);
+
+  const isEpubFile = useCallback((f: File) => f.name.toLowerCase().endsWith('.epub') || f.type === 'application/epub+zip', []);
 
   const isSheetInput = useCallback((file: File) => {
     const name = file.name.toLowerCase();
@@ -94,15 +97,17 @@ export default function SheetMainPage() {
     setSheetResults([]);
   }, [isSheetInput]);
 
-  const addPdfFiles = useCallback((files: File[]) => {
-    const valid = files.filter((f) => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf');
+  const addDocFiles = useCallback((files: File[]) => {
+    const valid = files.filter(
+      (f) => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf' || isEpubFile(f)
+    );
     if (valid.length === 0) {
-      toast.error('仅支持 PDF 文件');
+      toast.error('仅支持 PDF / EPUB 文件');
       return;
     }
-    setPdfFiles((prev) => [...prev, ...valid]);
-    setPdfResults([]);
-  }, []);
+    setDocFiles((prev) => [...prev, ...valid]);
+    setDocResults([]);
+  }, [isEpubFile]);
 
   /** 表格批量转换：每个输入文件产生 1..N 个输出（多表拆分） */
   const handleConvertSheets = useCallback(async () => {
@@ -127,24 +132,29 @@ export default function SheetMainPage() {
     if (fail > 0) toast.warning(`${fail} 个文件转换失败`);
   }, [sheetFiles, format, isConverting]);
 
-  /** PDF 批量提取文本 */
-  const handleExtractPdfs = useCallback(async () => {
-    if (pdfFiles.length === 0 || isExtracting) return;
+  /** PDF/EPUB 批量提取文本 */
+  const handleExtractDocs = useCallback(async () => {
+    if (docFiles.length === 0 || isExtracting) return;
     setIsExtracting(true);
     const out: ResultItem[] = [];
     let ok = 0;
     let fail = 0;
-    for (const file of pdfFiles) {
+    for (const file of docFiles) {
       try {
-        const text = await extractPdfText(file, (page, total) =>
-          setPdfProgress(`${file.name}（${page}/${total} 页）`)
-        );
+        const epub = isEpubFile(file);
+        const text = epub
+          ? await extractEpubText(file, (section, total) =>
+              setPdfProgress(`${file.name}（${section}/${total} 节）`)
+            )
+          : await extractPdfText(file, (page, total) =>
+              setPdfProgress(`${file.name}（${page}/${total} 页）`)
+            );
         out.push({
           id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
           sourceName: file.name,
           results: [
             {
-              filename: `${file.name.replace(/\.pdf$/i, '')}.txt`,
+              filename: `${file.name.replace(/\.(pdf|epub)$/i, '')}.txt`,
               blob: new Blob([text], { type: 'text/plain;charset=utf-8' }),
               sheetName: 'text',
             },
@@ -157,11 +167,11 @@ export default function SheetMainPage() {
       }
     }
     setPdfProgress('');
-    setPdfResults(out);
+    setDocResults(out);
     setIsExtracting(false);
-    if (ok > 0) toast.success(`已提取 ${ok} 个 PDF`);
-    if (fail > 0) toast.warning(`${fail} 个 PDF 提取失败`);
-  }, [pdfFiles, isExtracting]);
+    if (ok > 0) toast.success(`已提取 ${ok} 个文档`);
+    if (fail > 0) toast.warning(`${fail} 个文档提取失败`);
+  }, [docFiles, isExtracting, isEpubFile]);
 
   /** 下载单个面板的全部结果（多于 1 个文件时打包 ZIP） */
   const downloadAll = useCallback(async (items: ResultItem[], zipName: string) => {
@@ -188,7 +198,7 @@ export default function SheetMainPage() {
   }, []);
 
   const sheetCount = sheetResults.reduce((sum, r) => sum + r.results.length, 0);
-  const pdfCount = pdfResults.reduce((sum, r) => sum + r.results.length, 0);
+  const pdfCount = docResults.reduce((sum, r) => sum + r.results.length, 0);
 
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -204,13 +214,13 @@ export default function SheetMainPage() {
           </button>
           <h1 className="text-lg font-bold text-primary">数据转换</h1>
         </div>
-        {(sheetFiles.length > 0 || pdfFiles.length > 0) && (
+        {(sheetFiles.length > 0 || docFiles.length > 0) && (
           <button
             onClick={() => {
               setSheetFiles([]);
               setSheetResults([]);
-              setPdfFiles([]);
-              setPdfResults([]);
+              setDocFiles([]);
+              setDocResults([]);
             }}
             disabled={isConverting || isExtracting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors text-sm"
@@ -283,10 +293,10 @@ export default function SheetMainPage() {
         <section className="rounded-xl border border-border bg-card p-4 space-y-4 self-start">
           <div className="flex items-center gap-2">
             <FileText className="w-4.5 h-4.5 text-primary" />
-            <h2 className="font-semibold">PDF 提取文本</h2>
+            <h2 className="font-semibold">文档转文本（PDF / EPUB）</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            从 PDF 中提取文字为 TXT（逐页保留顺序，多页带页码标记）；本地解析，文件不上传
+            从 PDF（逐页，带页码标记）与 EPUB（按 spine 阅读顺序，带章节标记）中提取文字为 TXT；本地解析，文件不上传
           </p>
 
           <div
@@ -295,12 +305,12 @@ export default function SheetMainPage() {
           >
             <FileText className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
             <p className="text-sm font-medium">选择或拖入 PDF 文件</p>
-            <p className="text-xs text-muted-foreground mt-1">支持批量 · {pdfFiles.length > 0 ? `已选 ${pdfFiles.length} 个` : '扫描件无文字层将得到空文本'}</p>
+            <p className="text-xs text-muted-foreground mt-1">支持批量 · {docFiles.length > 0 ? `已选 ${docFiles.length} 个` : '扫描件无文字层将得到空文本'}</p>
           </div>
 
           <button
-            onClick={() => void handleExtractPdfs()}
-            disabled={pdfFiles.length === 0 || isExtracting}
+            onClick={() => void handleExtractDocs()}
+            disabled={docFiles.length === 0 || isExtracting}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
           >
             {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
@@ -308,9 +318,9 @@ export default function SheetMainPage() {
           </button>
 
           <ResultList
-            items={pdfResults}
+            items={docResults}
             count={pdfCount}
-            onDownloadAll={() => void downloadAll(pdfResults, 'web-img-pdf-text')}
+            onDownloadAll={() => void downloadAll(docResults, 'web-img-doc-text')}
             emptyHint="提取的文本将显示在这里"
           />
         </section>
@@ -332,9 +342,9 @@ export default function SheetMainPage() {
         ref={pdfInputRef}
         type="file"
         multiple
-        accept=".pdf,application/pdf"
+        accept=".pdf,.epub,application/pdf,application/epub+zip"
         onChange={(e) => {
-          if (e.target.files?.length) addPdfFiles(Array.from(e.target.files));
+          if (e.target.files?.length) addDocFiles(Array.from(e.target.files));
           e.target.value = '';
         }}
         className="hidden"
