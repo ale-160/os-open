@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { convertMedia, loadFFmpeg, mediaOutputName, MEDIA_OUTPUT_PRESETS, type MediaOutputFormat } from '@/utils/mediaConvert';
+import { convertMedia, loadFFmpeg, mediaOutputName, MEDIA_OUTPUT_PRESETS, type MediaConvertOptions, type MediaOutputFormat } from '@/utils/mediaConvert';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -27,6 +27,10 @@ export default function MediaMainPage() {
   const { language: lang } = useLanguage();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [target, setTarget] = useState<MediaOutputFormat>('mp3');
+  // 转码参数
+  const [maxHeight, setMaxHeight] = useState<number | null>(null);
+  const [videoQuality, setVideoQuality] = useState<'high' | 'medium' | 'low'>('medium');
+  const [audioBitrate, setAudioBitrate] = useState('192k');
   const [isConverting, setIsConverting] = useState(false);
   const [isLoadingCore, setIsLoadingCore] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -71,9 +75,14 @@ export default function MediaMainPage() {
     for (const item of pending) {
       setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, status: 'converting', progress: 0 } : i)));
       try {
+        const options: MediaConvertOptions = {
+          ...(maxHeight ? { maxHeight } : {}),
+          ...(MEDIA_OUTPUT_PRESETS.find((p) => p.id === target)?.kind === 'video' && target !== 'gif' ? { videoQuality } : {}),
+          ...(target !== 'gif' ? { audioBitrate } : {}),
+        };
         const blob = await convertMedia(item.file, target, (ratio) => {
           setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, progress: ratio } : i)));
-        });
+        }, options);
         setItems((prev) => prev.map((i) => (i.id === item.id
           ? { ...i, status: 'done', result: { blob, filename: mediaOutputName(item.file.name, target) } }
           : i)));
@@ -83,7 +92,7 @@ export default function MediaMainPage() {
       }
     }
     setIsConverting(false);
-  }, [items, isConverting, target]);
+  }, [items, isConverting, target, maxHeight, videoQuality, audioBitrate]);
 
   const handleDownloadAll = useCallback(async () => {
     const done = items.filter((i) => i.status === 'done' && i.result);
@@ -166,6 +175,53 @@ export default function MediaMainPage() {
                 </button>
               ))}
             </div>
+            {/* 转码参数 */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">{lang === 'zh' ? '参数' : 'Options'}</label>
+              <label className="block text-xs text-muted-foreground">{lang === 'zh' ? '音频码率' : 'Audio bitrate'}</label>
+              <select
+                value={audioBitrate}
+                onChange={(e) => setAudioBitrate(e.target.value)}
+                disabled={isConverting || target === 'gif'}
+                className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-sm disabled:opacity-50"
+              >
+                <option value="128k">128 kbps</option>
+                <option value="192k">192 kbps</option>
+                <option value="320k">320 kbps</option>
+              </select>
+              {(target === 'mp4' || target === 'webm') && (
+                <>
+                  <label className="block text-xs text-muted-foreground">{lang === 'zh' ? '视频质量' : 'Video quality'}</label>
+                  <select
+                    value={videoQuality}
+                    onChange={(e) => setVideoQuality(e.target.value as 'high' | 'medium' | 'low')}
+                    disabled={isConverting}
+                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-sm disabled:opacity-50"
+                  >
+                    <option value="high">{lang === 'zh' ? '高（体积大）' : 'High (larger)'}</option>
+                    <option value="medium">{lang === 'zh' ? '中（推荐）' : 'Medium (recommended)'}</option>
+                    <option value="low">{lang === 'zh' ? '低（体积小）' : 'Low (smaller)'}</option>
+                  </select>
+                </>
+              )}
+              {isVideoTarget && (
+                <>
+                  <label className="block text-xs text-muted-foreground">{lang === 'zh' ? '分辨率高度上限' : 'Max resolution height'}</label>
+                  <select
+                    value={maxHeight ?? ''}
+                    onChange={(e) => setMaxHeight(e.target.value ? parseInt(e.target.value) : null)}
+                    disabled={isConverting}
+                    className="w-full px-2 py-1.5 rounded-lg bg-background border border-border text-sm disabled:opacity-50"
+                  >
+                    <option value="">{lang === 'zh' ? '原始分辨率' : 'Original'}</option>
+                    <option value="1080">1080p</option>
+                    <option value="720">720p</option>
+                    <option value="480">480p</option>
+                  </select>
+                </>
+              )}
+            </div>
+
             {isVideoTarget && (
               <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
                 {lang === 'zh' ? '⚠ 视频目标需要视频输入；从音频转视频目标会失败' : '⚠ Video targets need a video input; audio → video target will fail'}
