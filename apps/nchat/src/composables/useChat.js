@@ -12,7 +12,7 @@
  *  - pendingRequests: 当前房间的待处理加入申请
  *  - storageStats: 本地存储用量统计
  */
-import { reactive, ref, shallowRef, readonly, computed } from 'vue'
+import { reactive, ref, shallowRef, readonly, computed, watch } from 'vue'
 import { loadOrCreateIdentity } from '../lib/crypto.js'
 import { PeerNetwork } from '../lib/peer.js'
 import { AccessRule, SpeakRule, NodeRole, DEFAULT_CAPABILITIES, MsgType } from '../lib/protocol.js'
@@ -805,6 +805,48 @@ function upsertPeer(peerJsId, patch) {
   peers.value = [...arr]
 }
 
+// ---- OS 未读角标：未读消息计数，上报桌面壳（Ale OS dock）/ 独立运行时更新标题 ----
+const unreadRooms = new Map() // roomName -> 未读数（非响应式，仅供角标计算）
+
+/** 应用是否正在被用户查看：iframe 内 document.hidden 仅反映标签页可见性，
+ *  壳以 CSS 隐藏最小化的应用（visibility 不变），需用 hasFocus() 识别 */
+function appIsVisible() {
+  if (typeof document === 'undefined') return false
+  return document.visibilityState === 'visible' && document.hasFocus()
+}
+
+function reportUnread() {
+  let total = 0
+  for (const n of unreadRooms.values()) total += n
+  try {
+    document.title = total > 0 ? `(${total}) nchat` : 'nchat'
+  } catch (e) { /* ignore */ }
+  try {
+    if (typeof window !== 'undefined' && window.parent && window.parent !== window) {
+      window.parent.postMessage({ type: 'os-badge', appId: 'nchat', count: total }, '*')
+    }
+  } catch (e) { /* ignore */ }
+}
+
+function clearUnread(room) {
+  if (room && unreadRooms.has(room)) {
+    unreadRooms.delete(room)
+    reportUnread()
+  }
+}
+
+// 切换房间即视为已读该房间
+watch(currentRoom, (room) => clearUnread(room))
+
+// 应用回到可见且有焦点时，当前房间视为已读
+if (typeof document !== 'undefined') {
+  const onVisible = () => {
+    if (appIsVisible()) clearUnread(currentRoom.value)
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  window.addEventListener('focus', onVisible)
+}
+
 async function handleChatMessage(chatMsg, fromHistory = false) {
   if (!chatMsg || !chatMsg.id) return
 
@@ -854,14 +896,19 @@ async function handleChatMessage(chatMsg, fromHistory = false) {
     stats.value.received++
   }
 
-  // P2-8: 浏览器通知——他人消息且（不在该房间或页面隐藏）且未免打扰
+  // P2-8: 浏览器通知 + 未读角标——他人消息且（不在该房间或应用未在前台）且未免打扰
   if (chatMsg.from !== state.peerId && !fromHistory) {
     const inThisRoom = chatMsg.room === currentRoom.value
-    const pageHidden = typeof document !== 'undefined' && document.hidden
-    if (!inThisRoom || pageHidden) {
+    const notViewing = !appIsVisible()
+    if (!inThisRoom || notViewing) {
       if (!mutedRooms.value.has(chatMsg.room)) {
         const preview = (chatMsg.text || (chatMsg.file ? '[文件]' : '')).slice(0, 50)
         pushNotification('info', `${chatMsg.name || chatMsg.from.slice(0, 8)}: ${preview}`, chatMsg.room)
+      }
+      // 未读计数（免打扰房间同样计入角标，只是不弹通知）
+      if (chatMsg.room) {
+        unreadRooms.set(chatMsg.room, (unreadRooms.get(chatMsg.room) ?? 0) + 1)
+        reportUnread()
       }
     }
   }

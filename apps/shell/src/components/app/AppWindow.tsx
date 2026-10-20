@@ -27,6 +27,8 @@ interface AppWindowContextValue {
   openApp: (app: OsApp) => void;
   goHome: () => void;
   killApp: (id: string) => void;
+  /** 各应用未读角标（应用 iframe 通过 postMessage 上报，打开应用即清零） */
+  badges: Readonly<Record<string, number>>;
 }
 
 // Provider 外的兜底实现：在新标签打开应用路径，保证上下文缺失时行为可用
@@ -35,7 +37,8 @@ const FALLBACK_CONTEXT: AppWindowContextValue = {
   activeApp: null,
   openApp: app => window.open(app.path, '_blank'),
   goHome: () => {},
-  killApp: () => {}
+  killApp: () => {},
+  badges: {}
 };
 
 const AppWindowContext = createContext<AppWindowContextValue>(FALLBACK_CONTEXT);
@@ -48,8 +51,35 @@ export function AppWindowProvider({ children }: { children: React.ReactNode }) {
   const [runningApps, setRunningApps] = useState<OsApp[]>([]);
   const [activeAppId, setActiveAppId] = useState<string | null>(null);
   const [loadedIds, setLoadedIds] = useState<Record<string, boolean>>({});
+  const [badges, setBadges] = useState<Record<string, number>>({});
+  // iframe 注册表：应用 postMessage 按 source 归属到具体应用
+  const framesRef = useRef<Map<string, HTMLIFrameElement>>(new Map());
+  const registerFrame = useCallback((id: string, el: HTMLIFrameElement | null) => {
+    if (el) framesRef.current.set(id, el);
+    else framesRef.current.delete(id);
+  }, []);
   // 当前窗口是否由 pushState 打开（决定收起时走 history.back 还是直接复位）
   const pushedRef = useRef(false);
+
+  // 应用 iframe 上报未读角标（{ type: 'os-badge', count }）
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; count?: number } | null;
+      if (!data || data.type !== 'os-badge') return;
+      let targetId: string | null = null;
+      for (const [id, frame] of framesRef.current) {
+        if (frame.contentWindow === event.source) {
+          targetId = id;
+          break;
+        }
+      }
+      if (!targetId) return;
+      const count = Math.max(0, Math.floor(Number(data.count) || 0));
+      setBadges((prev) => ({ ...prev, [targetId]: count }));
+    };
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, []);
 
   const activate = useCallback((app: OsApp) => {
     setRunningApps(prev =>
@@ -87,6 +117,13 @@ export function AppWindowProvider({ children }: { children: React.ReactNode }) {
   const openApp = useCallback(
     (app: OsApp) => {
       activate(app);
+      // 用户回到应用即视为已读
+      setBadges((prev) => {
+        if (!(app.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[app.id];
+        return next;
+      });
       if (activeAppId !== app.id) {
         window.history.pushState({ osApp: app.id }, '', app.path);
         pushedRef.current = true;
@@ -109,6 +146,11 @@ export function AppWindowProvider({ children }: { children: React.ReactNode }) {
     (id: string) => {
       setRunningApps(prev => prev.filter(app => app.id !== id));
       setLoadedIds(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setBadges(prev => {
         const next = { ...prev };
         delete next[id];
         return next;
@@ -136,11 +178,12 @@ export function AppWindowProvider({ children }: { children: React.ReactNode }) {
         activeApp: runningApps.find(app => app.id === activeAppId) ?? null,
         openApp,
         goHome,
-        killApp
+        killApp,
+        badges
       }}
     >
       {children}
-      <AppWindowView markLoaded={markLoaded} loadedIds={loadedIds} />
+      <AppWindowView markLoaded={markLoaded} loadedIds={loadedIds} registerFrame={registerFrame} badges={badges} />
     </AppWindowContext.Provider>
   );
 }
@@ -150,10 +193,14 @@ export function AppWindowProvider({ children }: { children: React.ReactNode }) {
  */
 function AppWindowView({
   markLoaded,
-  loadedIds
+  loadedIds,
+  registerFrame,
+  badges
 }: {
   markLoaded: (id: string) => void;
   loadedIds: Record<string, boolean>;
+  registerFrame: (id: string, el: HTMLIFrameElement | null) => void;
+  badges: Readonly<Record<string, number>>;
 }) {
   const { runningApps, activeApp, goHome, killApp, openApp } = useAppWindow();
   const language = 'zh';
@@ -206,6 +253,7 @@ function AppWindowView({
           >
             <iframe
               data-os-app-frame
+              ref={(el) => registerFrame(app.id, el)}
               src={app.path}
               title={language === 'zh' ? app.name : app.nameEn}
               className="h-full w-full border-0"
@@ -250,7 +298,9 @@ function AppWindowView({
           data-os-dock
           className="glass fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2.5 rounded-2xl p-2.5 shadow-xl"
         >
-          {runningApps.map(app => (
+          {runningApps.map(app => {
+            const badge = badges[app.id] ?? 0;
+            return (
             <div key={app.id} className="group relative">
               <button
                 type="button"
@@ -261,6 +311,14 @@ function AppWindowView({
               >
                 <img src={app.icon} alt="" className="h-full w-full object-cover" />
               </button>
+              {badge > 0 && (
+                <span
+                  data-os-dock-badge={app.id}
+                  className="absolute -left-1 -top-1 z-10 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] font-semibold leading-4 text-white shadow"
+                >
+                  {badge > 99 ? '99+' : badge}
+                </span>
+              )}
               <span
                 data-os-dock-running
                 className="absolute bottom-0.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full bg-foreground/70"
@@ -275,7 +333,8 @@ function AppWindowView({
                 <X className="h-3 w-3" />
               </button>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </>

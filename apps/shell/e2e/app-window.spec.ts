@@ -105,3 +105,27 @@ test('键盘 Home 键最小化应用窗口回桌面（应用保活）', async ({
   await expect(page.locator('[data-os-app-window="web-text"]')).toHaveCount(1);
   await expect(page.locator('[data-os-dock]')).toBeVisible();
 });
+
+test('应用 iframe 上报未读角标：dock 显示徽标，打开应用即清零', async ({ page }) => {
+  await page.goto('/');
+  await dismissWelcome(page);
+
+  await page.locator('[data-icon-item][data-id="icon-app-web-img"]').click();
+  await expect(page.locator('[data-os-app-window="web-img"]')).toHaveAttribute('data-active', 'true');
+
+  // 模拟应用内向壳上报未读（框架内执行 postMessage）
+  // 注意：点击图标后主页 URL 被 pushState 成 /img/，必须取子 frame（非 mainFrame）
+  const frame = page.frames().find(f => f !== page.mainFrame() && f.url().includes('/img/'));
+  await frame!.evaluate(() => window.parent.postMessage({ type: 'os-badge', appId: 'nchat', count: 3 }, '*'));
+
+  await page.getByRole('button', { name: /返回桌面|back to home/i }).click();
+  await expect(page.locator('[data-os-dock]')).toBeVisible();
+  const badge = page.locator('[data-os-dock-badge="web-img"]');
+  await expect(badge).toHaveText('3');
+
+  // 打开应用清零
+  await page.getByRole('button', { name: /打开 图片工具箱|open image toolbox/i }).click();
+  await expect(page.locator('[data-os-app-window="web-img"]')).toHaveAttribute('data-active', 'true');
+  await page.getByRole('button', { name: /返回桌面|back to home/i }).click();
+  await expect(page.locator('[data-os-dock-badge="web-img"]')).toHaveCount(0);
+});
