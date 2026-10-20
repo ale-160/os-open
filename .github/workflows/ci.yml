@@ -42,6 +42,7 @@ jobs:
         run: |
           pnpm --filter web-img lint
           pnpm --filter web-text lint
+          pnpm --filter typev lint
 
       - name: web-img encoder tests (GIF/TIFF roundtrip)
         run: |

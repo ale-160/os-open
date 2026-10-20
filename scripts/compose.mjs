@@ -1,5 +1,5 @@
 /**
- * 把三个应用的静态导出合成为单一站点：
+ * 把各应用的静态导出合成为单一站点：
  *   apps/shell/out     → out/          （桌面壳，根路径）
  *   apps/web-img/out   → out/img/      （图片工具箱，/img/）
  *   apps/web-text/out  → out/text/     （Markdown 编辑器，/text/）
@@ -16,7 +16,8 @@ const parts = [
   ['apps/shell/out', '.'],
   ['apps/web-img/out', 'img'],
   ['apps/web-text/out', 'text'],
-  ['apps/nchat/out', 'chat']
+  ['apps/nchat/out', 'chat'],
+  ['apps/typev/out', 'typev']
 ];
 
 rmSync(outDir, { recursive: true, force: true });

@@ -63,6 +63,16 @@ export const OS_APPS: readonly OsApp[] = [
     repository: 'https://github.com/ale-160/nchat'
   },
   {
+    id: 'typev',
+    name: '文字动画',
+    nameEn: 'TypeV',
+    path: '/typev/',
+    icon: '/apps/typev.png',
+    description: '脚本驱动的文字打字动画制作器：标签脚本、实时预览、录制导出视频',
+    descriptionEn: 'Script-driven text animation studio: tag script, live preview, video export',
+    repository: 'https://github.com/ale-160/os-open'
+  },
+  {
     id: 'web-text',
     name: 'Markdown 编辑器',
     nameEn: 'Markdown Editor',

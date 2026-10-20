@@ -59,6 +59,16 @@
       "isHidden": false,
       "iconType": "custom",
       "customIconUrl": "/apps/gallery.png"
+    },
+    {
+      "id": "icon-app-typev",
+      "name": "文字动画",
+      "url": "app://typev",
+      "folderId": null,
+      "order": 5,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/typev.png"
     }
   ],
   "folders": [],
@@ -71,7 +81,8 @@
         "icon-app-web-img",
         "icon-app-web-text",
         "icon-app-nchat",
-        "icon-app-gallery"
+        "icon-app-gallery",
+        "icon-app-typev"
       ]
     },
     {
