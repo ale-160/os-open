@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { DragOverlay } from '@/components/ui/DragOverlay';
 import { ImagesToPdfPanel } from '@/components/features/ImagesToPdfPanel';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 
 /** 渲染倍率：高分辨率渲染保证导出清晰度 */
 const PAGE_SCALE = 2.0;
@@ -32,11 +33,13 @@ interface PdfMainPageProps {
   lang: 'en' | 'zh';
 }
 
-export default function PdfMainPage({ lang }: PdfMainPageProps) {
+export default function PdfMainPage({ lang: _lang }: PdfMainPageProps) {
+  // 界面语言实时跟随系统共享语言（ale-os-language），服务端 lang 仅作 SEO/兜底
+  const { language } = useLanguage();
   // 动态设置 <html lang> 属性
   useEffect(() => {
-    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
-  }, [lang]);
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+  }, [language]);
 
   const router = useRouter();
   /** 页面模式：PDF → 图片 / 图片 → PDF */
@@ -106,10 +109,10 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
       // 用户快速翻页时 pdfjs 会以 RenderingCancelledException 中断旧渲染，属正常现象
       if ((err as { name?: string })?.name !== 'RenderingCancelledException') {
         console.error('渲染页面失败:', err);
-        setError(lang === 'zh' ? '渲染页面失败' : 'Failed to render page');
+        setError(language === 'zh' ? '渲染页面失败' : 'Failed to render page');
       }
     }
-  }, [pdfDoc, lang]);
+  }, [pdfDoc, language]);
 
   // 监听 pdfDoc 变化，渲染第一页（解决首次加载不显示问题）
   useEffect(() => {
@@ -133,9 +136,9 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
       // 第一页渲染由 useEffect 处理
     } catch (err) {
       console.error('加载 PDF 失败:', err);
-      setError(lang === 'zh' ? '加载 PDF 失败，请重试' : 'Failed to load PDF, please try again');
+      setError(language === 'zh' ? '加载 PDF 失败，请重试' : 'Failed to load PDF, please try again');
     }
-  }, [lang]);
+  }, [language]);
 
   // 处理文件选择
   const handleFilesSelected = useCallback(async (files: FileList | File[]) => {
@@ -143,7 +146,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     const pdfFile = fileArray.find(isPdfFile);
 
     if (!pdfFile) {
-      setError(lang === 'zh' ? '请选择 PDF 文件' : 'Please select a PDF file');
+      setError(language === 'zh' ? '请选择 PDF 文件' : 'Please select a PDF file');
       return;
     }
 
@@ -162,7 +165,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     // 加载 PDF 文档
     await loadPdfDocument(pdfFile);
     setLoading(false);
-  }, [pdfObjectUrl, loadPdfDocument, lang]);
+  }, [pdfObjectUrl, loadPdfDocument, language]);
 
   // 处理拖拽文件（过滤 PDF）；「图片 → PDF」模式下交给面板自己的拖拽处理
   const handleDragFiles = useCallback((files: File[]) => {
@@ -171,9 +174,9 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
     if (validPdfFiles.length > 0) {
       void handleFilesSelected(validPdfFiles);
     } else {
-      setError(lang === 'zh' ? '请选择 PDF 文件' : 'Please select a PDF file');
+      setError(language === 'zh' ? '请选择 PDF 文件' : 'Please select a PDF file');
     }
-  }, [handleFilesSelected, lang, mode]);
+  }, [handleFilesSelected, language, mode]);
 
   // 使用通用的拖拽处理 Hook
   const { isDragging, dragHandlers } = useDragDrop(handleDragFiles);
@@ -229,7 +232,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
 
     const pages = parsePageRange(pageRangeInput);
     if (pages.length === 0) {
-      setError(lang === 'zh' ? '请输入有效的页面范围' : 'Please enter a valid page range');
+      setError(language === 'zh' ? '请输入有效的页面范围' : 'Please enter a valid page range');
       return;
     }
 
@@ -283,7 +286,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
       setShowDownloadModal(false);
     } catch (err) {
       console.error('转换失败:', err);
-      setError(lang === 'zh' ? '转换失败，请重试' : 'Conversion failed, please try again');
+      setError(language === 'zh' ? '转换失败，请重试' : 'Conversion failed, please try again');
     } finally {
       setConverting(false);
     }
@@ -305,33 +308,33 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
   };
 
   const t = {
-    back: lang === 'zh' ? '返回' : 'Back',
-    pdfTool: lang === 'zh' ? 'PDF 转换工具' : 'PDF Converter',
-    uploadTitle: lang === 'zh' ? '上传您的 PDF 文件' : 'Upload Your PDF File',
-    uploadHint: lang === 'zh' ? '选择或拖拽一个 PDF 文件进行转换' : 'Select or drag a PDF file to convert',
-    dragHere: lang === 'zh' ? '拖拽 PDF 到此处' : 'Drag PDF here',
-    clickSelect: lang === 'zh' ? '或点击选择文件' : 'Or click to select file',
-    pages: lang === 'zh' ? '页' : 'pages',
-    convertDownload: lang === 'zh' ? '转换并下载' : 'Convert & Download',
-    downloadFormat: lang === 'zh' ? '下载格式' : 'Download Format',
-    imageQuality: lang === 'zh' ? '图片质量 (1-100)' : 'Image Quality (1-100)',
-    pageRange: lang === 'zh' ? '页面范围' : 'Page Range',
-    pageRangeHint: lang === 'zh' ? '单页: 1 · 范围: 1-3 · 多个: 1,3,5' : 'Single: 1 · Range: 1-3 · Multiple: 1,3,5',
-    cancel: lang === 'zh' ? '取消' : 'Cancel',
-    download: lang === 'zh' ? '下载' : 'Download',
-    converting: lang === 'zh' ? '转换中...' : 'Converting...',
-    best: lang === 'zh' ? '最佳 (100%)' : 'Best (100%)',
-    high: lang === 'zh' ? '高 (90%)' : 'High (90%)',
-    medium: lang === 'zh' ? '中 (75%)' : 'Medium (75%)',
-    low: lang === 'zh' ? '低 (50%)' : 'Low (50%)',
-    loading: lang === 'zh' ? '正在加载 PDF...' : 'Loading PDF...',
-    multiPage: lang === 'zh' ? '支持多页转换 · 使用高分辨率渲染确保转换效果最佳' : 'Multi-page support · High resolution rendering for best results',
-    png: lang === 'zh' ? 'PNG - 便携式网络图形' : 'PNG - Portable Network Graphics',
-    jpeg: lang === 'zh' ? 'JPEG - 联合图像专家组' : 'JPEG - Joint Photographic Experts Group',
-    webp: lang === 'zh' ? 'WebP - Google 格式' : 'WebP - Google Format',
-    tabToImage: lang === 'zh' ? 'PDF → 图片' : 'PDF → Image',
-    tabToPdf: lang === 'zh' ? '图片 → PDF' : 'Image → PDF',
-    composePrivacy: lang === 'zh'
+    back: language === 'zh' ? '返回' : 'Back',
+    pdfTool: language === 'zh' ? 'PDF 转换工具' : 'PDF Converter',
+    uploadTitle: language === 'zh' ? '上传您的 PDF 文件' : 'Upload Your PDF File',
+    uploadHint: language === 'zh' ? '选择或拖拽一个 PDF 文件进行转换' : 'Select or drag a PDF file to convert',
+    dragHere: language === 'zh' ? '拖拽 PDF 到此处' : 'Drag PDF here',
+    clickSelect: language === 'zh' ? '或点击选择文件' : 'Or click to select file',
+    pages: language === 'zh' ? '页' : 'pages',
+    convertDownload: language === 'zh' ? '转换并下载' : 'Convert & Download',
+    downloadFormat: language === 'zh' ? '下载格式' : 'Download Format',
+    imageQuality: language === 'zh' ? '图片质量 (1-100)' : 'Image Quality (1-100)',
+    pageRange: language === 'zh' ? '页面范围' : 'Page Range',
+    pageRangeHint: language === 'zh' ? '单页: 1 · 范围: 1-3 · 多个: 1,3,5' : 'Single: 1 · Range: 1-3 · Multiple: 1,3,5',
+    cancel: language === 'zh' ? '取消' : 'Cancel',
+    download: language === 'zh' ? '下载' : 'Download',
+    converting: language === 'zh' ? '转换中...' : 'Converting...',
+    best: language === 'zh' ? '最佳 (100%)' : 'Best (100%)',
+    high: language === 'zh' ? '高 (90%)' : 'High (90%)',
+    medium: language === 'zh' ? '中 (75%)' : 'Medium (75%)',
+    low: language === 'zh' ? '低 (50%)' : 'Low (50%)',
+    loading: language === 'zh' ? '正在加载 PDF...' : 'Loading PDF...',
+    multiPage: language === 'zh' ? '支持多页转换 · 使用高分辨率渲染确保转换效果最佳' : 'Multi-page support · High resolution rendering for best results',
+    png: language === 'zh' ? 'PNG - 便携式网络图形' : 'PNG - Portable Network Graphics',
+    jpeg: language === 'zh' ? 'JPEG - 联合图像专家组' : 'JPEG - Joint Photographic Experts Group',
+    webp: language === 'zh' ? 'WebP - Google 格式' : 'WebP - Google Format',
+    tabToImage: language === 'zh' ? 'PDF → 图片' : 'PDF → Image',
+    tabToPdf: language === 'zh' ? '图片 → PDF' : 'Image → PDF',
+    composePrivacy: language === 'zh'
       ? '所有处理在浏览器本地完成，图片不会上传到服务器'
       : 'All processing runs locally in your browser — images never leave your device',
   };
@@ -394,7 +397,7 @@ export default function PdfMainPage({ lang }: PdfMainPageProps) {
       {/* 主内容 */}
       <main className="flex-1 flex flex-col min-h-0">
         {mode === 'toPdf' ? (
-          <ImagesToPdfPanel lang={lang} onPdfFileReceived={handlePdfFileFromPanel} />
+          <ImagesToPdfPanel lang={language} onPdfFileReceived={handlePdfFileFromPanel} />
         ) : (
         <>
         {!currentPdfFile ? (

@@ -2847,18 +2847,6 @@ export class PeerNetwork extends EventTarget {
     return true
   }
 
-  /**
-   * 重启并切换到指定信令服务器
-   */
-  async restartWithServer(server) {
-    await this.stop()
-    this._started = false
-    this.peerJsId = null
-    this.connections.clear()
-    this._activeServer = null
-    await this.start(server)
-  }
-
   async leaveRoom(room) {
     if (!this._localRoomsSet.has(room)) return
     this._localRoomsSet.delete(room)

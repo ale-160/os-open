@@ -4,17 +4,18 @@
  *
  * 使用 createImageBitmap 解码（与 <img> 同等的格式支持，含 EXIF 方向），
  * OffscreenCanvas 绘制；JPEG/PNG/WebP 用原生 convertToBlob，
- * BMP/GIF/ICO 走共享的自研编码器（无 DOM 依赖）。
+ * BMP/TIFF/GIF/ICO 走共享的自研编码器（无 DOM 依赖）。
+ * AVIF 编码器（libavif WASM）不打进 Worker——由主线程直接编码（见 ConvertMainPage）。
  */
 
-import { encodeBMP, encodeICO } from '../utils/imageEncoders';
+import { encodeBMP, encodeICO, encodeTIFF } from '../utils/imageEncoders';
 import { encodeGIF } from '../utils/gifEncoder';
 import { buildFilename } from './protocol';
 
 interface ConvertRequest {
   id: string;
   file: File;
-  format: 'jpeg' | 'png' | 'webp' | 'gif' | 'bmp' | 'ico';
+  format: 'jpeg' | 'png' | 'webp' | 'avif' | 'jxl' | 'gif' | 'bmp' | 'tiff' | 'ico';
   quality?: number;
   maxWidth?: number | null;
   maxHeight?: number | null;
@@ -76,9 +77,17 @@ workerCtx.addEventListener('message', async (event: MessageEvent<ConvertRequest>
     bitmap.close();
 
     let outBlob: Blob;
-    if (format === 'gif' || format === 'bmp') {
+    if (format === 'avif' || format === 'jxl') {
+      // 防御：AVIF/JXL 请求由页面侧固定走主线程（WASM 不进 Worker），不应到达这里
+      throw new Error('AVIF/JXL encoding runs on the main thread');
+    } else if (format === 'gif' || format === 'bmp' || format === 'tiff') {
       const imageData = ctx.getImageData(0, 0, targetW, targetH);
-      outBlob = format === 'gif' ? encodeGIF(imageData) : encodeBMP(imageData);
+      outBlob =
+        format === 'gif'
+          ? encodeGIF(imageData)
+          : format === 'bmp'
+            ? encodeBMP(imageData)
+            : encodeTIFF(imageData);
     } else {
       const q = format === 'jpeg' || format === 'webp' ? (quality ?? 90) / 100 : undefined;
       outBlob = await canvas.convertToBlob({ type: `image/${format}`, quality: q });

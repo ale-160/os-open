@@ -27,6 +27,7 @@ import {
   IconTrash,
   IconReact
 } from './icons'
+import { saveAsset } from '../utils/osAssets'
 
 const props = defineProps({
   currentRoom: { type: String, default: '' },
@@ -273,6 +274,44 @@ function requestDownload(file) {
   }, 12000)
 }
 
+// ---- OS 系统图库：聊天图片一键存入 ale-os-assets（与系统图库 App、图片工具箱共享） ----
+const gallerySavedIds = ref(new Set())
+const gallerySavingIds = ref(new Set())
+
+async function blobUrlToDataUrl(blobUrl) {
+  const blob = await (await fetch(blobUrl)).blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(blob)
+  })
+}
+
+async function onSaveGallery(file) {
+  if (!file) return
+  try {
+    let dataUrl = file.dataUrl
+    if (!dataUrl && file.blobUrl) {
+      dataUrl = await blobUrlToDataUrl(file.blobUrl)
+    }
+    if (!dataUrl) {
+      // 原图未加载（仅元信息）：先向发送者拉取，完成后可再次保存
+      requestDownload(file)
+      return
+    }
+    gallerySavingIds.value = new Set(gallerySavingIds.value).add(file.fileId || file.name)
+    await saveAsset({ name: file.name || 'nchat-image', dataUrl })
+    gallerySavedIds.value = new Set(gallerySavedIds.value).add(file.fileId || file.name)
+  } catch (e) {
+    /* 存储失败静默（如隐私模式 IndexedDB 不可用），按钮态不复位为未保存 */
+  } finally {
+    const next = new Set(gallerySavingIds.value)
+    next.delete(file.fileId || file.name)
+    gallerySavingIds.value = next
+  }
+}
+
 // 监听消息变化：下载完成后清理下载中标记；下载失败立即提示
 watch(
   () => props.messages,
@@ -391,6 +430,8 @@ function onLocated(msgId) {
             :starred-ids="starredMsgIds"
             :multi-select="multiSelect.active"
             :selected-ids="selectedIds"
+            :gallery-saved="gallerySavedIds"
+            :gallery-saving="gallerySavingIds"
             @edit="emit('edit-message', $event)"
             @recall="emit('recall-message', $event)"
             @toggle-pin="emit('toggle-pin', $event)"
@@ -398,6 +439,7 @@ function onLocated(msgId) {
             @retry-message="emit('retry-message', $event)"
             @react="emit('react-message', $event)"
             @download="onDownloadFile"
+            @save-gallery="onSaveGallery"
             @reply="startReply"
             @locate="locateMessage"
             @multi-select="enterMultiSelect"
@@ -436,9 +478,12 @@ function onLocated(msgId) {
       :file="lightboxFile"
       :downloading="downloadingIds.has(lightboxFile.fileId)"
       :download-failed="downloadFailed"
+      :gallery-saved="gallerySavedIds"
+      :gallery-saving="gallerySavingIds"
       @close="closeLightbox"
       @retry="retryDownload"
       @download="requestDownload(lightboxFile)"
+      @save-gallery="onSaveGallery(lightboxFile)"
     />
   </div>
 </template>
