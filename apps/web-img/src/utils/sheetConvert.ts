@@ -9,10 +9,10 @@
  */
 import type { WorkBook } from 'xlsx';
 
-export type SheetInputFormat = 'xlsx' | 'xls' | 'csv' | 'tsv' | 'ods' | 'json';
-export type SheetOutputFormat = 'xlsx' | 'csv' | 'tsv' | 'ods' | 'json' | 'html';
+export type SheetInputFormat = 'xlsx' | 'xls' | 'csv' | 'tsv' | 'ods' | 'json' | 'yaml' | 'toml' | 'html';
+export type SheetOutputFormat = 'xlsx' | 'csv' | 'tsv' | 'ods' | 'json' | 'yaml' | 'toml' | 'html';
 
-export const SHEET_INPUT_EXTENSIONS = ['.xlsx', '.xls', '.csv', '.tsv', '.ods', '.json'];
+export const SHEET_INPUT_EXTENSIONS = ['.xlsx', '.xls', '.csv', '.tsv', '.ods', '.json', '.yaml', '.yml', '.toml', '.html', '.htm'];
 
 export const SHEET_OUTPUT_FORMATS: {
   id: SheetOutputFormat;
@@ -24,6 +24,8 @@ export const SHEET_OUTPUT_FORMATS: {
   { id: 'tsv', ext: '.tsv', note: { zh: '制表符分隔', en: 'Tab-separated values' } },
   { id: 'ods', ext: '.ods', note: { zh: 'OpenDocument 表格', en: 'OpenDocument spreadsheet' } },
   { id: 'json', ext: '.json', note: { zh: '行对象数组', en: 'Array of row objects' } },
+  { id: 'yaml', ext: '.yaml', note: { zh: 'YAML 配置/数据', en: 'YAML config/data' } },
+  { id: 'toml', ext: '.toml', note: { zh: 'TOML 配置（items 表数组）', en: 'TOML config (items tables)' } },
   { id: 'html', ext: '.html', note: { zh: '网页表格', en: 'HTML table' } },
 ];
 
@@ -33,6 +35,8 @@ const MIME: Record<SheetOutputFormat, string> = {
   tsv: 'text/tab-separated-values;charset=utf-8',
   ods: 'application/vnd.oasis.opendocument.spreadsheet',
   json: 'application/json;charset=utf-8',
+  yaml: 'text/yaml;charset=utf-8',
+  toml: 'application/toml;charset=utf-8',
   html: 'text/html;charset=utf-8',
 };
 
@@ -61,6 +65,55 @@ function withBom(text: string): string {
 }
 
 /**
+ * 把 YAML/TOML/JSON 解析出的数据归一化为单表工作簿：
+ * - 顶层「对象数组」→ 每项一行（键为列名）
+ * - 顶层对象且恰有一个「对象数组」值 → 该数组作为行（TOML [[items]] / YAML 常见配置形态）
+ * - 其他顶层对象 → 键/值两列表（嵌套值序列化为 JSON 字符串）
+ */
+function workbookFromData(
+  XLSX: typeof import('xlsx'),
+  data: unknown,
+  label: string
+): WorkBook {
+  const isObjectRow = (v: unknown) => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+  if (Array.isArray(data)) {
+    if (data.length === 0 || !data.every(isObjectRow)) {
+      throw new Error(`${label} 顶层数组需全部为对象（每项一行，键为列名）`);
+    }
+    return sheetFromRows(XLSX, data as Record<string, unknown>[]);
+  }
+
+  if (typeof data === 'object' && data !== null) {
+    const entries = Object.entries(data as Record<string, unknown>);
+    if (entries.length === 1 && Array.isArray(entries[0][1]) && entries[0][1].length > 0 && entries[0][1].every(isObjectRow)) {
+      return sheetFromRows(XLSX, entries[0][1] as Record<string, unknown>[]);
+    }
+    const rows = entries.map(([key, value]) => ({
+      key,
+      value: typeof value === 'object' && value !== null ? JSON.stringify(value) : (value as unknown),
+    }));
+    return sheetFromRows(XLSX, rows);
+  }
+
+  throw new Error(`${label} 内容需为对象数组或对象`);
+}
+
+function sheetFromRows(XLSX: typeof import('xlsx'), rows: Record<string, unknown>[]): WorkBook {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  return wb;
+}
+
+/** TOML 无 null 且单元格内不宜再嵌套结构——嵌套值序列化为 JSON 字符串 */
+function toTomlSafeValue(value: unknown): unknown {
+  if (value === null || value === undefined) return '';
+  if (typeof value === 'object') return JSON.stringify(value);
+  return value;
+}
+
+/**
  * 把任意输入解析为 SheetJS 工作簿。
  * - XLSX/XLS/CSV/TSV/ODS：SheetJS 原生解析（CSV/TSV 按字符串读取保证 UTF-8）
  * - JSON：顶层必须是「对象数组」，每个对象为一行
@@ -84,6 +137,35 @@ export async function parseToWorkbook(file: File): Promise<WorkBook> {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     return wb;
+  }
+
+  if (name.endsWith('.yaml') || name.endsWith('.yml')) {
+    const text = await file.text();
+    const YAML = await import('js-yaml');
+    let data: unknown;
+    try {
+      data = YAML.load(text);
+    } catch {
+      throw new Error('YAML 解析失败：文件不是合法 YAML');
+    }
+    return workbookFromData(XLSX, data, 'YAML');
+  }
+
+  if (name.endsWith('.toml')) {
+    const text = await file.text();
+    const TOML = await import('smol-toml');
+    let data: unknown;
+    try {
+      data = TOML.parse(text);
+    } catch {
+      throw new Error('TOML 解析失败：文件不是合法 TOML');
+    }
+    return workbookFromData(XLSX, data, 'TOML');
+  }
+
+  if (name.endsWith('.html') || name.endsWith('.htm')) {
+    // SheetJS 原生解析 HTML <table>（取第一个表格）
+    return XLSX.read(await file.text(), { type: 'string' });
   }
 
   if (name.endsWith('.csv') || name.endsWith('.tsv')) {
@@ -143,6 +225,15 @@ export async function convertWorkbook(
     } else if (target === 'json') {
       const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
       blob = new Blob([JSON.stringify(rows, null, 2)], { type: MIME[target] });
+    } else if (target === 'yaml') {
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+      const YAML = await import('js-yaml');
+      blob = new Blob([YAML.dump(rows, { lineWidth: -1 })], { type: MIME[target] });
+    } else if (target === 'toml') {
+      const rows = (XLSX.utils.sheet_to_json(ws, { defval: null }) as Record<string, unknown>[])
+        .map((row) => Object.fromEntries(Object.entries(row).map(([k, v]) => [k, toTomlSafeValue(v)])));
+      const TOML = await import('smol-toml');
+      blob = new Blob([TOML.stringify({ items: rows })], { type: MIME[target] });
     } else {
       blob = new Blob([XLSX.utils.sheet_to_html(ws)], { type: MIME[target] });
     }

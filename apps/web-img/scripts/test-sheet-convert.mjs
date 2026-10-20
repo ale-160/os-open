@@ -122,6 +122,52 @@ async function main() {
     console.log('✓ TSV → CSV 单表无后缀');
   }
 
+  // 7. YAML 输入：对象数组行表 + 配置对象键值表 + YAML 输出往返
+  {
+    const wb1 = await wbFromFileLike({ name: 'rows.yaml', text: '- 姓名: 张三\n  分数: 95\n- 姓名: 李四\n  分数: 88\n' });
+    let rows = XLSX.utils.sheet_to_json(wb1.Sheets.Sheet1);
+    assert.strictEqual(rows[1]['姓名'], '李四');
+
+    const wb2 = await wbFromFileLike({ name: 'conf.yaml', text: 'host: localhost\nport: 8080\noptions:\n  debug: true\n' });
+    rows = XLSX.utils.sheet_to_json(wb2.Sheets.Sheet1);
+    assert.deepStrictEqual(rows.map((r) => r.key), ['host', 'port', 'options']);
+    assert.strictEqual(rows[2].value, '{"debug":true}');
+
+    const out = await convertWorkbook(wb1, 'yaml', 'rows');
+    const dumped = await out[0].blob.text();
+    assert.ok(dumped.includes('张三') && dumped.includes('分数'), 'YAML 输出含数据');
+    console.log('✓ YAML 输入（行表/键值表）+ YAML 输出往返');
+  }
+
+  // 8. TOML 输入：[[items]] 表数组 → 行表；TOML 输出 [[items]] + null 净化
+  {
+    const wb = await wbFromFileLike({ name: 'conf.toml', text: '[[items]]\nname = "a"\ncount = 1\n\n[[items]]\nname = "b"\ncount = 2\n' });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets.Sheet1);
+    assert.strictEqual(rows[0].name, 'a');
+
+    const out = await convertWorkbook(wb, 'toml', 'conf');
+    const text = await out[0].blob.text();
+    assert.ok(text.includes('[[items]]') && text.includes('name = "a"'), 'TOML 输出 items 表数组');
+
+    // null 值净化：含 null 单元格的行导出 TOML 不抛错
+    const ws = XLSX.utils.json_to_sheet([{ a: 1, b: null }]);
+    const wb2 = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb2, ws, 'S');
+    const out2 = await convertWorkbook(wb2, 'toml', 'n');
+    assert.ok((await out2[0].blob.text()).includes('items'));
+    console.log('✓ TOML 输入（表数组）+ TOML 输出与 null 净化');
+  }
+
+  // 9. HTML 表格输入（SheetJS 原生解析）
+  {
+    const html = '<html><body><table><tr><th>名称</th><th>数量</th></tr><tr><td>苹果</td><td>3</td></tr></table></body></html>';
+    const wb = await wbFromFileLike({ name: 't.html', text: html });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+    assert.strictEqual(rows[0]['名称'], '苹果');
+    assert.strictEqual(rows[0]['数量'], 3);
+    console.log('✓ HTML 表格输入解析');
+  }
+
   console.log('\n全部表格转换用例通过');
 }
 

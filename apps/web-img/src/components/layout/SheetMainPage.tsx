@@ -229,7 +229,7 @@ export default function SheetMainPage() {
             <h2 className="font-semibold">表格转换</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            XLSX / XLS / CSV / TSV / ODS / JSON 互转；多表工作簿导出 CSV 等按表拆分，XLSX/ODS 保留全部表
+            XLSX / XLS / CSV / TSV / ODS / JSON / YAML / TOML / HTML 表格互转；多表工作簿导出 CSV 等按表拆分，XLSX/ODS 保留全部表；YAML/TOML 配置对象自动转键值表或行表
           </p>
 
           <div

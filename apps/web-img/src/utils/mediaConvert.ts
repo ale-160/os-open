@@ -70,7 +70,7 @@ async function cachedBlobURL(url: string, mime: string): Promise<string> {
 }
 
 /** 加载（单例）ffmpeg 核心；首次调用触发 ~31MB 的 CDN 下载 */
-export async function loadFFmpeg(onDownload?: (bytes: number) => void): Promise<FFmpeg> {
+export async function loadFFmpeg(): Promise<FFmpeg> {
   if (instance) return instance;
   loadPromise ??= (async () => {
     const ff = new FFmpeg();

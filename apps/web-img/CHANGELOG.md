@@ -6,6 +6,12 @@
 
 ### 新增
 
+- **表格转换格式再扩充（8 种目标 / 11 种输入扩展名）**：新增 YAML 与 TOML 双向、HTML 表格输入
+  - **YAML 输入/输出**（js-yaml）：顶层数组按行表解析；配置对象自动转「键/值」两列表（嵌套值序列化 JSON）；导出为行对象 YAML
+  - **TOML 输入/输出**（smol-toml）：`[[items]]` 表数组按行表解析；其他顶层对象转键值表；导出为 `[[items]]` 表数组（null 单元格自动净化，TOML 无 null）
+  - **HTML 表格输入**：SheetJS 原生解析 `<table>`（取首个表格），网页表格直接转 XLSX/CSV 等
+  - `scripts/test-sheet-convert.mjs` 扩至 9 个用例（YAML 行表/键值表/输出往返、TOML 表数组/null 净化、HTML 解析），浏览器端到端验证 YAML→JSON、TOML→CSV、HTML→XLSX
+
 - **JPEG XL（JXL）双向支持**：目标格式增至 9 种，输入矩阵同步补齐
   - **JXL 导出**：`@jsquash/jxl`（libjxl WASM，约 1MB 按需懒加载，主线程与 AVIF 同路径）；质量滑条 1-100 同语义，100 即数学无损
   - **JXL 输入**：所有主流浏览器均无法解码 JXL，导入时经 libjxl WASM 解码归一化为 PNG（保留 alpha，进度 toast），与 HEIC/TIFF 解码层一致
