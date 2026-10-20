@@ -47,9 +47,9 @@ jobs:
       - name: web-img encoder tests (GIF/TIFF roundtrip)
         run: |
           cd apps/web-img
-          node node_modules/typescript/bin/tsc src/utils/gifEncoder.ts --outDir .test-tmp --module commonjs --target es2020
+          node node_modules/typescript/bin/tsc src/utils/gifEncoder.ts --outDir .test-tmp --module commonjs --target es2020 --skipLibCheck
           node scripts/test-gif-encoder.mjs
-          node node_modules/typescript/bin/tsc src/utils/imageEncoders.ts --outDir .test-tmp --module commonjs --target es2020
+          node node_modules/typescript/bin/tsc src/utils/imageEncoders.ts --outDir .test-tmp --module commonjs --target es2020 --skipLibCheck
           node scripts/test-tiff-encoder.mjs
           node node_modules/typescript/bin/tsc src/utils/sheetConvert.ts --outDir .test-tmp --module es2020 --target es2020 --moduleResolution bundler --skipLibCheck
           node scripts/test-sheet-convert.mjs
