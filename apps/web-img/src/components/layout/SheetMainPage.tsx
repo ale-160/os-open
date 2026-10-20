@@ -8,6 +8,7 @@ import { extractPdfText } from '@/utils/pdfText';
 import { extractEpubText } from '@/utils/epubText';
 import { downloadFile, formatFileSize } from '@/utils/file';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 import {
   ArrowLeft, Loader2, Download, Trash2, FileSpreadsheet,
   PackageCheck, FileText, Table2,
@@ -28,6 +29,7 @@ function ResultList({ items, onDownloadAll, count, emptyHint }: {
   count: number;
   emptyHint: string;
 }) {
+  const { language: lang } = useLanguage();
   if (items.length === 0) {
     return <p className="text-xs text-muted-foreground text-center py-6">{emptyHint}</p>;
   }
@@ -43,7 +45,7 @@ function ResultList({ items, onDownloadAll, count, emptyHint }: {
               <button
                 onClick={() => downloadFile(r.blob, r.filename)}
                 className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                title="下载"
+                title={lang === 'zh' ? '下载' : 'Download'}
               >
                 <Download className="w-3.5 h-3.5" />
               </button>
@@ -56,7 +58,7 @@ function ResultList({ items, onDownloadAll, count, emptyHint }: {
         className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-muted hover:bg-muted/80 transition-colors text-sm font-medium"
       >
         {count > 1 ? <PackageCheck className="w-4 h-4" /> : <Download className="w-4 h-4" />}
-        下载{count > 1 ? '全部（ZIP）' : ''}（{count}）
+        {lang === 'zh' ? '下载' : 'Download'}{count > 1 ? (lang === 'zh' ? '全部（ZIP）' : ' all (ZIP)') : ''}（{count}）
       </button>
     </div>
   );
@@ -64,6 +66,8 @@ function ResultList({ items, onDownloadAll, count, emptyHint }: {
 
 export default function SheetMainPage() {
   const router = useRouter();
+  // 界面语言实时跟随系统共享语言（ale-os-language）
+  const { language: lang } = useLanguage();
 
   // ── 表格转换 ──
   const [sheetFiles, setSheetFiles] = useState<File[]>([]);
@@ -89,10 +93,10 @@ export default function SheetMainPage() {
   const addSheetFiles = useCallback((files: File[]) => {
     const valid = files.filter(isSheetInput);
     if (valid.length === 0) {
-      toast.error('仅支持 XLSX / XLS / CSV / TSV / ODS / JSON 文件');
+      toast.error(lang === 'zh' ? '仅支持 XLSX / XLS / CSV / TSV / ODS / JSON 文件' : 'Only XLSX / XLS / CSV / TSV / ODS / JSON files are supported');
       return;
     }
-    if (valid.length < files.length) toast.warning(`已跳过 ${files.length - valid.length} 个不支持的文件`);
+    if (valid.length < files.length) toast.warning(lang === 'zh' ? `已跳过 ${files.length - valid.length} 个不支持的文件` : `Skipped ${files.length - valid.length} unsupported file(s)`);
     setSheetFiles((prev) => [...prev, ...valid]);
     setSheetResults([]);
   }, [isSheetInput]);
@@ -102,7 +106,7 @@ export default function SheetMainPage() {
       (f) => f.name.toLowerCase().endsWith('.pdf') || f.type === 'application/pdf' || isEpubFile(f)
     );
     if (valid.length === 0) {
-      toast.error('仅支持 PDF / EPUB 文件');
+      toast.error(lang === 'zh' ? '仅支持 PDF / EPUB 文件' : 'Only PDF / EPUB files are supported');
       return;
     }
     setDocFiles((prev) => [...prev, ...valid]);
@@ -128,8 +132,8 @@ export default function SheetMainPage() {
     }
     setSheetResults(out);
     setIsConverting(false);
-    if (ok > 0) toast.success(`已转换 ${ok} 个文件`);
-    if (fail > 0) toast.warning(`${fail} 个文件转换失败`);
+    if (ok > 0) toast.success(lang === 'zh' ? `已转换 ${ok} 个文件` : `Converted ${ok} file(s)`);
+    if (fail > 0) toast.warning(lang === 'zh' ? `${fail} 个文件转换失败` : `${fail} file(s) failed to convert`);
   }, [sheetFiles, format, isConverting]);
 
   /** PDF/EPUB 批量提取文本 */
@@ -144,10 +148,10 @@ export default function SheetMainPage() {
         const epub = isEpubFile(file);
         const text = epub
           ? await extractEpubText(file, (section, total) =>
-              setPdfProgress(`${file.name}（${section}/${total} 节）`)
+              setPdfProgress(lang === 'zh' ? `${file.name}（${section}/${total} 节）` : `${file.name} (section ${section}/${total})`)
             )
           : await extractPdfText(file, (page, total) =>
-              setPdfProgress(`${file.name}（${page}/${total} 页）`)
+              setPdfProgress(lang === 'zh' ? `${file.name}（${page}/${total} 页）` : `${file.name} (page ${page}/${total})`)
             );
         out.push({
           id: `${file.name}-${file.size}-${Math.random().toString(36).slice(2)}`,
@@ -169,8 +173,8 @@ export default function SheetMainPage() {
     setPdfProgress('');
     setDocResults(out);
     setIsExtracting(false);
-    if (ok > 0) toast.success(`已提取 ${ok} 个文档`);
-    if (fail > 0) toast.warning(`${fail} 个文档提取失败`);
+    if (ok > 0) toast.success(lang === 'zh' ? `已提取 ${ok} 个文档` : `Extracted ${ok} document(s)`);
+    if (fail > 0) toast.warning(lang === 'zh' ? `${fail} 个文档提取失败` : `${fail} document(s) failed to extract`);
   }, [docFiles, isExtracting, isEpubFile]);
 
   /** 下载单个面板的全部结果（多于 1 个文件时打包 ZIP） */
@@ -210,9 +214,9 @@ export default function SheetMainPage() {
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>返回</span>
+            <span>{lang === 'zh' ? '返回' : 'Back'}</span>
           </button>
-          <h1 className="text-lg font-bold text-primary">数据转换</h1>
+          <h1 className="text-lg font-bold text-primary">{lang === 'zh' ? '数据转换' : 'Data Converter'}</h1>
         </div>
         {(sheetFiles.length > 0 || docFiles.length > 0) && (
           <button
@@ -226,7 +230,7 @@ export default function SheetMainPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 disabled:opacity-50 transition-colors text-sm"
           >
             <Trash2 className="w-4 h-4" />
-            <span>清空</span>
+            <span>{lang === 'zh' ? '清空' : 'Clear'}</span>
           </button>
         )}
       </header>
@@ -236,10 +240,10 @@ export default function SheetMainPage() {
         <section className="rounded-xl border border-border bg-card p-4 space-y-4 self-start">
           <div className="flex items-center gap-2">
             <Table2 className="w-4.5 h-4.5 text-primary" />
-            <h2 className="font-semibold">表格转换</h2>
+            <h2 className="font-semibold">{lang === 'zh' ? '表格转换' : 'Spreadsheets'}</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            XLSX / XLS / CSV / TSV / ODS / JSON / YAML / TOML / HTML 表格互转；多表工作簿导出 CSV 等按表拆分，XLSX/ODS 保留全部表；YAML/TOML 配置对象自动转键值表或行表
+            {lang === 'zh' ? 'XLSX / XLS / CSV / TSV / ODS / JSON / YAML / TOML / HTML 表格互转；多表工作簿导出 CSV 等按表拆分，XLSX/ODS 保留全部表；YAML/TOML 配置对象自动转键值表或行表' : 'Convert between XLSX / XLS / CSV / TSV / ODS / JSON / YAML / TOML / HTML tables; multi-sheet workbooks split per sheet for CSV export, XLSX/ODS keep all sheets; YAML/TOML config objects become key-value or row tables'}
           </p>
 
           <div
@@ -247,8 +251,8 @@ export default function SheetMainPage() {
             onClick={() => sheetInputRef.current?.click()}
           >
             <FileSpreadsheet className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
-            <p className="text-sm font-medium">选择或拖入表格文件</p>
-            <p className="text-xs text-muted-foreground mt-1">支持批量 · {sheetFiles.length > 0 ? `已选 ${sheetFiles.length} 个` : '零依赖本地转换'}</p>
+            <p className="text-sm font-medium">{lang === 'zh' ? '选择或拖入表格文件' : 'Select or drop spreadsheet files'}</p>
+            <p className="text-xs text-muted-foreground mt-1">{lang === 'zh' ? '支持批量 · ' : 'Batch supported · '}{sheetFiles.length > 0 ? `已选 ${sheetFiles.length} 个` : lang === 'zh' ? '零依赖本地转换' : 'Local, zero uploads'}</p>
           </div>
 
           <div className="grid grid-cols-3 gap-1.5">
@@ -257,7 +261,7 @@ export default function SheetMainPage() {
                 key={f.id}
                 onClick={() => setFormat(f.id)}
                 disabled={isConverting}
-                title={f.note.zh}
+                title={lang === 'zh' ? f.note.zh : f.note.en}
                 className={cn(
                   'px-2 py-1.5 rounded-lg transition-all text-center',
                   format === f.id
@@ -278,14 +282,14 @@ export default function SheetMainPage() {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
           >
             {isConverting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Table2 className="w-4 h-4" />}
-            {isConverting ? '转换中...' : '开始转换'}
+            {isConverting ? (lang === 'zh' ? '转换中...' : 'Converting...') : (lang === 'zh' ? '开始转换' : 'Convert')}
           </button>
 
           <ResultList
             items={sheetResults}
             count={sheetCount}
             onDownloadAll={() => void downloadAll(sheetResults, 'web-img-sheet')}
-            emptyHint="转换结果将显示在这里"
+            emptyHint={lang === 'zh' ? '转换结果将显示在这里' : 'Conversion results will appear here'}
           />
         </section>
 
@@ -293,10 +297,10 @@ export default function SheetMainPage() {
         <section className="rounded-xl border border-border bg-card p-4 space-y-4 self-start">
           <div className="flex items-center gap-2">
             <FileText className="w-4.5 h-4.5 text-primary" />
-            <h2 className="font-semibold">文档转文本（PDF / EPUB）</h2>
+            <h2 className="font-semibold">{lang === 'zh' ? '文档转文本（PDF / EPUB）' : 'Docs to Text (PDF / EPUB)'}</h2>
           </div>
           <p className="text-xs text-muted-foreground">
-            从 PDF（逐页，带页码标记）与 EPUB（按 spine 阅读顺序，带章节标记）中提取文字为 TXT；本地解析，文件不上传
+            {lang === 'zh' ? '从 PDF（逐页，带页码标记）与 EPUB（按 spine 阅读顺序，带章节标记）中提取文字为 TXT；本地解析，文件不上传' : 'Extract text from PDF (per page, with page markers) and EPUB (in spine reading order, with section markers) to TXT; parsed locally, files never leave your device'}
           </p>
 
           <div
@@ -304,8 +308,8 @@ export default function SheetMainPage() {
             onClick={() => pdfInputRef.current?.click()}
           >
             <FileText className="w-10 h-10 mx-auto text-muted-foreground/50 mb-2" />
-            <p className="text-sm font-medium">选择或拖入 PDF 文件</p>
-            <p className="text-xs text-muted-foreground mt-1">支持批量 · {docFiles.length > 0 ? `已选 ${docFiles.length} 个` : '扫描件无文字层将得到空文本'}</p>
+            <p className="text-sm font-medium">{lang === 'zh' ? '选择或拖入 PDF 文件' : 'Select or drop PDF files'}</p>
+            <p className="text-xs text-muted-foreground mt-1">{lang === 'zh' ? '支持批量 · ' : 'Batch supported · '}{docFiles.length > 0 ? `已选 ${docFiles.length} 个` : lang === 'zh' ? '扫描件无文字层将得到空文本' : 'Scanned PDFs without a text layer yield empty text'}</p>
           </div>
 
           <button
@@ -314,14 +318,14 @@ export default function SheetMainPage() {
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
           >
             {isExtracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText className="w-4 h-4" />}
-            {isExtracting ? (pdfProgress || '提取中...') : '提取文本'}
+            {isExtracting ? (pdfProgress || (lang === 'zh' ? '提取中...' : 'Extracting...')) : (lang === 'zh' ? '提取文本' : 'Extract text')}
           </button>
 
           <ResultList
             items={docResults}
             count={pdfCount}
             onDownloadAll={() => void downloadAll(docResults, 'web-img-doc-text')}
-            emptyHint="提取的文本将显示在这里"
+            emptyHint={lang === 'zh' ? '提取的文本将显示在这里' : 'Extracted text will appear here'}
           />
         </section>
       </main>
@@ -351,7 +355,7 @@ export default function SheetMainPage() {
       />
 
       <footer className="px-4 py-2 border-t border-border bg-muted/10 text-xs text-muted-foreground text-center shrink-0">
-        🔒 所有转换在浏览器本地完成，文件不会上传到服务器
+        {lang === 'zh' ? '🔒 所有转换在浏览器本地完成，文件不会上传到服务器' : '🔒 All conversions run locally in your browser — files never leave your device'}
       </footer>
     </div>
   );

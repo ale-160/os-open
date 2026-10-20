@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import JSZip from 'jszip';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface ConvertMainPageProps {
   lang: 'en' | 'zh';
@@ -72,10 +73,12 @@ const isSupportedImage = (file: File): boolean => {
   return SUPPORTED_EXTENSIONS.includes(ext);
 };
 
-export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
+export default function ConvertMainPage({ lang: _lang }: ConvertMainPageProps) {
+  // 界面语言实时跟随系统共享语言（ale-os-language），服务端 lang 仅作 SEO/兜底
+  const { language } = useLanguage();
   useEffect(() => {
-    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
-  }, [lang]);
+    document.documentElement.lang = language === 'zh' ? 'zh-CN' : 'en';
+  }, [language]);
 
   const router = useRouter();
   const [items, setItems] = useState<ConvertItem[]>([]);
@@ -121,15 +124,15 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
   const addFiles = useCallback(async (files: File[]) => {
     const valid = files.filter(isSupportedImage);
     if (valid.length === 0) {
-      setError(lang === 'zh' ? '仅支持图片文件' : 'Only image files are supported');
+      setError(language === 'zh' ? '仅支持图片文件' : 'Only image files are supported');
       return;
     }
     setError(null);
 
     // HEIC→JPEG、TIFF→PNG、JXL→PNG（浏览器原生无法解码），保证后续转换路径可用
-    const normalizedHeic = await normalizeImageFiles(valid, lang);
-    const normalizedTiff = await normalizeTiffFiles(normalizedHeic, lang);
-    const normalized = await normalizeJxlFiles(normalizedTiff, lang);
+    const normalizedHeic = await normalizeImageFiles(valid, language);
+    const normalizedTiff = await normalizeTiffFiles(normalizedHeic, language);
+    const normalized = await normalizeJxlFiles(normalizedTiff, language);
 
     for (const file of normalized) {
       try {
@@ -148,7 +151,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
         // 跳过无法解码的文件
       }
     }
-  }, [lang, measureImage, trackUrl]);
+  }, [language, measureImage, trackUrl]);
 
   const handleRemoveItem = useCallback((id: string) => {
     setItems(prev => {
@@ -388,34 +391,34 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
 
   // ── 文案 ──
   const t = {
-    back: lang === 'zh' ? '返回' : 'Back',
-    title: lang === 'zh' ? '图片格式转换' : 'Image Converter',
-    uploadTitle: lang === 'zh' ? '拖拽图片到此处' : 'Drag images here',
-    uploadHint: lang === 'zh' ? '或点击选择文件 · 支持批量' : 'Or click to select files · batch supported',
-    targetFormat: lang === 'zh' ? '目标格式' : 'Target Format',
-    quality: lang === 'zh' ? '质量' : 'Quality',
-    limitSize: lang === 'zh' ? '限制最大尺寸（等比缩小）' : 'Limit max size (downscale)',
-    width: lang === 'zh' ? '宽' : 'W',
-    height: lang === 'zh' ? '高' : 'H',
-    convertAll: lang === 'zh' ? '开始转换' : 'Convert All',
-    converting: lang === 'zh' ? '转换中...' : 'Converting...',
-    downloadAll: lang === 'zh' ? '打包下载' : 'Download All',
-    clearAll: lang === 'zh' ? '清空' : 'Clear',
-    gifMaker: lang === 'zh' ? 'GIF 合成' : 'GIF Maker',
-    files: lang === 'zh' ? '个文件' : 'files',
-    original: lang === 'zh' ? '原图' : 'Original',
-    result: lang === 'zh' ? '结果' : 'Result',
-    pending: lang === 'zh' ? '待转换' : 'Pending',
-    failed: lang === 'zh' ? '转换失败' : 'Failed',
-    staleHint: lang === 'zh'
+    back: language === 'zh' ? '返回' : 'Back',
+    title: language === 'zh' ? '图片格式转换' : 'Image Converter',
+    uploadTitle: language === 'zh' ? '拖拽图片到此处' : 'Drag images here',
+    uploadHint: language === 'zh' ? '或点击选择文件 · 支持批量' : 'Or click to select files · batch supported',
+    targetFormat: language === 'zh' ? '目标格式' : 'Target Format',
+    quality: language === 'zh' ? '质量' : 'Quality',
+    limitSize: language === 'zh' ? '限制最大尺寸（等比缩小）' : 'Limit max size (downscale)',
+    width: language === 'zh' ? '宽' : 'W',
+    height: language === 'zh' ? '高' : 'H',
+    convertAll: language === 'zh' ? '开始转换' : 'Convert All',
+    converting: language === 'zh' ? '转换中...' : 'Converting...',
+    downloadAll: language === 'zh' ? '打包下载' : 'Download All',
+    clearAll: language === 'zh' ? '清空' : 'Clear',
+    gifMaker: language === 'zh' ? 'GIF 合成' : 'GIF Maker',
+    files: language === 'zh' ? '个文件' : 'files',
+    original: language === 'zh' ? '原图' : 'Original',
+    result: language === 'zh' ? '结果' : 'Result',
+    pending: language === 'zh' ? '待转换' : 'Pending',
+    failed: language === 'zh' ? '转换失败' : 'Failed',
+    staleHint: language === 'zh'
       ? '设置已更改，重新转换以更新结果'
       : 'Settings changed — convert again to update results',
-    privacyNote: lang === 'zh'
+    privacyNote: language === 'zh'
       ? '所有转换在浏览器本地完成，文件不会上传到服务器'
       : 'All conversions run locally in your browser — files never leave your device',
-    saveGallery: lang === 'zh' ? '存入系统图库' : 'Save to system gallery',
-    savedGallery: lang === 'zh' ? '已存入系统图库' : 'Saved to system gallery',
-    savingGallery: lang === 'zh' ? '正在存入图库…' : 'Saving to gallery…',
+    saveGallery: language === 'zh' ? '存入系统图库' : 'Save to system gallery',
+    savedGallery: language === 'zh' ? '已存入系统图库' : 'Saved to system gallery',
+    savingGallery: language === 'zh' ? '正在存入图库…' : 'Saving to gallery…',
   };
 
   const doneCount = doneItems.length;
@@ -445,7 +448,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
         </div>
         <div className="flex items-center gap-1.5">
           <a
-            href={lang === 'zh' ? '/zh/gif' : '/gif'}
+            href={language === 'zh' ? '/zh/gif' : '/gif'}
             className="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
             title={t.gifMaker}
             aria-label={t.gifMaker}
@@ -491,7 +494,7 @@ export default function ConvertMainPage({ lang }: ConvertMainPageProps) {
                     <span className="text-xs opacity-70 font-mono">{f.ext}</span>
                   </div>
                   <div className="text-xs opacity-70 leading-tight mt-0.5">
-                    {lang === 'zh' ? f.note.zh : f.note.en}
+                    {language === 'zh' ? f.note.zh : f.note.en}
                   </div>
                 </button>
               ))}
