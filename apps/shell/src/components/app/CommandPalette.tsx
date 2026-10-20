@@ -93,7 +93,8 @@ export function CommandPalette({ isOpen, onOpenChange, config, handlers }: Comma
   const S = getStrings(config.theme.language);
   const { openApp, goHome, runningApps } = useAppWindow();
 
-  // Ctrl/⌘+K 全局唤起/关闭（在任何输入框聚焦时同样生效）
+  // Ctrl/⌘+K 全局唤起/关闭；Escape 打开时必关（捕获阶段——
+  // 焦点在 cmdk 输入框时其 Escape 处理会阻断冒泡，仅依赖 radix 关闭会偶发失效）
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (
@@ -104,10 +105,14 @@ export function CommandPalette({ isOpen, onOpenChange, config, handlers }: Comma
       ) {
         event.preventDefault();
         onOpenChange(!isOpen);
+        return;
+      }
+      if (event.key === 'Escape' && isOpen) {
+        onOpenChange(false);
       }
     };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [isOpen, onOpenChange]);
 
   const commands = useMemo(
