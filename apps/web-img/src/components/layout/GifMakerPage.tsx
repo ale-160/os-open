@@ -16,6 +16,7 @@ import {
   ChevronUp, ChevronDown, Play,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/hooks/useLanguage';
 
 interface GifMakerPageProps {
   lang: 'en' | 'zh';
@@ -36,7 +37,9 @@ const MAX_FRAMES = 30;
 
 let idCounter = 0;
 
-export default function GifMakerPage({ lang }: GifMakerPageProps) {
+export default function GifMakerPage({ lang: _lang }: GifMakerPageProps) {
+  // 界面语言实时跟随系统共享语言（ale-os-language），服务端 lang 仅作 SEO/兜底
+  const { language } = useLanguage();
   const router = useRouter();
   const [frames, setFrames] = useState<FrameItem[]>([]);
   const [delayMs, setDelayMs] = useState(500);
@@ -75,7 +78,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
       if (room <= 0) return;
       const accepted = files.slice(0, room);
       // HEIC 先解码为浏览器可处理的 JPEG
-      const normalized = await normalizeImageFiles(accepted, lang);
+      const normalized = await normalizeImageFiles(accepted, language);
       const items: FrameItem[] = [];
       for (const file of normalized) {
         try {
@@ -96,7 +99,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
         setError(null);
       }
     })();
-  }, [frames.length, trackUrl, lang]);
+  }, [frames.length, trackUrl, language]);
 
   const removeFrame = useCallback((id: string) => {
     setFrames(prev => {
@@ -198,24 +201,24 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
 
   // ── 文案 ──
   const t = {
-    back: lang === 'zh' ? '返回' : 'Back',
-    title: lang === 'zh' ? 'GIF 动画合成' : 'GIF Maker',
-    clearAll: lang === 'zh' ? '清空' : 'Clear',
-    frames: lang === 'zh' ? '帧序列' : 'Frames',
-    framesHint: lang === 'zh'
+    back: language === 'zh' ? '返回' : 'Back',
+    title: language === 'zh' ? 'GIF 动画合成' : 'GIF Maker',
+    clearAll: language === 'zh' ? '清空' : 'Clear',
+    frames: language === 'zh' ? '帧序列' : 'Frames',
+    framesHint: language === 'zh'
       ? `拖拽图片到此处，按添加顺序合成 · 最多 ${MAX_FRAMES} 帧`
       : `Drag images here, combined in added order · up to ${MAX_FRAMES} frames`,
-    delay: lang === 'zh' ? '帧延时' : 'Frame Delay',
-    loop: lang === 'zh' ? '循环播放' : 'Loop',
-    encode: lang === 'zh' ? '生成 GIF' : 'Create GIF',
-    encoding: lang === 'zh' ? '合成中...' : 'Creating...',
-    needTwo: lang === 'zh' ? '至少需要 1 张图片' : 'Add at least 1 image',
-    result: lang === 'zh' ? '结果预览' : 'Result Preview',
-    download: lang === 'zh' ? '下载 GIF' : 'Download GIF',
-    reencodeHint: lang === 'zh'
+    delay: language === 'zh' ? '帧延时' : 'Frame Delay',
+    loop: language === 'zh' ? '循环播放' : 'Loop',
+    encode: language === 'zh' ? '生成 GIF' : 'Create GIF',
+    encoding: language === 'zh' ? '合成中...' : 'Creating...',
+    needTwo: language === 'zh' ? '至少需要 1 张图片' : 'Add at least 1 image',
+    result: language === 'zh' ? '结果预览' : 'Result Preview',
+    download: language === 'zh' ? '下载 GIF' : 'Download GIF',
+    reencodeHint: language === 'zh'
       ? '帧或参数已更改，请重新生成'
       : 'Frames or settings changed — create again',
-    privacyNote: lang === 'zh'
+    privacyNote: language === 'zh'
       ? '所有处理在浏览器本地完成，图片不会上传到服务器'
       : 'All processing runs locally in your browser — images never leave your device',
     ms: 'ms',
@@ -367,7 +370,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
 
           {frames.length === 0 ? (
             <div className="h-48 rounded-lg border border-dashed border-border/60 flex items-center justify-center">
-              <EmptyState variant="frames" size="sm" title={lang === 'zh' ? '尚未添加帧' : 'No frames yet'} />
+              <EmptyState variant="frames" size="sm" title={language === 'zh' ? '尚未添加帧' : 'No frames yet'} />
             </div>
           ) : (
             <ol className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 list-none">
@@ -390,7 +393,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
                     <button
                       onClick={() => moveFrame(frame.id, -1)}
                       disabled={i === 0 || isEncoding}
-                      aria-label={lang === 'zh' ? '上移' : 'Move up'}
+                      aria-label={language === 'zh' ? '上移' : 'Move up'}
                       className="w-6 h-6 rounded-md bg-black/70 text-white flex items-center justify-center hover:bg-black/90 disabled:opacity-30"
                     >
                       <ChevronUp className="w-3.5 h-3.5" />
@@ -398,7 +401,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
                     <button
                       onClick={() => moveFrame(frame.id, 1)}
                       disabled={i === frames.length - 1 || isEncoding}
-                      aria-label={lang === 'zh' ? '下移' : 'Move down'}
+                      aria-label={language === 'zh' ? '下移' : 'Move down'}
                       className="w-6 h-6 rounded-md bg-black/70 text-white flex items-center justify-center hover:bg-black/90 disabled:opacity-30"
                     >
                       <ChevronDown className="w-3.5 h-3.5" />
@@ -407,7 +410,7 @@ export default function GifMakerPage({ lang }: GifMakerPageProps) {
                   <button
                     onClick={() => removeFrame(frame.id)}
                     disabled={isEncoding}
-                    aria-label={lang === 'zh' ? '移除' : 'Remove'}
+                    aria-label={language === 'zh' ? '移除' : 'Remove'}
                     className="absolute bottom-1.5 right-1.5 z-10 w-6 h-6 rounded-md bg-black/70 text-white flex items-center justify-center hover:bg-destructive opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <X className="w-3.5 h-3.5" />
