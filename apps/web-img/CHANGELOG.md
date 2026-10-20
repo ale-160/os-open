@@ -6,6 +6,54 @@
 
 ### 新增
 
+- **音视频剪辑**：/media 参数区新增按「起始秒 + 时长秒」截取（-ss 快速 seek / -t 时长），音频/视频/GIF 所有目标均可先剪辑再转码
+
+- **全部工具页语言同步**：convert / gif / pdf / sheet / media 五个工具页此前固定中文，现全部跟随系统共享语言（ale-os-language，storage 事件实时生效）——统一语言管理承诺补齐最后一块；sheet/media 补全英文文案，页面内子组件（结果列表等）同步多语言
+- **音视频转码参数面板（/media）**：
+  - 音频码率：128 / 192 / 320 kbps（mp3/m4a/ogg 及视频音轨；GIF 无音轨自动隐藏）
+  - 视频质量三档（mp4 走 CRF 23/28/33，webm 走码率 2M/1M/600k）
+  - 分辨率高度上限：原始 / 1080p / 720p / 480p（等比缩放 `-vf scale=-2:H`，GIF 预设自带 scale 时替换其高度）
+  - 浏览器端到端验证：同一 44.1kHz 3 秒 WAV 在 320k 与 128k 下产物 120KB / 48KB，与理论值一致
+
+- **EPUB → TXT 提取**：「文档转文本」面板从 PDF 扩展到 EPUB 电子书
+  - 复用项目内 JSZip 解包 + 浏览器原生 DOMParser，零新依赖
+  - 按 OPF spine 阅读顺序逐章提取 XHTML 文本（块级元素边界转换行、剥离 script/style），带书名与章节标记；manifest href 相对 OPF 目录解析并解码百分号编码
+  - 浏览器端到端验证：双章节 EPUB（含内联样式）提取 TXT，章节标记与文本完整、样式内容剥离
+
+- **表格转换格式再扩充（8 种目标 / 11 种输入扩展名）**：新增 YAML 与 TOML 双向、HTML 表格输入
+  - **YAML 输入/输出**（js-yaml）：顶层数组按行表解析；配置对象自动转「键/值」两列表（嵌套值序列化 JSON）；导出为行对象 YAML
+  - **TOML 输入/输出**（smol-toml）：`[[items]]` 表数组按行表解析；其他顶层对象转键值表；导出为 `[[items]]` 表数组（null 单元格自动净化，TOML 无 null）
+  - **HTML 表格输入**：SheetJS 原生解析 `<table>`（取首个表格），网页表格直接转 XLSX/CSV 等
+  - `scripts/test-sheet-convert.mjs` 扩至 9 个用例（YAML 行表/键值表/输出往返、TOML 表数组/null 净化、HTML 解析），浏览器端到端验证 YAML→JSON、TOML→CSV、HTML→XLSX
+
+- **JPEG XL（JXL）双向支持**：目标格式增至 9 种，输入矩阵同步补齐
+  - **JXL 导出**：`@jsquash/jxl`（libjxl WASM，约 1MB 按需懒加载，主线程与 AVIF 同路径）；质量滑条 1-100 同语义，100 即数学无损
+  - **JXL 输入**：所有主流浏览器均无法解码 JXL，导入时经 libjxl WASM 解码归一化为 PNG（保留 alpha，进度 toast），与 HEIC/TIFF 解码层一致
+  - 浏览器端到端验证：PNG→JXL（产物 0xFF 0x0A 裸码流魔数）→JXL 输入归一化往返
+- **格式转换版图总览（本轮格式转换迭代收尾）**：目标 9 种图片格式（JPEG/PNG/WebP/AVIF/JXL/TIFF/GIF/BMP/ICO）+ 数据页 6 种表格格式互转 + PDF 提取文本 + 媒体页 8 种音视频目标（输入覆盖 ffmpeg 全部可解码容器）
+
+- **音视频转换页（/media）**：格式转换进入媒体领域，格式版图最大一次扩张
+  - 基于 ffmpeg.wasm（@ffmpeg/ffmpeg 0.12 + @ffmpeg/core 0.12.10）在浏览器本地转码，文件不上传
+  - 音频目标：MP3 / M4A / WAV / OGG / FLAC（任意输入含视频自动提取音轨）；视频目标：MP4（H.264+AAC）/ WebM（VP8+Vorbis）/ GIF 动图（10fps 等比缩放）
+  - 核心约 31MB 超过 Cloudflare Pages 单文件 25MiB 上限无法自托管——首次使用从 jsdelivr（锁定版本）加载并经 Cache API 持久缓存，之后离线可用；页面明示加载来源与本地转码承诺
+  - 单 ffmpeg 实例全局串行化转码；实时进度条与逐条完成状态；批量 ZIP 下载
+  - 首页新增「音视频转换」入口，sitemap 收录；浏览器端到端验证 WAV→MP3（产物 ID3 魔数校验通过）
+
+- **数据转换页（/sheet）**：格式转换从图片扩展到文档/数据领域
+  - **表格互转**：XLSX / XLS / CSV / TSV / ODS / JSON 六种格式互转（基于 SheetJS 官方 CDN 构建版 0.20.3，含 npm 0.18.5 之后的安全修复；纯 JS 零依赖按需加载）
+  - 多表工作簿导出 CSV/TSV/JSON/HTML 时按表拆分为多个文件（ZIP 打包下载），导出 XLSX/ODS 保留全部表；CSV/TSV 自动加 UTF-8 BOM，Excel 直接打开不乱码
+  - **PDF 提取文本**：逐页提取文字为 TXT（复用项目内 pdfjs-dist，多页带页码标记），扫描件无文字层时得到空文本提示
+  - 首页新增「数据转换」入口，sitemap 同步收录；**顺修预存 bug**——首页工具卡在中文语言下指向不存在的 /zh/* 路由导致 404
+- **表格转换核心测试**：`scripts/test-sheet-convert.mjs` 6 个用例——XLSX 整簿往返、多表拆分文件名、UTF-8 BOM 字节校验、JSON 行对象一致性、ODS 读回、非法 JSON 输入拒绝，已接入 CI
+
+- **格式转换新增 AVIF 与 TIFF 两种目标格式**（现共 8 种：JPEG/PNG/WebP/AVIF/TIFF/GIF/BMP/ICO）
+- **TIFF 输入解码**：Chrome/Firefox 的 `<img>` 无法解码 TIFF（此前拖入 .tif/.tiff 会被静默跳过），现基于纯 JS 的 `utif`（Photopea，MIT，约 100KB，按需加载）补齐——导入时自动解码为 PNG（无损保留 alpha，多页取第一页），批量进度 toast 与成功/失败计数，模式与 HEIC 解码一致；转换页输入矩阵补齐最后一块
+  - **AVIF 导出**：基于 `@jsquash/avif`（libavif WASM，Apache-2.0）——各主流浏览器 canvas 原生均不支持 AVIF 编码（`toBlob` 会静默回退 PNG 产出扩展名不符的文件），WASM 编码器仅在选中 AVIF 时按需加载（约 3.5MB，其他格式零开销），质量滑条 1-100 全平台可用；转换页浏览器端到端验证产出真实 `image/avif`
+  - **TIFF 导出**：自研零依赖未压缩基线编码器（`imageEncoders.ts` 的 `encodeTIFF`，小端 II，单条带，72 DPI）——像素全不透明时写 3 采样 RGB，存在透明像素时自动写 4 采样 RGBA（ExtraSamples=2 未关联 alpha），补齐 BMP 不支持透明的无损位图场景；Worker 与主线程兜底路径均可用
+- **转换页接入系统图库**：转换结果一键「存入图库」（写入共享资产库 `ale-os-assets`，系统图库 App 与其他应用即时可见），与主编辑器保存体验对齐
+- **TIFF 编码器测试**：`scripts/test-tiff-encoder.mjs` 3 个用例——用按 TIFF 6.0 规范独立实现的参考解析器校验文件头/IFD 结构/字对齐/RATIONAL 布局，并逐像素往返比对 RGB 与 RGBA（含 ExtraSamples）场景，已接入 CI
+- **构建切换**：web-img 构建从 Turbopack 切回 `next build --webpack`——Turbopack 处理 `@jsquash/avif` 的 WASM 资产时构建挂起（复现于 worker 与主线程两种引入方式），webpack 正常产出 `avif_enc.*.wasm` 静态资产
+
 - **HEIC/HEIF 输入解码**：iPhone 照片可直接拖入全站所有功能（主编辑器、批量转换、GIF 合成、图片转 PDF）
   - 基于开源 `heic-to`（libheif WASM，LGPL-3.0），解码器约 3MB 仅在真正导入 HEIC 时按需加载，其他格式零开销
   - 统一转为 JPEG（质量 0.92）后进入后续流程，转换页 Worker 线程池路径同样可用

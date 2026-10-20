@@ -10,9 +10,11 @@ const props = defineProps({
   starredIds: { type: Array, default: () => [] },
   multiSelect: { type: Boolean, default: false },
   selectedIds: { type: Array, default: () => [] },
+  gallerySaved: { type: Set, default: () => new Set() },
+  gallerySaving: { type: Set, default: () => new Set() },
 })
 
-const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select', 'retry-message'])
+const emit = defineEmits(['edit', 'recall', 'toggle-pin', 'react', 'download', 'save-gallery', 'reply', 'locate', 'toggle-star', 'multi-select', 'toggle-select', 'retry-message'])
 
 const listRef = ref(null)
 const editingId = ref(null)
@@ -93,6 +95,10 @@ function onReact(payload) {
 function onDownload(file) {
   emit('download', file)
 }
+
+function onSaveGallery(file) {
+  emit('save-gallery', file)
+}
 </script>
 
 <template>
@@ -109,6 +115,8 @@ function onDownload(file) {
       :starred-ids="starredIds"
       :multi-select="multiSelect"
       :selected="selectedIds.includes(m.id)"
+      :gallery-saved="gallerySaved"
+      :gallery-saving="gallerySaving"
       @edit="startEdit"
       @save-edit="saveEdit"
       @update-draft="updateDraft"
@@ -117,6 +125,7 @@ function onDownload(file) {
       @toggle-pin="emit('toggle-pin', $event)"
       @react="onReact"
       @download="onDownload"
+      @save-gallery="onSaveGallery"
       @reply="emit('reply', $event)"
       @locate="emit('locate', $event)"
       @toggle-star="emit('toggle-star', $event)"

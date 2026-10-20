@@ -1,12 +1,14 @@
 'use client';
 
 /**
- * 纯前端图片编码器：BMP 与 ICO。
+ * 纯前端图片编码器：AVIF、BMP、ICO 与 TIFF。
  *
  * 浏览器 Canvas 原生只支持导出 jpeg/png/webp；
- * 这里补充两种无依赖的编码实现，扩展格式转换的输出矩阵：
+ * 这里补充无依赖/懒加载的编码实现，扩展格式转换的输出矩阵：
+ * - AVIF：libavif WASM（@jsquash/avif，按需动态加载），全平台可用
  * - BMP：24 位真彩色（自底向上行序，行按 4 字节对齐），不支持透明通道
  * - ICO：Windows 图标容器，内嵌多尺寸 PNG（16/32/48/64/128/256）
+ * - TIFF：未压缩基线（RGB / RGBA），支持透明通道的无损位图
  */
 
 /**
@@ -62,6 +64,129 @@ export function canvasToBMP(canvas: HTMLCanvasElement): Blob | null {
   const ctx = canvas.getContext('2d');
   if (!ctx) return null;
   return encodeBMP(ctx.getImageData(0, 0, canvas.width, canvas.height));
+}
+
+/**
+ * 将 ImageData 编码为 JPEG XL Blob（@jsquash/jxl，libjxl WASM）。
+ * 浏览器 canvas 原生不支持 JXL 编码，走 WASM（按需懒加载，约 1MB）；
+ * quality 1-100 与滑条同语义（100 = 无损），effort 7 取速度/压缩平衡。
+ */
+export async function encodeJXL(imageData: ImageData, quality = 90): Promise<Blob> {
+  const { encode } = await import('@jsquash/jxl');
+  const buffer = await encode(imageData, { quality, effort: 7 });
+  return new Blob([buffer], { type: 'image/jxl' });
+}
+
+/**
+ * 将 ImageData 编码为 AVIF Blob（@jsquash/avif，libavif WASM）。
+ *
+ * 各主流浏览器的 canvas 原生均不支持 AVIF 编码（toBlob 会静默回退 PNG，
+ * 产出与扩展名不符的文件），因此走 WASM 实现：
+ * - 模块仅在真正转换 AVIF 时动态加载（wasm 约 3.5MB，其他格式零开销）；
+ * - Worker / 主线程均可运行；quality 1-100（与 jpeg/webp 滑条同语义），speed 8 取速度与压缩率平衡。
+ */
+export async function encodeAVIF(imageData: ImageData, quality = 90): Promise<Blob> {
+  const { encode } = await import('@jsquash/avif');
+  const buffer = await encode(imageData, { quality, speed: 8 });
+  return new Blob([buffer], { type: 'image/avif' });
+}
+
+/**
+ * 将 ImageData 编码为未压缩基线 TIFF Blob（小端 II）。
+ * - 像素全部不透明时写 3 采样 RGB；存在 alpha<255 像素时写 4 采样 RGBA
+ *   （ExtraSamples=2 未关联 alpha），补齐 BMP 不支持透明的无损导出场景。
+ * - 单条带（StripOffsets/RowsPerStrip=height），无 DOM 依赖，可在 Worker 中运行。
+ */
+export function encodeTIFF(imageData: ImageData): Blob {
+  const { width, height, data } = imageData;
+
+  let hasAlpha = false;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] < 255) {
+      hasAlpha = true;
+      break;
+    }
+  }
+  const spp = hasAlpha ? 4 : 3; // SamplesPerPixel
+
+  // IFD 条目按 tag 升序：RGB 12 项，RGBA 13 项（多 ExtraSamples）
+  const entryCount = hasAlpha ? 13 : 12;
+  const ifdOffset = 8;
+  const ifdSize = 2 + entryCount * 12 + 4;
+  const bitsOffset = ifdOffset + ifdSize; // BitsPerSample 数组（spp × SHORT）
+  const xResOffset = bitsOffset + spp * 2; // XResolution RATIONAL
+  const yResOffset = xResOffset + 8; // YResolution RATIONAL
+  const pixelOffset = yResOffset + 8; // 像素数据（单条带，字对齐）
+
+  const pixelSize = width * height * spp;
+  const buffer = new ArrayBuffer(pixelOffset + pixelSize);
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+
+  // ── 文件头：II（小端）+ 42 + IFD 偏移 ──
+  view.setUint8(0, 0x49);
+  view.setUint8(1, 0x49);
+  view.setUint16(2, 42, true);
+  view.setUint32(4, ifdOffset, true);
+
+  // ── IFD ──
+  const TYPE_SHORT = 3;
+  const TYPE_LONG = 4;
+  const TYPE_RATIONAL = 5;
+  view.setUint16(ifdOffset, entryCount, true);
+  let e = ifdOffset + 2;
+  const entry = (tag: number, type: number, count: number, value: number) => {
+    view.setUint16(e, tag, true);
+    view.setUint16(e + 2, type, true);
+    view.setUint32(e + 4, count, true);
+    // SHORT/LONG 内联进值字段；数组/RATIONAL 存偏移
+    view.setUint32(e + 8, value, true);
+    e += 12;
+  };
+
+  entry(256, TYPE_LONG, 1, width); // ImageWidth
+  entry(257, TYPE_LONG, 1, height); // ImageLength
+  entry(258, TYPE_SHORT, spp, bitsOffset); // BitsPerSample（外部数组）
+  entry(259, TYPE_SHORT, 1, 1); // Compression = 无压缩
+  entry(262, TYPE_SHORT, 1, 2); // PhotometricInterpretation = RGB
+  entry(273, TYPE_LONG, 1, pixelOffset); // StripOffsets
+  entry(277, TYPE_SHORT, 1, spp); // SamplesPerPixel
+  entry(278, TYPE_LONG, 1, height); // RowsPerStrip（单条带）
+  entry(279, TYPE_LONG, 1, pixelSize); // StripByteCounts
+  entry(282, TYPE_RATIONAL, 1, xResOffset); // XResolution = 72/1
+  entry(283, TYPE_RATIONAL, 1, yResOffset); // YResolution = 72/1
+  entry(296, TYPE_SHORT, 1, 2); // ResolutionUnit = 英寸
+  if (hasAlpha) entry(338, TYPE_SHORT, 1, 2); // ExtraSamples = 未关联 alpha
+  view.setUint32(e, 0, true); // 无下一 IFD
+
+  // ── 外部数据 ──
+  for (let i = 0; i < spp; i++) view.setUint16(bitsOffset + i * 2, 8, true);
+  view.setUint32(xResOffset, 72, true);
+  view.setUint32(xResOffset + 4, 1, true);
+  view.setUint32(yResOffset, 72, true);
+  view.setUint32(yResOffset + 4, 1, true);
+
+  // ── 像素：TIFF 条带为自顶向下逐行 ──
+  const rowSrc = width * 4;
+  if (hasAlpha) {
+    for (let y = 0; y < height; y++) {
+      bytes.set(data.subarray(y * rowSrc, (y + 1) * rowSrc), pixelOffset + y * rowSrc);
+    }
+  } else {
+    for (let y = 0; y < height; y++) {
+      let src = y * rowSrc;
+      let dst = pixelOffset + y * width * 3;
+      for (let x = 0; x < width; x++) {
+        bytes[dst] = data[src]; // R
+        bytes[dst + 1] = data[src + 1]; // G
+        bytes[dst + 2] = data[src + 2]; // B
+        src += 4;
+        dst += 3;
+      }
+    }
+  }
+
+  return new Blob([buffer], { type: 'image/tiff' });
 }
 
 /** ICO 内嵌的标准尺寸集合 */

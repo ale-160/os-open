@@ -15,6 +15,20 @@ export const STRINGS_ZH = {
   themeToggle: '切换主题',
   exportConfig: '导出配置',
   importConfig: '导入配置',
+
+  // 命令面板（Spotlight）
+  commandSearch: '全局搜索 (Ctrl+K)',
+  commandPaletteTitle: '命令面板',
+  commandPaletteDescription: '搜索应用、桌面图标或系统操作',
+  commandPlaceholder: '搜索应用、图标或操作...',
+  commandNoResults: '没有匹配的结果',
+  commandGroupApps: '系统应用',
+  commandGroupIcons: '桌面图标',
+  commandGroupActions: '系统操作',
+  commandGroupWeb: '网络搜索',
+  webSearchLabel: '在网络中搜索',
+  backToDesktop: '回到桌面',
+  actionToggleLanguage: '切换语言',
   
   // 空状态
   emptyTitle: '还没有任何内容',
@@ -132,7 +146,7 @@ export const STRINGS_ZH = {
   customWallpaperUrl: '自定义壁纸URL',
   apply: '应用',
   uploadLocalImage: '上传本地图片',
-  imageTooLarge: '图片太大，请选择小于2MB的图片',
+  imageTooLarge: '图片太大，请选择小于8MB的图片',
   pleaseSelectImage: '请选择图片文件',
   searchEngine: '搜索引擎',
   baidu: '百度',
@@ -378,6 +392,20 @@ export const STRINGS_EN = {
   themeToggle: 'Toggle Theme',
   exportConfig: 'Export Config',
   importConfig: 'Import Config',
+
+  // Command Palette (Spotlight)
+  commandSearch: 'Global Search (Ctrl+K)',
+  commandPaletteTitle: 'Command Palette',
+  commandPaletteDescription: 'Search apps, desktop icons or system actions',
+  commandPlaceholder: 'Search apps, icons or actions...',
+  commandNoResults: 'No matching results',
+  commandGroupApps: 'Apps',
+  commandGroupIcons: 'Desktop Icons',
+  commandGroupActions: 'Actions',
+  commandGroupWeb: 'Web Search',
+  webSearchLabel: 'Search the web for',
+  backToDesktop: 'Back to Desktop',
+  actionToggleLanguage: 'Toggle Language',
   
   // Empty State
   emptyTitle: 'No content yet',
@@ -494,7 +522,7 @@ export const STRINGS_EN = {
   customWallpaperUrl: 'Custom Wallpaper URL',
   apply: 'Apply',
   uploadLocalImage: 'Upload Local Image',
-  imageTooLarge: 'Image too large, please select an image smaller than 2MB',
+  imageTooLarge: 'Image too large, please select an image smaller than 8MB',
   pleaseSelectImage: 'Please select an image file',
   searchEngine: 'Search Engine',
   baidu: 'Baidu',

@@ -138,8 +138,8 @@ export const PDF_METADATA_EN = {
 
 // 图片格式转换页元数据
 export const CONVERT_METADATA_ZH = {
-  title: "web-img · 图片格式转换 - 批量转换 JPG PNG WebP GIF BMP ICO",
-  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、GIF、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF 及 iPhone HEIC 输入。纯前端本地处理，图片不会上传服务器。",
+  title: "web-img · 图片格式转换 - 批量转换 JPG PNG WebP AVIF JXL TIFF GIF BMP ICO",
+  description: "免费在线图片格式转换工具，支持批量将图片转换为 JPG、PNG、WebP、AVIF、JXL、TIFF、GIF、BMP、ICO 格式，可调质量和尺寸。支持 JPG、PNG、WebP、GIF、BMP、SVG、ICO、AVIF、JXL、TIFF 及 iPhone HEIC 输入。纯前端本地处理，图片不会上传服务器。",
   keywords: [
     "图片格式转换",
     "格式转换器",
@@ -157,8 +157,8 @@ export const CONVERT_METADATA_ZH = {
 };
 
 export const CONVERT_METADATA_EN = {
-  title: "web-img · Image Converter - Batch Convert JPG PNG WebP GIF BMP ICO",
-  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, GIF, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF and iPhone HEIC input. All processed locally — files never leave your device.",
+  title: "web-img · Image Converter - Batch Convert JPG PNG WebP AVIF JXL TIFF GIF BMP ICO",
+  description: "Free online image format converter. Batch convert images to JPG, PNG, WebP, AVIF, JXL, TIFF, GIF, BMP, or ICO with quality and size control. Accepts JPG, PNG, WebP, GIF, BMP, SVG, ICO, AVIF, JXL, TIFF and iPhone HEIC input. All processed locally — files never leave your device.",
   keywords: [
     "image converter",
     "format converter",
@@ -331,6 +331,138 @@ export function getGifMakerMetadata(lang: string = "en"): Metadata {
     },
     alternates: {
       canonical: url,
+    },
+  };
+}
+
+
+// 数据转换页元数据（表格互转 + PDF 提取文本）
+export const SHEET_METADATA_ZH = {
+  title: "web-img · 数据转换 - XLSX CSV JSON YAML TOML ODS 表格互转 + PDF/EPUB 提取文本",
+  description: "免费在线数据转换工具：XLSX、XLS、CSV、TSV、ODS、JSON、YAML、TOML、HTML 表格格式互转（多表工作簿按表拆分，CSV 带 UTF-8 BOM），并支持 PDF/EPUB 提取文字为 TXT。纯前端本地处理，文件不会上传服务器。",
+  keywords: [
+    "数据转换",
+    "表格转换",
+    "XLSX转CSV",
+    "CSV转XLSX",
+    "Excel转JSON",
+    "JSON转Excel",
+    "ODS转换",
+    "PDF提取文本",
+    "PDF转TXT",
+    "EPUB转TXT",
+    "EPUB提取文本",
+    "在线表格转换器",
+    "web-img",
+  ],
+};
+
+export const SHEET_METADATA_EN = {
+  title: "web-img · Data Converter - XLSX CSV JSON YAML TOML ODS + PDF/EPUB to Text",
+  description: "Free online data converter: convert between XLSX, XLS, CSV, TSV, ODS, JSON, YAML, TOML and HTML tables (multi-sheet workbooks split per sheet, CSV with UTF-8 BOM), and extract PDF/EPUB text to TXT. All processed locally — files never leave your device.",
+  keywords: [
+    "data converter",
+    "spreadsheet converter",
+    "xlsx to csv",
+    "csv to xlsx",
+    "excel to json",
+    "json to excel",
+    "ods converter",
+    "pdf to text",
+    "pdf text extraction",
+    "online spreadsheet converter",
+    "web-img",
+  ],
+};
+
+export function getSheetMetadata(lang: string = "zh"): Metadata {
+  const sheetMeta = lang === "en" ? SHEET_METADATA_EN : SHEET_METADATA_ZH;
+  const base = lang === "en" ? METADATA_EN : METADATA_ZH;
+
+  return {
+    title: sheetMeta.title,
+    description: sheetMeta.description,
+    keywords: sheetMeta.keywords,
+    openGraph: {
+      ...base.openGraph,
+      title: sheetMeta.title,
+      description: sheetMeta.description,
+      url: "https://os.ale160.com/img/sheet/",
+    },
+    twitter: { ...base.twitter, title: sheetMeta.title, description: sheetMeta.description },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+    alternates: {
+      canonical: "https://os.ale160.com/img/sheet/",
+    },
+  };
+}
+
+
+// 音视频转换页元数据（ffmpeg.wasm 本地转码）
+export const MEDIA_METADATA_ZH = {
+  title: "web-img · 音视频转换 - MP3 WAV OGG FLAC M4A MP4 WebM GIF 本地转码",
+  description: "免费在线音视频转换工具：转换为 MP3、M4A、WAV、OGG、FLAC 音频与 MP4、WebM、GIF，支持从视频提取音轨。基于 WebAssembly 的 ffmpeg 本地转码，文件不会上传服务器（首次使用需联网加载解码核心）。",
+  keywords: [
+    "音视频转换",
+    "视频转MP3",
+    "MP4转MP3",
+    "音频转换器",
+    "视频转GIF",
+    "WAV转MP3",
+    "MP4转WebM",
+    "提取音轨",
+    "本地转码",
+    "web-img",
+  ],
+};
+
+export const MEDIA_METADATA_EN = {
+  title: "web-img · Media Converter - MP3 WAV OGG FLAC M4A MP4 WebM GIF",
+  description: "Free online media converter: convert to MP3, M4A, WAV, OGG, FLAC audio and MP4, WebM, GIF video, extract audio tracks from video. Powered by in-browser WebAssembly ffmpeg — files never leave your device (first use downloads the ~31MB core from a CDN).",
+  keywords: [
+    "media converter",
+    "video to mp3",
+    "mp4 to mp3",
+    "audio converter",
+    "video to gif",
+    "wav to mp3",
+    "mp4 to webm",
+    "extract audio",
+    "local transcoding",
+    "web-img",
+  ],
+};
+
+export function getMediaMetadata(lang: string = "zh"): Metadata {
+  const mediaMeta = lang === "en" ? MEDIA_METADATA_EN : MEDIA_METADATA_ZH;
+  const base = lang === "en" ? METADATA_EN : METADATA_ZH;
+
+  return {
+    title: mediaMeta.title,
+    description: mediaMeta.description,
+    keywords: mediaMeta.keywords,
+    openGraph: {
+      ...base.openGraph,
+      title: mediaMeta.title,
+      description: mediaMeta.description,
+      url: "https://os.ale160.com/img/media/",
+    },
+    twitter: { ...base.twitter, title: mediaMeta.title, description: mediaMeta.description },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+    alternates: {
+      canonical: "https://os.ale160.com/img/media/",
     },
   };
 }
