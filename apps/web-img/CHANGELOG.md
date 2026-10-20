@@ -6,6 +6,13 @@
 
 ### 新增
 
+- **全部工具页语言同步**：convert / gif / pdf / sheet / media 五个工具页此前固定中文，现全部跟随系统共享语言（ale-os-language，storage 事件实时生效）——统一语言管理承诺补齐最后一块；sheet/media 补全英文文案，页面内子组件（结果列表等）同步多语言
+- **音视频转码参数面板（/media）**：
+  - 音频码率：128 / 192 / 320 kbps（mp3/m4a/ogg 及视频音轨；GIF 无音轨自动隐藏）
+  - 视频质量三档（mp4 走 CRF 23/28/33，webm 走码率 2M/1M/600k）
+  - 分辨率高度上限：原始 / 1080p / 720p / 480p（等比缩放 `-vf scale=-2:H`，GIF 预设自带 scale 时替换其高度）
+  - 浏览器端到端验证：同一 44.1kHz 3 秒 WAV 在 320k 与 128k 下产物 120KB / 48KB，与理论值一致
+
 - **EPUB → TXT 提取**：「文档转文本」面板从 PDF 扩展到 EPUB 电子书
   - 复用项目内 JSZip 解包 + 浏览器原生 DOMParser，零新依赖
   - 按 OPF spine 阅读顺序逐章提取 XHTML 文本（块级元素边界转换行、剥离 script/style），带书名与章节标记；manifest href 相对 OPF 目录解析并解码百分号编码

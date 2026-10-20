@@ -47,6 +47,54 @@ const MIME: Record<MediaOutputFormat, string> = {
   gif: 'image/gif',
 };
 
+/** 转码可选参数（分辨率上限 / 视频质量 / 音频码率） */
+export interface MediaConvertOptions {
+  /** 视频高度上限（原始分辨率缩放到该高度，等宽自适应；不传保持原始） */
+  maxHeight?: number;
+  /** 视频质量档位（mp4 走 CRF，webm 走码率） */
+  videoQuality?: 'high' | 'medium' | 'low';
+  /** 有损音频码率（mp3/m4a/ogg 及视频音轨） */
+  audioBitrate?: string;
+}
+
+const VIDEO_CRF: Record<NonNullable<MediaConvertOptions['videoQuality']>, string> = {
+  high: '23',
+  medium: '28',
+  low: '33',
+};
+const VIDEO_BV: Record<NonNullable<MediaConvertOptions['videoQuality']>, string> = {
+  high: '2M',
+  medium: '1M',
+  low: '600k',
+};
+
+/** 按用户选项改写预设参数（码率/质量/分辨率滤镜） */
+function buildArgs(preset: MediaOutputPreset, opts: MediaConvertOptions | undefined): string[] {
+  const args = [...preset.args];
+  if (!opts) return args;
+
+  if (opts.audioBitrate) {
+    const i = args.indexOf('-b:a');
+    if (i !== -1) args[i + 1] = opts.audioBitrate;
+  }
+  if (opts.videoQuality) {
+    const crf = args.indexOf('-crf');
+    if (crf !== -1) args[crf + 1] = VIDEO_CRF[opts.videoQuality];
+    const bv = args.indexOf('-b:v');
+    if (bv !== -1) args[bv + 1] = VIDEO_BV[opts.videoQuality];
+  }
+  if (opts.maxHeight) {
+    const vf = args.indexOf('-vf');
+    if (vf !== -1) {
+      // gif 预设自带 scale：替换其高度
+      args[vf + 1] = args[vf + 1].replace(/scale=\d+:-2/, `scale=-2:${opts.maxHeight}`);
+    } else if (preset.kind === 'video') {
+      args.push('-vf', `scale=-2:${opts.maxHeight}:flags=lanczos`);
+    }
+  }
+  return args;
+}
+
 let instance: FFmpeg | null = null;
 let loadPromise: Promise<FFmpeg> | null = null;
 
@@ -100,9 +148,11 @@ function extOf(name: string): string {
 export async function convertMedia(
   file: File,
   target: MediaOutputFormat,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  options?: MediaConvertOptions
 ): Promise<Blob> {
   const preset = MEDIA_OUTPUT_PRESETS.find((p) => p.id === target)!;
+  const outArgs = buildArgs(preset, options);
 
   const run = async (): Promise<Blob> => {
     const ff = await loadFFmpeg();
@@ -115,7 +165,7 @@ export async function convertMedia(
     ff.on('progress', progressHandler);
     try {
       await ff.writeFile(inName, await fetchFile(file));
-      await ff.exec(['-i', inName, ...preset.args, outName]);
+      await ff.exec(['-i', inName, ...outArgs, outName]);
       const data = await ff.readFile(outName);
       const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : data;
       if (!bytes.length) throw new Error('转码输出为空（输入可能损坏或格式不受支持）');
