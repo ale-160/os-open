@@ -29,6 +29,9 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'heal', icon: '💊', zh: '满血复活', en: 'Full Recovery', zhDesc: '从生病中痊愈', enDesc: 'Recover from sickness' },
   { id: 'game12', icon: '🎮', zh: '接点心大师', en: 'Snack Master', zhDesc: '接点心单局得 12 分', enDesc: 'Score 12 in one Snack Catch' },
   { id: 'aiChat', icon: '💬', zh: 'AI 好友', en: 'AI Buddy', zhDesc: '与咕咕 AI 聊过天', enDesc: 'Chat with AI GuGu' },
+  { id: 'travel1', icon: '🎒', zh: '第一次旅行', en: 'First Trip', zhDesc: '咕咕旅行归来', enDesc: 'GuGu returns from a trip' },
+  { id: 'album6', icon: '📸', zh: '旅行摄影师', en: 'Shutterbug', zhDesc: '相册集齐 6 张照片', enDesc: 'Collect 6 travel photos' },
+  { id: 'souvenir4', icon: '🎁', zh: '手信收藏家', en: 'Collector', zhDesc: '收集 4 种不同手信', enDesc: 'Collect 4 different souvenirs' },
 ];
 
 /** 判定新解锁（纯函数；返回未解锁且条件已达成的 id 列表） */
@@ -52,6 +55,9 @@ export function checkAchievements(pet: PetState): string[] {
   add('heal', c.heal >= 1);
   add('game12', pet.bests.snack >= 12);
   add('aiChat', c.aiChat >= 1);
+  add('travel1', pet.album.photos.length >= 1);
+  add('album6', pet.album.photos.length >= 6);
+  add('souvenir4', new Set(pet.album.souvenirs.map((s) => s.dest)).size >= 4);
   return earned;
 }
 

@@ -20,6 +20,8 @@ interface ActionPanelProps {
   onOpenAchievements: () => void;
   onOpenSkin: () => void;
   onOpenSettings: () => void;
+  onOpenTravel: () => void;
+  onOpenDiary: () => void;
 }
 
 export function ActionPanel({
@@ -30,6 +32,8 @@ export function ActionPanel({
   onOpenAchievements,
   onOpenSkin,
   onOpenSettings,
+  onOpenTravel,
+  onOpenDiary,
 }: ActionPanelProps) {
   const doAction = usePetStore((s) => s.doAction);
   const toggleSleep = usePetStore((s) => s.toggleSleep);
@@ -123,6 +127,8 @@ export function ActionPanel({
                 ach: onOpenAchievements,
                 skin: onOpenSkin,
                 settings: onOpenSettings,
+                travel: onOpenTravel,
+                diary: onOpenDiary,
               }).map((item) => (
                 <button
                   key={item.label}
@@ -158,7 +164,7 @@ function moreItems(
   now: number,
   t: ReturnType<typeof ui>,
   locale: 'zh' | 'en',
-  open: { shop: () => void; game: () => void; chat: () => void; ach: () => void; skin: () => void; settings: () => void }
+  open: { shop: () => void; game: () => void; chat: () => void; ach: () => void; skin: () => void; settings: () => void; travel: () => void; diary: () => void }
 ): MoreItem[] {
   const disabledBySleep = pet.sleeping || pet.stage === 'egg';
   return [
@@ -181,6 +187,8 @@ function moreItems(
       onClick: () => usePetStore.getState().doStudy(),
     },
     { icon: '🛍️', label: t.actShop, disabled: disabledBySleep, onClick: open.shop },
+    { icon: '🎒', label: t.actTravel, disabled: false, onClick: open.travel },
+    { icon: '📖', label: t.actDiary, disabled: false, onClick: open.diary },
     { icon: '🎮', label: t.actGame, disabled: disabledBySleep, onClick: open.game },
     { icon: '💬', label: locale === 'zh' ? '聊天' : 'Chat', disabled: false, onClick: open.chat },
     { icon: '🏆', label: t.achTitle, disabled: false, onClick: open.ach },

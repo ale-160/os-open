@@ -75,9 +75,48 @@ export interface GameBests {
 /** 小游戏种类（GameDialog 与结算共用） */
 export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing';
 
+/** 旅行目的地 id（见 lib/travel.ts） */
+export type DestId =
+  | 'mountain'
+  | 'beach'
+  | 'forest'
+  | 'town'
+  | 'onsen'
+  | 'camp'
+  | 'field'
+  | 'plaza';
+
+/** 便当柜里的行李（影响旅行时长/目的地倾向/手信） */
+export type Provision = 'bento' | 'bottle' | 'charm';
+
+/** 一次旅行（进行中或已归来待播报） */
+export interface PetTrip {
+  status: 'away' | 'returned';
+  departAt: number;
+  returnAt: number;
+  dest: DestId;
+  provision: Provision | null;
+  /** 已寄回的照片文案序号 */
+  photos: number[];
+  souvenir: boolean;
+}
+
+/** 相册照片（旅行寄回） */
+export interface AlbumPhoto {
+  dest: DestId;
+  cap: number;
+  at: number;
+}
+
+/** 手信收藏 */
+export interface AlbumSouvenir {
+  dest: DestId;
+  at: number;
+}
+
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {
-  saveVersion: 4;
+  saveVersion: 6;
   /** 宠物名（玩家可改，默认咕咕） */
   name: string;
   variant: VariantId;
@@ -144,6 +183,17 @@ export interface PetState {
   lastCheckinDate?: string;
   /** 连续签到天数 */
   checkinStreak?: number;
+
+  /** 进行中/归来待播报的旅行（null = 在家） */
+  trip: PetTrip | null;
+  /** 旅行相册（照片与手信，上限 36 条） */
+  album: { photos: AlbumPhoto[]; souvenirs: AlbumSouvenir[] };
+  /** 便当柜里装好的行李（下次出发生效） */
+  packedProvision?: Provision | null;
+  /** 上次自主出发时间（冷却用） */
+  lastTripAt?: number;
+  /** 日记：按日期（toDateString）记录事件 token（见 lib/diary.ts） */
+  diary: Record<string, string[]>;
 }
 
 /** 商店商品（买即用，无库存） */

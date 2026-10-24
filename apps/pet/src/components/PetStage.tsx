@@ -9,7 +9,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
-import { ui } from '@/lib/locale';
+import { weatherFor, type Weather } from '@/lib/weather';
+import { destById } from '@/lib/travel';
+import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { PetSprite, type TrickId } from './PetSprite';
 
@@ -38,6 +40,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
 
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
+  const [weather] = useState<Weather>(() => weatherFor(new Date()));
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const dirRef = useRef<1 | -1>(1);
@@ -47,7 +50,8 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   const timersRef = useRef<number[]>([]);
 
   const isEgg = pet.stage === 'egg';
-  const canPerform = !isEgg && !pet.sleeping && !anim && !pet.sick;
+  const away = pet.trip?.status === 'away';
+  const canPerform = !isEgg && !away && !pet.sleeping && !anim && !pet.sick;
   const walking = canPerform && !trick;
   const running = canPerform && trick === 'run';
 
@@ -218,6 +222,35 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       <div className="absolute -bottom-[14%] left-1/2 h-[34%] w-[150%] -translate-x-1/2 rounded-[100%]" style={{ background: sky.floor }} />
       <div className="absolute bottom-0 h-[7%] w-full" style={{ background: sky.floorDeep, opacity: 0.7 }} />
 
+      {/* 天气：坏天气罩层 + 粒子 */}
+      {(weather === 'rain' || weather === 'snow') && (
+        <>
+          <div className="pointer-events-none absolute inset-0 z-[5] bg-slate-500/15" />
+          {weather === 'rain'
+            ? [8, 18, 30, 41, 55, 63, 74, 86, 94].map((l, i) => (
+                <span
+                  key={i}
+                  className="anim-rain pointer-events-none absolute top-0 h-5 w-[2px] rounded-full bg-white/70"
+                  style={{ left: `${l}%`, animationDelay: `${(i % 4) * 0.22}s`, animationDuration: `${0.7 + (i % 3) * 0.15}s` }}
+                />
+              ))
+            : [6, 16, 26, 38, 48, 60, 70, 82, 90, 96].map((l, i) => (
+                <span
+                  key={i}
+                  className="anim-snow pointer-events-none absolute top-0 text-sm text-white"
+                  style={{ left: `${l}%`, animationDelay: `${(i % 5) * 0.9}s`, animationDuration: `${5.5 + (i % 4) * 1.2}s` }}
+                >
+                  ❄
+                </span>
+              ))}
+        </>
+      )}
+
+      {/* 天气图标（右上角浮动） */}
+      <span className="absolute right-3 top-[120px] z-[6] rounded-full bg-white/45 px-2 py-0.5 text-xs backdrop-blur-sm">
+        {weather === 'sunny' ? '☀️' : weather === 'cloudy' ? '⛅' : weather === 'rain' ? '🌧️' : '🌨️'}
+      </span>
+
       {/* 小剧场：蝴蝶（动画结束即卸载） */}
       {butterfly > 0 && (
         <span
@@ -252,11 +285,23 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         </div>
       )}
 
-      {/* 咕咕（含气泡，随踱步整体移动） */}
-      <div
-        ref={wrapRef}
-        className="absolute bottom-[7%] -translate-x-1/2"
-        style={{ left: '50%' }}
+      {/* 旅行中：出门告示卡替代咕咕本体 */}
+      {away && pet.trip && (
+        <div className="absolute left-1/2 top-1/2 z-10 w-56 -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-amber-100 bg-white/95 p-4 text-center shadow-xl backdrop-blur">
+          <span className="block text-3xl">🎒</span>
+          <p className="mt-1.5 text-sm font-bold text-gugu-ink">
+            {pet.name} {fmt(t.tripNote, { dest: locale === 'zh' ? destById(pet.trip.dest).zh : destById(pet.trip.dest).en })}
+          </p>
+          <p className="mt-1 text-[11px] text-gugu-ink-soft">{t.tripBack}</p>
+        </div>
+      )}
+
+      {/* 咕咕本体（旅行时隐藏） */}
+      {!away && (
+        <div
+          ref={wrapRef}
+          className="absolute bottom-[7%] -translate-x-1/2"
+          style={{ left: '50%' }}
         onContextMenu={(e) => {
           e.preventDefault();
           openMenuAt(e.clientX, e.clientY);
@@ -294,7 +339,8 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           trick={canPerform ? trick : null}
           onTap={onTap}
         />
-      </div>
+        </div>
+      )}
 
       {/* 破壳提示 */}
       {isEgg && pet.tapsToHatch === HATCH_TAPS && (

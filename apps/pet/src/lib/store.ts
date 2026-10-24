@@ -22,6 +22,11 @@ import { useLocale } from '@/hooks/useLocale';
 import { aiReady, buildSystemPrompt, chatComplete, loadAiSettings } from './ai';
 import { achievementById, checkAchievements } from './achievements';
 import { sfx } from './sfx';
+import { checkCare } from './care';
+import { addDiaryEvent } from './diary';
+import { isBadWeather, weatherFor } from './weather';
+import { notify } from './notify';
+import { pickDest } from './travel';
 import {
   deleteSkinRecord,
   listSkinRecords,
@@ -46,12 +51,14 @@ import type {
   GameKind,
   PetCounters,
   PetState,
+  Provision,
   ShopItem,
   SimEventKind,
   VariantId,
 } from './types';
 
 const STORAGE_KEY = 'ale-pet-save';
+const CARE_KEY = 'ale-pet-care';
 const ZERO_COUNTERS: PetCounters = {
   feed: 0,
   wash: 0,
@@ -94,6 +101,10 @@ interface PetStore {
   chatBusy: boolean;
   /** 本次会话是否出现过 AI 失败回退 */
   chatFallbackUsed: boolean;
+  /** 用户活动追踪（关怀功能用，内存态） */
+  lastActivityAt: number;
+  sessionStartAt: number;
+  careSent: Set<string>;
 
   init: () => void;
   adopt: (variant: VariantId, name: string) => void;
@@ -135,43 +146,78 @@ interface PetStore {
   importBackup: (data: unknown) => Promise<boolean>;
   /** 切换养成模式（休闲/经典） */
   setMode: (mode: PetState['mode']) => void;
+  /** 便当柜装行李（下次出发生效） */
+  packProvision: (p: Provision | null) => void;
+  /** 关闭旅行报告，咕咕回家 */
+  dismissTrip: () => void;
+  /** 用户活动心跳（指针/键盘），供关怀判断 */
+  pokeActivity: () => void;
 }
 
-/** v1 → v4 迁移：补元宝、冷却、成就系统与逐游戏最高分 */
+/** v1 → v5 迁移：补元宝、冷却、成就、逐游戏最高分与旅行系统 */
 function migrateV1(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 4,
+    saveVersion: 6,
     coins: INITIAL_COINS,
     lastWorkedAt: 0,
     lastStudiedAt: 0,
     counters: { ...ZERO_COUNTERS },
     bests: { ...ZERO_BESTS },
     achievements: [],
+    trip: null,
+    album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
-/** v2 → v4 迁移：补成就系统与逐游戏最高分 */
+/** v2 → v5 迁移：补成就系统与旅行系统 */
 function migrateV2(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 4,
+    saveVersion: 6,
     counters: { ...ZERO_COUNTERS },
     bests: { ...ZERO_BESTS },
     achievements: [],
+    trip: null,
+    album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
-/** v3 → v4 迁移：共享最高分拆分为逐游戏最高分（接点心继承旧值） */
+/** v3 → v5 迁移：共享最高分拆分为逐游戏最高分（接点心继承旧值） */
 function migrateV3(raw: Record<string, unknown>): PetState {
   const legacyCounters = (raw.counters ?? {}) as Partial<PetCounters> & { minigameBest?: number };
   const { minigameBest = 0, ...restCounters } = legacyCounters;
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 4,
+    saveVersion: 6,
     counters: { ...ZERO_COUNTERS, ...restCounters },
     bests: { ...ZERO_BESTS, snack: minigameBest },
     achievements: Array.isArray(raw.achievements) ? (raw.achievements as string[]) : [],
+    trip: null,
+    album: { photos: [], souvenirs: [] },
+    diary: {},
+  };
+}
+
+/** v5 → v6 迁移：补日记字段 */
+function migrateV5(raw: Record<string, unknown>): PetState {
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 6,
+    diary: {},
+  };
+}
+
+/** v4 → v6 迁移：补旅行系统与日记字段 */
+function migrateV4(raw: Record<string, unknown>): PetState {
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 6,
+    trip: null,
+    album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
@@ -179,7 +225,9 @@ function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>
   if (parsed.saveVersion === 1) return migrateV1(parsed);
   if (parsed.saveVersion === 2) return migrateV2(parsed);
   if (parsed.saveVersion === 3) return migrateV3(parsed);
-  if (parsed.saveVersion !== 4 || typeof parsed.updatedAt !== 'number') return null;
+  if (parsed.saveVersion === 4) return migrateV4(parsed);
+  if (parsed.saveVersion === 5) return migrateV5(parsed);
+  if (parsed.saveVersion !== 6 || typeof parsed.updatedAt !== 'number') return null;
   return parsed as unknown as PetState;
 }
 
@@ -242,6 +290,94 @@ const TIER_CFG: Record<GameKind, [great: number, ok: number]> = {
   sing: [12, 5],
 };
 
+/** 关怀去重记录（localStorage，保留最近 60 条 key） */
+function loadCareSent(): Set<string> {
+  try {
+    const text = localStorage.getItem(CARE_KEY);
+    return new Set(text ? (JSON.parse(text) as string[]) : []);
+  } catch {
+    return new Set();
+  }
+}
+function persistCareSent(sent: Set<string>) {
+  try {
+    const arr = [...sent].slice(-60);
+    localStorage.setItem(CARE_KEY, JSON.stringify(arr));
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 旅行相册上限（超出淘汰最旧） */
+const ALBUM_CAP = 36;
+
+function trimAlbum<T>(list: T[]): T[] {
+  return list.slice(-ALBUM_CAP);
+}
+
+/** 在宠物状态上记录一条日记事件（按今天聚合） */
+function withDiary(pet: PetState, token: string): PetState {
+  const today = new Date().toDateString();
+  return { ...pet, diary: addDiaryEvent(pet.diary, today, token) };
+}
+
+/** 旅行归来结算：照片/手信入册 + 收获（心情/成长提升，消耗少量饱食精力） */
+function processTripReturn(pet: PetState, trip: NonNullable<PetState['trip']>, now: number): PetState {
+  const photoCaps = trip.photos.length ? trip.photos : [0];
+  const photos = photoCaps.map((cap, i) => ({
+    dest: trip.dest,
+    cap,
+    at: trip.departAt + ((i + 1) * (trip.returnAt - trip.departAt)) / (photoCaps.length + 1),
+  }));
+  const souvenir = trip.souvenir || Math.random() < 0.4;
+  return {
+    ...pet,
+    trip: { ...trip, status: 'returned' },
+    album: {
+      photos: trimAlbum([...pet.album.photos, ...photos]),
+      souvenirs: trimAlbum([...pet.album.souvenirs, ...(souvenir ? [{ dest: trip.dest, at: trip.returnAt }] : [])]),
+    },
+    mood: clamp01(pet.mood + 12),
+    growth: pet.growth + 5,
+    satiety: clamp01(pet.satiety - 6),
+    energy: clamp01(pet.energy - 8),
+    lastTripAt: now,
+  };
+}
+
+/** 自主出发：状态好才会出门 */
+function departTrip(pet: PetState, now: number): PetState {
+  const dest = pickDest(pet.packedProvision ?? null);
+  return {
+    ...pet,
+    packedProvision: null,
+    lastTripAt: now,
+    trip: {
+      status: 'away',
+      departAt: now,
+      returnAt: now + (3 + Math.random() * 1.5) * 60_000,
+      dest,
+      provision: pet.packedProvision ?? null,
+      photos: [],
+      souvenir: pet.packedProvision === 'charm',
+    },
+  };
+}
+
+/** 自主出门条件 */
+function canTravel(pet: PetState): boolean {
+  return (
+    pet.alive &&
+    pet.stage !== 'egg' &&
+    !pet.sleeping &&
+    !pet.sick &&
+    !pet.trip &&
+    pet.satiety > 60 &&
+    pet.mood > 60 &&
+    pet.energy > 60
+  );
+}
+
 export const usePetStore = create<PetStore>()((set, get) => ({
   pet: null,
   ready: false,
@@ -254,12 +390,16 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   chatMessages: [],
   chatBusy: false,
   chatFallbackUsed: false,
+  lastActivityAt: 0,
+  sessionStartAt: 0,
+  careSent: new Set<string>(),
 
   init: () => {
     if (get().ready || typeof window === 'undefined') return;
+    const now = Date.now();
+    set({ lastActivityAt: now, sessionStartAt: now, careSent: loadCareSent() });
     const raw = loadRaw();
     if (raw) {
-      const now = Date.now();
       const awayMs = now - raw.updatedAt;
       const { next, events } = simulate(raw, now);
       saveRaw(next);
@@ -276,7 +416,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         const yesterday = new Date(Date.now() - 86_400_000).toDateString();
         const streak = next.lastCheckinDate === yesterday ? (next.checkinStreak ?? 0) + 1 : 1;
         const checkinNext: PetState = {
-          ...next,
+          ...withDiary(next, 'checkin'),
           lastCheckinDate: today,
           checkinStreak: streak,
           coins: next.coins + 10,
@@ -284,6 +424,47 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         saveRaw(checkinNext);
         set({ pet: checkinNext });
         get().say('checkin', { n: 10, s: streak });
+      }
+      // 离线旅行：离开足够久、状态还行、没在旅途中 → 咕咕自己出门玩了一趟
+      const awayMin = awayMs / 60_000;
+      const cur = get().pet;
+      if (
+        cur &&
+        cur.alive &&
+        cur.stage !== 'egg' &&
+        !cur.trip &&
+        awayMin >= 25 &&
+        cur.satiety > 45 &&
+        cur.mood > 45 &&
+        Math.random() < 0.65
+      ) {
+        const provision = cur.packedProvision ?? null;
+        const dest = pickDest(provision);
+        const durMin = provision === 'bento' ? 25 + Math.random() * 15 : 12 + Math.random() * 13;
+        const window = Math.max(60_000, awayMs - durMin * 60_000);
+        const departAt = now - awayMs + Math.random() * window;
+        const returnAt = departAt + durMin * 60_000;
+        const photoCaps = [0, ...(provision === 'bento' || Math.random() < 0.5 ? [1] : [])];
+        const souvenir = provision === 'charm' || Math.random() < 0.7;
+        const tripNext: PetState = {
+          ...cur,
+          packedProvision: null,
+          trip: { status: 'returned', departAt, returnAt, dest, provision, photos: photoCaps, souvenir },
+          album: {
+            photos: trimAlbum([
+              ...cur.album.photos,
+              ...photoCaps.map((cap, i) => ({ dest, cap, at: departAt + ((i + 1) * (returnAt - departAt)) / (photoCaps.length + 1) })),
+            ]),
+            souvenirs: trimAlbum([...cur.album.souvenirs, ...(souvenir ? [{ dest, at: returnAt }] : [])]),
+          },
+          mood: clamp01(cur.mood + 12),
+          growth: cur.growth + 6,
+          satiety: clamp01(cur.satiety - 6),
+          energy: clamp01(cur.energy - 8),
+        };
+        const withTripDiary = withDiary(tripNext, 'trip:' + dest);
+        saveRaw(withTripDiary);
+        set({ pet: withTripDiary });
       }
     } else {
       set({ ready: true });
@@ -300,16 +481,9 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       try {
         const remote = JSON.parse(e.newValue) as { saveVersion?: number } & Record<string, unknown>;
         const cur = get().pet;
-        const remotePet =
-          remote.saveVersion === 1
-            ? migrateV1(remote)
-            : remote.saveVersion === 2
-              ? migrateV2(remote)
-              : remote.saveVersion === 3
-                ? migrateV3(remote)
-                : (remote as unknown as PetState);
+        const remotePet = normalizeRaw(remote);
         if (
-          remotePet?.saveVersion === 4 &&
+          remotePet?.saveVersion === 6 &&
           (!cur || remotePet.updatedAt > cur.updatedAt)
         ) {
           set({ pet: remotePet });
@@ -341,7 +515,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet || pet.stage !== 'egg') return;
     const remaining = pet.tapsToHatch - 1;
     if (remaining <= 0) {
-    const next = hatchEgg(pet, Date.now());
+    const next = withDiary(hatchEgg(pet, Date.now()), 'hatch');
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'confetti' } });
     sfx.hatch();
@@ -392,10 +566,12 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     }
     const { ok, next } = applyAction(pet, id, now);
     if (!ok) return;
-    saveRaw(next);
+    const withD = withDiary(next, id);
+    saveRaw(withD);
+    const nextPet = withD;
     const anim = ACTION_ANIM[id];
     set({
-      pet: next,
+      pet: nextPet,
       anim,
       burst: { id: ++burstSeq, kind: id === 'wash' ? 'bubble' : id === 'play' ? 'sparkle' : 'heart' },
     });
@@ -420,9 +596,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       if (reason === 'tired') get().say('tired');
       return;
     }
-    saveRaw(next);
+    const withD = withDiary(next, 'work');
+    saveRaw(withD);
     set({
-      pet: next,
+      pet: withD,
       anim: 'working',
       burst: { id: ++burstSeq, kind: 'sparkle' },
     });
@@ -446,9 +623,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       if (reason === 'tired') get().say('tired');
       return;
     }
-    saveRaw(next);
+    const withD = withDiary(next, 'study');
+    saveRaw(withD);
     set({
-      pet: next,
+      pet: withD,
       anim: 'studying',
       burst: { id: ++burstSeq, kind: 'sparkle' },
     });
@@ -487,8 +665,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       bests: { ...simmed.bests, [game]: Math.max(prevBest, score) },
       updatedAt: now,
     };
-    saveRaw(next);
-    set({ pet: next, burst: { id: ++burstSeq, kind: 'heart' } });
+    const withGame = withDiary(next, 'game');
+    const withBest = newBest ? withDiary(withGame, `best:${game}:${score}`) : withGame;
+    saveRaw(withBest);
+    set({ pet: withBest, burst: { id: ++burstSeq, kind: 'heart' } });
     const [great, ok] = TIER_CFG[game];
     const tier: LineKind = score >= great ? 'gameGreat' : score >= ok ? 'gameOk' : 'gameMeh';
     get().say(tier);
@@ -517,7 +697,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       const text = localStorage.getItem(STORAGE_KEY);
       if (text) {
         const remote = JSON.parse(text) as { saveVersion?: number; updatedAt?: number };
-        if (remote?.saveVersion === 2 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
+        if (remote?.saveVersion === 6 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
           const latest = loadRaw();
           if (latest) set({ pet: latest });
           return;
@@ -527,6 +707,23 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       /* 忽略坏数据，继续本页模拟 */
     }
     const now = Date.now();
+
+    // 旅行状态机：归来结算（报告弹窗由页面依据 trip.status 渲染）
+    if (pet.trip?.status === 'away') {
+      if (now >= pet.trip.returnAt) {
+        const { next: simmed } = simulate(pet, now);
+        const returned = withDiary(processTripReturn(simmed, simmed.trip!, now), 'trip:' + simmed.trip!.dest);
+        saveRaw(returned);
+        set({ pet: returned });
+        const ln = useLocale.getState().locale;
+        notify(
+          ln === 'zh' ? `🎒 ${returned.name}旅行归来` : '🎒 Back from a trip',
+          ln === 'zh' ? '带回了照片和手信，快来看看！' : 'Photos and souvenirs await!'
+        );
+      }
+      return; // 旅途中舞台展示出门告示
+    }
+
     if (pet.stage === 'egg') {
       // 蛋不衰减，只推进时间戳（避免长时间挂蛋后回来误触发离线结算）
       if (now - pet.updatedAt > 60_000) {
@@ -542,6 +739,14 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (get().anim) return;
     const kind = events[events.length - 1]?.kind;
     if (kind && EVENT_LINE[kind]) {
+      if (kind === 'sick' || kind === 'recover' || kind === 'stageUp') {
+        saveRaw(withDiary(next, kind));
+        set({ pet: withDiary(next, kind) });
+      }
+      if (kind === 'sick') {
+        const ln = useLocale.getState().locale;
+        notify(ln === 'zh' ? '🤒 咕咕生病了' : '🤒 GuGu is sick', ln === 'zh' ? '快回来喂药照顾它！' : 'Come back and take care of it!');
+      }
       get().say(EVENT_LINE[kind]!);
       return;
     }
@@ -565,6 +770,16 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       get().say(delta > 0 ? 'eventMoodUp' : 'eventMoodDown');
       return;
     }
+    // 自主出门：状态好、距上次旅行 20 分钟以上、天气好、小概率（雨雪天咕咕宅家）
+    const wToday = weatherFor(new Date());
+    if (isBadWeather(wToday)) {
+      if (!next.sleeping && Math.random() < 0.02) get().say(wToday === 'snow' ? 'weatherSnow' : 'weatherRain');
+    } else if (canTravel(next) && now - (next.lastTripAt ?? 0) > 20 * 60_000 && Math.random() < 0.004) {
+      const departed = departTrip(next, now);
+      saveRaw(departed);
+      set({ pet: departed });
+      return;
+    }
     // 偶发闲聊（睡觉时安静）；小概率插播时段问候或长按/右键菜单提示
     if (!next.sleeping && Math.random() < 0.07) {
       const roll = Math.random();
@@ -573,6 +788,32 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       if (roll < 0.12) get().say('hintMenu');
       else if (roll < 0.3) get().say(greet);
       else get().say('idle');
+    }
+    // 关怀：咕咕反过来关心用户（饭点/久坐/熬夜/疲劳，各自去重）
+    if (!next.sleeping) {
+      const decision = checkCare({
+        hour: new Date().getHours(),
+        date: new Date().toDateString(),
+        sessionActiveMs: now - get().sessionStartAt,
+        sinceInteractionMs: now - get().lastActivityAt,
+        sent: get().careSent,
+      });
+      if (decision) {
+        const sent = new Set(get().careSent);
+        sent.add(decision.dedupeKey);
+        persistCareSent(sent);
+        set({ careSent: sent });
+        const l = useLocale.getState().locale;
+        const CARE_LINE: Record<string, LineKind> = { careMeal: 'careMeal', careRest: 'careRest', careNight: 'careNight', careFatigue: 'careFatigue' };
+        const line = CARE_LINE[decision.kind];
+        if (!line) return;
+        if (decision.kind === 'mealBreakfast') {
+          get().say(line, { m: l === 'zh' ? decision.mealZh ?? '' : decision.mealEn ?? '' });
+        } else {
+          get().say(line);
+        }
+        return;
+      }
     }
     get().grantAchievements();
   },
@@ -677,10 +918,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       ]);
       const cur = get().pet;
       if (cur) {
-        const withChat: PetState = {
-          ...cur,
-          counters: { ...cur.counters, aiChat: cur.counters.aiChat + 1 },
-        };
+        const withChat: PetState = withDiary(
+          { ...cur, counters: { ...cur.counters, aiChat: cur.counters.aiChat + 1 } },
+          'chat'
+        );
         saveRaw(withChat);
         set({ pet: withChat });
       }
@@ -712,10 +953,16 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet) return;
     const earned = checkAchievements(pet);
     if (!earned.length) return;
-    const next: PetState = { ...pet, achievements: [...pet.achievements, ...earned] };
+    const withD = earned.reduce((acc, id) => withDiary(acc, 'ach:' + (achievementById(id)?.zh ?? id)), pet);
+    const next: PetState = { ...withD, achievements: [...withD.achievements, ...earned] };
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
     sfx.fanfare();
+    const l2 = useLocale.getState().locale;
+    notify(
+      l2 === 'zh' ? `🏆 ${pet.name}解锁新成就` : '🏆 New achievement',
+      l2 === 'zh' ? achievementById(earned[0])?.zh ?? '' : achievementById(earned[0])?.en ?? ''
+    );
     const locale = useLocale.getState().locale;
     const def = achievementById(earned[0]);
     get().say('achUnlock', { a: def ? (locale === 'zh' ? def.zh : def.en) : earned[0] });
@@ -760,5 +1007,25 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const next = { ...pet, mode };
     saveRaw(next);
     set({ pet: next });
+  },
+
+  packProvision: (p) => {
+    const pet = get().pet;
+    if (!pet) return;
+    const next = { ...pet, packedProvision: p };
+    saveRaw(next);
+    set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
+  },
+
+  dismissTrip: () => {
+    const pet = get().pet;
+    if (!pet?.trip) return;
+    const next = { ...pet, trip: null };
+    saveRaw(next);
+    set({ pet: next });
+  },
+
+  pokeActivity: () => {
+    set({ lastActivityAt: Date.now() });
   },
 }));
