@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 跟我唱（Simon 序列记忆）：咕咕按音符顺序唱歌，玩家跟唱。
  * 每轮序列 +1 音符，得分 = 完成轮次的音符数 × 2；点错即结束。60 秒上限。
@@ -25,6 +27,7 @@ export function SingGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const finishMinigame = usePetStore((s) => s.finishMinigame);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'showing' | 'input' | 'done'>('ready');
   const [seq, setSeq] = useState<number[]>([]);

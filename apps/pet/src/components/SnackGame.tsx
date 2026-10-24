@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 接点心小游戏：移动咕咕接住掉落的点心（躲开炸弹），30 秒一局。
  * 奖励：得分 → 心情 + 元宝（见 balance.minigameReward）。
@@ -37,6 +39,7 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
   const resolvedSkin = usePetStore((s) => s.resolvedSkin);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
   const skin = resolvedSkin();
   const bodyFaceLayout = faceLayoutFor(pet.variant, 'baby');
 

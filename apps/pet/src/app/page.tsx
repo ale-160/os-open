@@ -8,6 +8,7 @@ import { ActionPanel } from '@/components/ActionPanel';
 import { ChatPanel } from '@/components/ChatPanel';
 import { GameDialog } from '@/components/GameDialog';
 import { HatchFlow } from '@/components/HatchFlow';
+import { Memorial } from '@/components/Memorial';
 import { MemoryGame } from '@/components/MemoryGame';
 import { PetMenu } from '@/components/PetMenu';
 import { PetStage } from '@/components/PetStage';
@@ -75,6 +76,9 @@ export default function Page() {
   }
   if (!pet) {
     return <HatchFlow />;
+  }
+  if (!pet.alive) {
+    return <Memorial pet={pet} onAdopt={() => usePetStore.getState().reset()} />;
   }
 
   const stageKey = `stage${pet.stage.charAt(0).toUpperCase()}${pet.stage.slice(1)}` as 'stageEgg';
@@ -153,7 +157,7 @@ export default function Page() {
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {settingsOpen && pet.alive && <SettingsDialog pet={pet} onClose={() => setSettingsOpen(false)} />}
       {shopOpen && <ShopDialog pet={pet} onClose={() => setShopOpen(false)} />}
       {gamePickerOpen && (
         <GameDialog

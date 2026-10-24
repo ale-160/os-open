@@ -145,13 +145,18 @@ export function simulate(prev: PetState, now: number): SimResult {
     events.push({ kind: 'recover', at: now });
   }
 
-  // 健康：生病掉、良好回、糟糕缓降；休闲模式保底 5（死亡机制留给经典模式）
+  // 健康：生病掉、良好回、糟糕缓降；休闲模式保底 5，经典模式无保底（归零离世）
+  const floorHealth = s.mode === 'classic' ? 0 : 5;
   if (s.sick) {
-    s.health = Math.max(5, s.health - DECAY_PER_HOUR.healthSick * hours);
+    s.health = Math.max(floorHealth, s.health - DECAY_PER_HOUR.healthSick * hours);
   } else if (s.satiety > 30 && s.cleanliness > 30) {
     s.health = clamp01(s.health + DECAY_PER_HOUR.healthRegen * hours);
   } else {
-    s.health = Math.max(5, s.health - DECAY_PER_HOUR.healthPoor * hours);
+    s.health = Math.max(floorHealth, s.health - DECAY_PER_HOUR.healthPoor * hours);
+  }
+  if (s.mode === 'classic' && s.health <= 0) {
+    s.alive = false;
+    events.push({ kind: 'dead', at: now });
   }
 
   // 被动成长：状态全优时缓慢增加

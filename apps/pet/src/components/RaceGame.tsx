@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 冲鸭！赛跑（大富翁式连点竞速）：连点屏幕冲刺，赢过蜗牛就赢。
  * 每次点按 +2.2% 距离；蜗牛匀速推进（越到后程越快），22 秒内未到终点按距离计分。
@@ -21,6 +23,7 @@ export function RaceGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const finishMinigame = usePetStore((s) => s.finishMinigame);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
   const [playerPct, setPlayerPct] = useState(0);

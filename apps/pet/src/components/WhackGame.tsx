@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 打虫虫（参考大富翁打地鼠）：20 秒，虫虫从洞里冒头就点 +1，炸弹 -2。
  * 出现间隔与停留时间随进度收紧。
@@ -22,6 +24,7 @@ export function WhackGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const finishMinigame = usePetStore((s) => s.finishMinigame);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
   const [score, setScore] = useState(0);

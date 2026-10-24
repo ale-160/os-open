@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /** 小游戏选择面板：接点心 / 打虫虫 / 对对碰 / 冲鸭赛跑 / 投喂高手 / 跟我唱 */
 
 import { useLocale } from '@/hooks/useLocale';
@@ -17,6 +19,7 @@ export function GameDialog({
 }) {
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const games: { kind: GameKind; icon: string; name: string; hint: string }[] = [
     { kind: 'snack', icon: '🍪', name: t.gameTitle, hint: locale === 'zh' ? '移动咕咕接点心' : 'Move GuGu to catch' },

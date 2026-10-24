@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /** 咕咕商店：元宝购买道具，买即用（无库存） */
 
 import { useLocale } from '@/hooks/useLocale';
@@ -31,6 +33,7 @@ export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
   const buyItem = usePetStore((s) => s.buyItem);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   return (
     <div

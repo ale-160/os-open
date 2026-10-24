@@ -127,6 +127,14 @@ interface PetStore {
   clearChat: () => void;
   /** 检查并发放新解锁的成就（气泡 + 粒子庆祝） */
   grantAchievements: () => void;
+  /** 改名 */
+  rename: (name: string) => void;
+  /** 导出完整备份（存档 + 自定义皮肤）；未领养时返回 null */
+  exportBackup: () => { save: PetState; skins: CustomSkinRecord[]; exportedAt: number } | null;
+  /** 从备份导入（存档走版本迁移，皮肤逐条落 IndexedDB） */
+  importBackup: (data: unknown) => Promise<boolean>;
+  /** 切换养成模式（休闲/经典） */
+  setMode: (mode: PetState['mode']) => void;
 }
 
 /** v1 → v4 迁移：补元宝、冷却、成就系统与逐游戏最高分 */
@@ -167,16 +175,19 @@ function migrateV3(raw: Record<string, unknown>): PetState {
   };
 }
 
+function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>): PetState | null {
+  if (parsed.saveVersion === 1) return migrateV1(parsed);
+  if (parsed.saveVersion === 2) return migrateV2(parsed);
+  if (parsed.saveVersion === 3) return migrateV3(parsed);
+  if (parsed.saveVersion !== 4 || typeof parsed.updatedAt !== 'number') return null;
+  return parsed as unknown as PetState;
+}
+
 function loadRaw(): PetState | null {
   try {
     const text = localStorage.getItem(STORAGE_KEY);
     if (!text) return null;
-    const parsed = JSON.parse(text) as { saveVersion?: number } & Record<string, unknown>;
-    if (parsed.saveVersion === 1) return migrateV1(parsed);
-    if (parsed.saveVersion === 2) return migrateV2(parsed);
-    if (parsed.saveVersion === 3) return migrateV3(parsed);
-    if (parsed.saveVersion !== 4 || typeof parsed.updatedAt !== 'number') return null;
-    return parsed as unknown as PetState;
+    return normalizeRaw(JSON.parse(text) as { saveVersion?: number } & Record<string, unknown>);
   } catch {
     return null;
   }
@@ -217,8 +228,18 @@ const ANIM_MS: Record<ActionId | 'work' | 'study', number> = {
   feed: 2400,
   wash: 2800,
   play: 3200,
-  work: 3000,
-  study: 3200,
+  work: 5000,
+  study: 4600,
+};
+
+/** 结算评语分档：各游戏"很棒/不错"阈值不同（race 赢即 14+，toss 满分 15） */
+const TIER_CFG: Record<GameKind, [great: number, ok: number]> = {
+  snack: [12, 5],
+  whack: [12, 5],
+  memory: [15, 6],
+  race: [14, 6],
+  toss: [11, 5],
+  sing: [12, 5],
 };
 
 export const usePetStore = create<PetStore>()((set, get) => ({
@@ -248,6 +269,21 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       } else {
         const kind = events[events.length - 1]?.kind;
         if (kind && EVENT_LINE[kind]) get().say(EVENT_LINE[kind]!);
+      }
+      // 每日签到（自动，领养未破壳不签）
+      const today = new Date().toDateString();
+      if (next.stage !== 'egg' && next.lastCheckinDate !== today) {
+        const yesterday = new Date(Date.now() - 86_400_000).toDateString();
+        const streak = next.lastCheckinDate === yesterday ? (next.checkinStreak ?? 0) + 1 : 1;
+        const checkinNext: PetState = {
+          ...next,
+          lastCheckinDate: today,
+          checkinStreak: streak,
+          coins: next.coins + 10,
+        };
+        saveRaw(checkinNext);
+        set({ pet: checkinNext });
+        get().say('checkin', { n: 10, s: streak });
       }
     } else {
       set({ ready: true });
@@ -453,7 +489,8 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     };
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'heart' } });
-    const tier: LineKind = score >= 12 ? 'gameGreat' : score >= 5 ? 'gameOk' : 'gameMeh';
+    const [great, ok] = TIER_CFG[game];
+    const tier: LineKind = score >= great ? 'gameGreat' : score >= ok ? 'gameOk' : 'gameMeh';
     get().say(tier);
     get().grantAchievements();
     return { ...reward, newBest };
@@ -682,5 +719,46 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const locale = useLocale.getState().locale;
     const def = achievementById(earned[0]);
     get().say('achUnlock', { a: def ? (locale === 'zh' ? def.zh : def.en) : earned[0] });
+  },
+
+  rename: (name) => {
+    const pet = get().pet;
+    if (!pet) return;
+    const trimmed = name.trim().slice(0, 12);
+    if (!trimmed) return;
+    const next = { ...pet, name: trimmed };
+    saveRaw(next);
+    set({ pet: next });
+  },
+
+  exportBackup: () => {
+    const pet = get().pet;
+    if (!pet) return null;
+    return { save: pet, skins: get().customSkins, exportedAt: Date.now() };
+  },
+
+  importBackup: async (data) => {
+    try {
+      const d = data as { save?: { saveVersion?: number } & Record<string, unknown>; skins?: CustomSkinRecord[] };
+      const pet = d.save ? normalizeRaw(d.save) : null;
+      if (!pet) return false;
+      saveRaw(pet);
+      for (const skin of d.skins ?? []) {
+        await saveSkinRecord({ ...skin, id: skin.id || crypto.randomUUID() }).catch(() => {});
+      }
+      const list = await listSkinRecords().catch(() => []);
+      set({ pet, customSkins: list.sort((a, b) => b.createdAt - a.createdAt) });
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  setMode: (mode) => {
+    const pet = get().pet;
+    if (!pet) return;
+    const next = { ...pet, mode };
+    saveRaw(next);
+    set({ pet: next });
   },
 }));

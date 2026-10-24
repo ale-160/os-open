@@ -212,18 +212,39 @@ function fromBase64Url(text: string): Uint8Array {
   return bytes;
 }
 
-/** 导出分享码：guguskin1.<base64url(json)>（含图片 dataURL，远程 URL 皮肤只含引用） */
+/**
+ * 导出分享码（v2）：`guguskin1.<base64url(metajson)>.<图片负载 base64>`。
+ * 图片负载直接沿用 dataURL 的 base64 段，避免 JSON→base64 的 4/3 二次膨胀；
+ * 远程 URL 皮肤无负载段。（解析兼容 v1 单段旧码）
+ */
 export function encodeSkinCode(skin: ShareableSkin): string {
-  const json = JSON.stringify(skin);
-  return CODE_PREFIX + toBase64Url(new TextEncoder().encode(json));
+  const payload = skin.imageDataUrl?.startsWith('data:image/') ? skin.imageDataUrl.split(',')[1] : undefined;
+  const meta = {
+    name: skin.name,
+    url: skin.url,
+    faceOverlay: skin.faceOverlay,
+  };
+  const head = CODE_PREFIX + toBase64Url(new TextEncoder().encode(JSON.stringify(meta)));
+  return payload ? `${head}.${payload}` : head;
 }
 
-/** 解析分享码；非法输入抛错 */
+/** 解析分享码（兼容 v1 单段旧码）；非法输入抛错 */
 export function decodeSkinCode(code: string): ShareableSkin {
   const trimmed = code.trim();
   if (!trimmed.startsWith(CODE_PREFIX)) throw new Error('invalid skin code');
-  const json = new TextDecoder().decode(fromBase64Url(trimmed.slice(CODE_PREFIX.length)));
-  const parsed = JSON.parse(json) as ShareableSkin;
+  const rest = trimmed.slice(CODE_PREFIX.length);
+  const dotIdx = rest.indexOf('.');
+  let parsed: ShareableSkin;
+  if (dotIdx === -1) {
+    // v1：整段 base64url(JSON)
+    parsed = JSON.parse(new TextDecoder().decode(fromBase64Url(rest))) as ShareableSkin;
+  } else {
+    // v2：meta base64url(JSON) + 图片负载 base64
+    const meta = JSON.parse(new TextDecoder().decode(fromBase64Url(rest.slice(0, dotIdx)))) as ShareableSkin;
+    const payload = rest.slice(dotIdx + 1);
+    if (payload && !meta.url) meta.imageDataUrl = `data:image/png;base64,${payload}`;
+    parsed = meta;
+  }
   if (typeof parsed.name !== 'string' || (!parsed.imageDataUrl && !parsed.url)) {
     throw new Error('invalid skin payload');
   }

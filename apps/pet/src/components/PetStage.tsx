@@ -224,7 +224,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         </span>
       )}
 
-      {/* 生病 / 睡觉浮动胶囊（悬浮 HUD 下层） */}
+      {/* 生病 / 睡觉 / 打工 / 学习浮动胶囊（悬浮 HUD 下层） */}
       {pet.sick && (
         <div className="absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[#f0716b]/85 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
           🤒 {t.sickPill}
@@ -233,6 +233,16 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {pet.sleeping && !pet.sick && (
         <div className="absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[#5f7de0]/80 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
           💤 {t.sleepPill}
+        </div>
+      )}
+      {anim === 'working' && (
+        <div className="absolute left-1/2 top-[118px] z-10 -translate-x-1/2 animate-pulse rounded-full bg-[#8a6a4d]/85 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
+          💼 {locale === 'zh' ? '打工中…' : 'Working...'}
+        </div>
+      )}
+      {anim === 'studying' && (
+        <div className="absolute left-1/2 top-[118px] z-10 -translate-x-1/2 animate-pulse rounded-full bg-[#7bc86c]/85 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
+          📖 {locale === 'zh' ? '学习中…' : 'Studying...'}
         </div>
       )}
 
@@ -258,6 +268,14 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           >
             {bubble.text}
             <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-amber-100 bg-white/95" />
+          </div>
+        )}
+        {/* 走路脚下的小尘土 */}
+        {walking && (
+          <div className="pointer-events-none absolute bottom-1 left-1/2 w-[110px] -translate-x-1/2">
+            <span className="anim-dust absolute bottom-0 left-3 h-1.5 w-1.5 rounded-full bg-[#a5825f]/70" />
+            <span className="anim-dust absolute bottom-0.5 left-11 h-1 w-1 rounded-full bg-[#a5825f]/60" style={{ animationDelay: '0.45s' }} />
+            <span className="anim-dust absolute bottom-1 left-[64px] h-1.5 w-1.5 rounded-full bg-[#a5825f]/70" style={{ animationDelay: '0.9s' }} />
           </div>
         )}
         <PetSprite

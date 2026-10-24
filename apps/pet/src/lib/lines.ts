@@ -35,6 +35,7 @@ export type LineKind =
   | 'hintMenu'
   | 'butterfly'
   | 'yawn'
+  | 'checkin'
   | 'greetDawn'
   | 'greetDay'
   | 'greetDusk'
@@ -118,6 +119,11 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
     gameOk: ["还不错！咕咕有认真接！", "接住好多！差一点点就完美", "好玩！下次接更多！"],
     gameMeh: ["呜…点心都躲着我…", "再来一次，咕咕要认真了！", "手滑了…不算不算！"],
     achUnlock: ["🏆 达成成就「{a}」！", "咕咕解锁了新成就「{a}」！", "恭喜！获得成就「{a}」！"],
+    checkin: [
+      "签到成功！+{n} 元宝",
+      "连续签到 {s} 天！+{n} 元宝",
+      "每日签到 +{n} 元宝，咕咕攒着养老",
+    ],
     hintMenu: [
       "长按或右键我，有惊喜菜单哦",
       "偷偷告诉你：右键我可以直接点外卖",
@@ -214,6 +220,11 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
     gameOk: ["Not bad! I caught a lot!", "So close to perfect!", "Fun! I'll catch more next time!"],
     gameMeh: ["Sniff... the snacks dodged me...", "One more round, I'll focus!", "Slipped... that doesn't count!"],
     achUnlock: ["🏆 Achievement unlocked: {a}!", "GuGu just earned \"{a}\"!", "Congrats! New achievement: {a}!"],
+    checkin: [
+      "Check-in! +{n} coins",
+      "{s}-day streak! +{n} coins",
+      "Daily bonus +{n} coins, saving up!",
+    ],
     hintMenu: [
       "Long-press or right-click me for a menu!",
       "Psst — right-click me for quick actions!",

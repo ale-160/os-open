@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 形象工坊：官方配色切换 + 社区模板（仓库 PR 渠道）+ 自定义单图皮肤（上传 / URL / 表情叠加开关 / 分享码导入导出）。
  * 自定义皮肤存 IndexedDB；分享码 = base64url(JSON)，含 dataURL（远程 URL 皮肤只含引用）。
@@ -41,6 +43,7 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
   const resolvedSkin = usePetStore((s) => s.resolvedSkin);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [urlInput, setUrlInput] = useState('');
   const [faceOverlay, setFaceOverlay] = useState(false);

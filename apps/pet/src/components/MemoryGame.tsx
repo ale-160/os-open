@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 点心对对碰（记忆翻牌）：12 张牌 6 对，45 秒内配对。
  * 得分 = 对数 × 3 + 剩余时间奖励，走统一的 minigameReward 结算。
@@ -39,6 +41,7 @@ export function MemoryGame({ onClose }: { pet: PetState; onClose: () => void }) 
   const finishMinigame = usePetStore((s) => s.finishMinigame);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
   const [cards, setCards] = useState<Card[]>(shuffledDeck);

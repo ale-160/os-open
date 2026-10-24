@@ -79,3 +79,6 @@ jobs:
 
       - name: E2E (shell)
         run: pnpm --filter shell e2e
+
+      - name: E2E (pet)
+        run: pnpm --filter pet e2e

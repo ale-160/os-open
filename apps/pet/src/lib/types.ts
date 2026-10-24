@@ -38,6 +38,7 @@ export type SimEventKind =
   | 'recover'
   | 'wake'
   | 'stageUp'
+  | 'dead'
   | 'back';
 
 export interface SimEvent {
@@ -138,6 +139,11 @@ export interface PetState {
 
   /** 新手引导步数（3 = 完成） */
   tutorialStep: number;
+
+  /** 每日签到：最近签到日期（可选字段，v4 内向后兼容） */
+  lastCheckinDate?: string;
+  /** 连续签到天数 */
+  checkinStreak?: number;
 }
 
 /** 商店商品（买即用，无库存） */

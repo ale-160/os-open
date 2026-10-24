@@ -1,11 +1,13 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 宠物长按/右键菜单：把全部养成动作收进上下文菜单，底部栏只留高频项。
  * 定位在长按/右键坐标附近（自动收进视口），点击任意项后关闭。
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { cooldownRemaining } from '@/lib/balance';
 import { ui } from '@/lib/locale';
@@ -32,8 +34,13 @@ export function PetMenu({ x, y, pet, onOpenChat, onOpenAchievements, onOpenSkin,
   const tapPet = usePetStore((s) => s.tapPet);
   const { locale } = useLocale();
   const t = ui(locale);
-  // 菜单为瞬时组件：打开瞬间的冷却快照即可（刷新跟随由打开时机保证）
-  const [now] = useState(() => Date.now());
+  useEscClose(onClose);
+  // 冷却随打开时间实时刷新
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, []);
 
   const egg = pet.stage === 'egg';
   const disabled = egg || pet.sleeping;

@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /** 与咕咕的 AI 聊天面板（BYOK；失败自动回退本地台词并在提示条说明） */
 
 import { useEffect, useRef, useState } from 'react';
@@ -16,6 +18,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
   const clearChat = usePetStore((s) => s.clearChat);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [input, setInput] = useState('');
   const listRef = useRef<HTMLDivElement>(null);

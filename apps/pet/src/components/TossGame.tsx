@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /**
  * 投喂高手（大富翁式时机判定）：指针在轨道上左右摆动，在准星区间内点停即投中。
  * 三轮一轮比一轮快、区间一轮比一轮窄：中心 +5、区间内 +3、偏出 0。
@@ -24,6 +26,7 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const finishMinigame = usePetStore((s) => s.finishMinigame);
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'result' | 'done'>('ready');
   const [round, setRound] = useState(0);

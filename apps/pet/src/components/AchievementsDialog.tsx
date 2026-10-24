@@ -1,5 +1,7 @@
 'use client';
 
+import { useEscClose } from '@/hooks/useEscClose';
+
 /** 成就图鉴：已解锁徽章高亮，未解锁灰显；由顶栏 🏆 进入 */
 
 import { useLocale } from '@/hooks/useLocale';
@@ -10,6 +12,7 @@ import type { PetState } from '@/lib/types';
 export function AchievementsDialog({ pet, onClose }: { pet: PetState; onClose: () => void }) {
   const { locale } = useLocale();
   const t = ui(locale);
+  useEscClose(onClose);
   const unlocked = new Set(pet.achievements);
 
   return (

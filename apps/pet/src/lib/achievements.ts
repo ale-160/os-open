@@ -27,7 +27,7 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'adult', icon: '🌳', zh: '成年礼', en: 'Adulthood', zhDesc: '进入成年阶段', enDesc: 'Reach the adult stage' },
   { id: 'rich', icon: '🪙', zh: '小金库', en: 'Nest Egg', zhDesc: '持有 100 元宝', enDesc: 'Hold 100 coins' },
   { id: 'heal', icon: '💊', zh: '满血复活', en: 'Full Recovery', zhDesc: '从生病中痊愈', enDesc: 'Recover from sickness' },
-  { id: 'game12', icon: '🎮', zh: '接点心大师', en: 'Snack Master', zhDesc: '小游戏单局得 12 分', enDesc: 'Score 12 in one game' },
+  { id: 'game12', icon: '🎮', zh: '接点心大师', en: 'Snack Master', zhDesc: '接点心单局得 12 分', enDesc: 'Score 12 in one Snack Catch' },
   { id: 'aiChat', icon: '💬', zh: 'AI 好友', en: 'AI Buddy', zhDesc: '与咕咕 AI 聊过天', enDesc: 'Chat with AI GuGu' },
 ];
 
