@@ -35,7 +35,7 @@ const MS_PER_HOUR = 3_600_000;
 /** 领养：创建蛋状态 */
 export function createPet(variant: VariantId, name: string, now: number): PetState {
   return {
-    saveVersion: 2,
+    saveVersion: 3,
     name: name.trim() || '咕咕',
     variant,
     stage: 'egg',
@@ -50,6 +50,8 @@ export function createPet(variant: VariantId, name: string, now: number): PetSta
     growth: 0,
     coins: INITIAL_COINS,
     personality: { foodie: 0, lively: 0, artsy: 0, chill: 0 },
+    counters: { feed: 0, wash: 0, play: 0, work: 0, study: 0, tap: 0, heal: 0, minigameBest: 0, aiChat: 0 },
+    achievements: [],
     sleeping: false,
     sick: false,
     alive: true,
@@ -138,6 +140,7 @@ export function simulate(prev: PetState, now: number): SimResult {
     s.health >= 50
   ) {
     s.sick = false;
+    s.counters = { ...s.counters, heal: s.counters.heal + 1 };
     events.push({ kind: 'recover', at: now });
   }
 
@@ -182,7 +185,7 @@ export function applyAction(prev: PetState, id: ActionId, now: number): ActionOu
   const def = ACTIONS[id];
   if (cooldownRemaining(id, prev, now) > 0) return { ok: false, next: prev, reason: 'cooldown' };
 
-  const next: PetState = { ...prev, personality: { ...prev.personality } };
+  const next: PetState = { ...prev, personality: { ...prev.personality }, counters: { ...prev.counters } };
   if (def.satiety !== undefined) next.satiety = clamp01(next.satiety + def.satiety);
   if (def.cleanliness !== undefined) next.cleanliness = clamp01(next.cleanliness + def.cleanliness);
   if (def.mood !== undefined) next.mood = clamp01(next.mood + def.mood);
@@ -197,9 +200,18 @@ export function applyAction(prev: PetState, id: ActionId, now: number): ActionOu
       );
     }
   }
-  if (id === 'feed') next.lastFedAt = now;
-  if (id === 'wash') next.lastWashedAt = now;
-  if (id === 'play') next.lastPlayedAt = now;
+  if (id === 'feed') {
+    next.counters.feed += 1;
+    next.lastFedAt = now;
+  }
+  if (id === 'wash') {
+    next.counters.wash += 1;
+    next.lastWashedAt = now;
+  }
+  if (id === 'play') {
+    next.counters.play += 1;
+    next.lastPlayedAt = now;
+  }
 
   return { ok: true, next };
 }
@@ -221,6 +233,7 @@ export function applyWork(prev: PetState, now: number): ActionOutcome {
     coins: prev.coins + earned,
     mood: clamp01(prev.mood + 1),
     cleanliness: clamp01(prev.cleanliness - 2),
+    counters: { ...prev.counters, work: prev.counters.work + 1 },
     lastWorkedAt: now,
   };
   return { ok: true, next };
@@ -236,6 +249,7 @@ export function applyStudy(prev: PetState, now: number): ActionOutcome {
   const next: PetState = {
     ...prev,
     personality: { ...prev.personality, artsy: Math.min(PERSONALITY_CAP, prev.personality.artsy + STUDY.personalityArtsy) },
+    counters: { ...prev.counters, study: prev.counters.study + 1 },
     energy: clamp01(prev.energy - STUDY.energyCost),
     growth: prev.growth + STUDY.growth,
     lastStudiedAt: now,

@@ -46,9 +46,26 @@ export interface SimEvent {
   at: number;
 }
 
+/** 行为计数器（成就系统的数据源） */
+export interface PetCounters {
+  feed: number;
+  wash: number;
+  play: number;
+  work: number;
+  study: number;
+  /** 摸摸次数 */
+  tap: number;
+  /** 病愈次数 */
+  heal: number;
+  /** 接点心最高分 */
+  minigameBest: number;
+  /** AI 对话次数 */
+  aiChat: number;
+}
+
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {
-  saveVersion: 2;
+  saveVersion: 3;
   /** 宠物名（玩家可改，默认咕咕） */
   name: string;
   variant: VariantId;
@@ -79,6 +96,12 @@ export interface PetState {
 
   /** 性格积累（各 0..100） */
   personality: Record<PersonalityKey, number>;
+
+  /** 行为计数器（成就系统） */
+  counters: PetCounters;
+
+  /** 已解锁成就 id 列表 */
+  achievements: string[];
 
   sleeping: boolean;
   sick: boolean;

@@ -3,6 +3,7 @@
 /** 咕咕 GuGu 主页面：领养流程 ↔ 游戏主界面（头部/状态/舞台/引导/行动面板/商店/小游戏） */
 
 import { useEffect, useState } from 'react';
+import { AchievementsDialog } from '@/components/AchievementsDialog';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ChatPanel } from '@/components/ChatPanel';
 import { HatchFlow } from '@/components/HatchFlow';
@@ -34,6 +35,7 @@ export default function Page() {
   const [gameOpen, setGameOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [skinOpen, setSkinOpen] = useState(false);
+  const [achOpen, setAchOpen] = useState(false);
 
   useEffect(() => {
     init();
@@ -92,6 +94,14 @@ export default function Page() {
           </button>
           <button
             type="button"
+            onClick={() => setAchOpen(true)}
+            aria-label={t.achTitle}
+            className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
+          >
+            🏆
+          </button>
+          <button
+            type="button"
             onClick={() => setSkinOpen(true)}
             aria-label={t.skinTitle}
             className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
@@ -132,6 +142,7 @@ export default function Page() {
       {gameOpen && <SnackGame pet={pet} onClose={() => setGameOpen(false)} />}
       {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
       {skinOpen && <SkinDialog pet={pet} onClose={() => setSkinOpen(false)} />}
+      {achOpen && <AchievementsDialog pet={pet} onClose={() => setAchOpen(false)} />}
     </main>
   );
 }

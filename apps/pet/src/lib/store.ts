@@ -20,6 +20,7 @@ import {
 import { pickLine, type LineKind } from './lines';
 import { useLocale } from '@/hooks/useLocale';
 import { aiReady, buildSystemPrompt, chatComplete, loadAiSettings } from './ai';
+import { achievementById, checkAchievements } from './achievements';
 import {
   deleteSkinRecord,
   listSkinRecords,
@@ -40,6 +41,7 @@ import type {
   ActionId,
   ActivityState,
   BurstData,
+  PetCounters,
   PetState,
   ShopItem,
   SimEventKind,
@@ -47,6 +49,17 @@ import type {
 } from './types';
 
 const STORAGE_KEY = 'ale-pet-save';
+const ZERO_COUNTERS: PetCounters = {
+  feed: 0,
+  wash: 0,
+  play: 0,
+  work: 0,
+  study: 0,
+  tap: 0,
+  heal: 0,
+  minigameBest: 0,
+  aiChat: 0,
+};
 
 interface BubbleData {
   id: number;
@@ -109,11 +122,31 @@ interface PetStore {
   resolvedSkin: () => { src: string; faceOverlay: boolean } | null;
   sendChat: (text: string) => Promise<void>;
   clearChat: () => void;
+  /** 检查并发放新解锁的成就（气泡 + 粒子庆祝） */
+  grantAchievements: () => void;
 }
 
-/** v1 → v2 迁移：补元宝与打工/学习冷却字段 */
+/** v1 → v3 迁移：补元宝、打工/学习冷却与成就系统字段 */
 function migrateV1(raw: Record<string, unknown>): PetState {
-  return { ...(raw as unknown as PetState), saveVersion: 2, coins: INITIAL_COINS, lastWorkedAt: 0, lastStudiedAt: 0 };
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 3,
+    coins: INITIAL_COINS,
+    lastWorkedAt: 0,
+    lastStudiedAt: 0,
+    counters: { ...ZERO_COUNTERS },
+    achievements: [],
+  };
+}
+
+/** v2 → v3 迁移：补成就系统字段 */
+function migrateV2(raw: Record<string, unknown>): PetState {
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 3,
+    counters: { ...ZERO_COUNTERS },
+    achievements: [],
+  };
 }
 
 function loadRaw(): PetState | null {
@@ -122,7 +155,8 @@ function loadRaw(): PetState | null {
     if (!text) return null;
     const parsed = JSON.parse(text) as { saveVersion?: number } & Record<string, unknown>;
     if (parsed.saveVersion === 1) return migrateV1(parsed);
-    if (parsed.saveVersion !== 2 || typeof parsed.updatedAt !== 'number') return null;
+    if (parsed.saveVersion === 2) return migrateV2(parsed);
+    if (parsed.saveVersion !== 3 || typeof parsed.updatedAt !== 'number') return null;
     return parsed as unknown as PetState;
   } catch {
     return null;
@@ -211,9 +245,14 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       try {
         const remote = JSON.parse(e.newValue) as { saveVersion?: number } & Record<string, unknown>;
         const cur = get().pet;
-        const remotePet = remote.saveVersion === 1 ? migrateV1(remote) : (remote as unknown as PetState);
+        const remotePet =
+          remote.saveVersion === 1
+            ? migrateV1(remote)
+            : remote.saveVersion === 2
+              ? migrateV2(remote)
+              : (remote as unknown as PetState);
         if (
-          remotePet?.saveVersion === 2 &&
+          remotePet?.saveVersion === 3 &&
           (!cur || remotePet.updatedAt > cur.updatedAt)
         ) {
           set({ pet: remotePet });
@@ -249,6 +288,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       saveRaw(next);
       set({ pet: next, burst: { id: ++burstSeq, kind: 'confetti' } });
       get().say('hatchWelcome');
+      get().grantAchievements();
     } else {
       const next = { ...pet, tapsToHatch: remaining };
       saveRaw(next);
@@ -267,7 +307,11 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const loved = stamps.length < PET_TAP.maxPerMinute;
     stamps.push(now);
     const next: PetState = loved
-      ? { ...simmed, mood: clamp01(simmed.mood + PET_TAP.mood) }
+      ? {
+          ...simmed,
+          mood: clamp01(simmed.mood + PET_TAP.mood),
+          counters: { ...simmed.counters, tap: simmed.counters.tap + 1 },
+        }
       : simmed;
     saveRaw(next);
     set({
@@ -276,6 +320,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       burst: { id: ++burstSeq, kind: 'heart' },
     });
     if (Math.random() < 0.55) get().say('tap');
+    get().grantAchievements();
   },
 
   doAction: (id) => {
@@ -300,6 +345,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     setTimeout(() => {
       if (get().anim === anim) set({ anim: null });
     }, animMs);
+    get().grantAchievements();
   },
 
   doWork: () => {
@@ -325,6 +371,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     setTimeout(() => {
       if (get().anim === 'working') set({ anim: null });
     }, ANIM_MS.work);
+    get().grantAchievements();
   },
 
   doStudy: () => {
@@ -350,6 +397,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     setTimeout(() => {
       if (get().anim === 'studying') set({ anim: null });
     }, ANIM_MS.study);
+    get().grantAchievements();
   },
 
   buyItem: (item) => {
@@ -375,12 +423,14 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       ...simmed,
       coins: simmed.coins + reward.coins,
       mood: clamp01(simmed.mood + reward.mood),
+      counters: { ...simmed.counters, minigameBest: Math.max(simmed.counters.minigameBest, score) },
       updatedAt: now,
     };
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'heart' } });
     const tier: LineKind = score >= 12 ? 'gameGreat' : score >= 5 ? 'gameOk' : 'gameMeh';
     get().say(tier);
+    get().grantAchievements();
     return reward;
   },
 
@@ -455,6 +505,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     }
     // 偶发闲聊（睡觉时安静）
     if (!next.sleeping && Math.random() < 0.07) get().say('idle');
+    get().grantAchievements();
   },
 
   say: (kind, vars) => {
@@ -555,10 +606,20 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         { role: 'system', content: buildSystemPrompt({ ...pet, dominantPersonality: dominantPersonality(pet.personality) }, locale) },
         ...history,
       ]);
+      const cur = get().pet;
+      if (cur) {
+        const withChat: PetState = {
+          ...cur,
+          counters: { ...cur.counters, aiChat: cur.counters.aiChat + 1 },
+        };
+        saveRaw(withChat);
+        set({ pet: withChat });
+      }
       set({
         chatMessages: [...get().chatMessages, { role: 'gugu', text: reply }],
         chatBusy: false,
       });
+      get().grantAchievements();
     } catch {
       // AI 不可用 → 本地台词兜底
       const locale = useLocale.getState().locale;
@@ -576,4 +637,17 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   },
 
   clearChat: () => set({ chatMessages: [], chatFallbackUsed: false }),
+
+  grantAchievements: () => {
+    const pet = get().pet;
+    if (!pet) return;
+    const earned = checkAchievements(pet);
+    if (!earned.length) return;
+    const next: PetState = { ...pet, achievements: [...pet.achievements, ...earned] };
+    saveRaw(next);
+    set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
+    const locale = useLocale.getState().locale;
+    const def = achievementById(earned[0]);
+    get().say('achUnlock', { a: def ? (locale === 'zh' ? def.zh : def.en) : earned[0] });
+  },
 }));

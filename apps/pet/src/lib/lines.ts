@@ -31,6 +31,7 @@ export type LineKind =
   | 'gameGreat'
   | 'gameOk'
   | 'gameMeh'
+  | 'achUnlock'
   | 'idle';
 
 const LINES: Record<Locale, Record<LineKind, string[]>> = {
@@ -109,6 +110,7 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
     gameGreat: ["无敌了！点心一颗都没跑！", "咕咕是接点心大师！", "太爽啦！再来挑战！"],
     gameOk: ["还不错！咕咕有认真接！", "接住好多！差一点点就完美", "好玩！下次接更多！"],
     gameMeh: ["呜…点心都躲着我…", "再来一次，咕咕要认真了！", "手滑了…不算不算！"],
+    achUnlock: ["🏆 达成成就「{a}」！", "咕咕解锁了新成就「{a}」！", "恭喜！获得成就「{a}」！"],
     idle: [
       "咕咕咕～哼哼歌",
       "歪头看你",
@@ -193,6 +195,7 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
     gameGreat: ["Unstoppable! Not one snack escaped!", "I'm the snack-catching master!", "So good! One more round!"],
     gameOk: ["Not bad! I caught a lot!", "So close to perfect!", "Fun! I'll catch more next time!"],
     gameMeh: ["Sniff... the snacks dodged me...", "One more round, I'll focus!", "Slipped... that doesn't count!"],
+    achUnlock: ["🏆 Achievement unlocked: {a}!", "GuGu just earned \"{a}\"!", "Congrats! New achievement: {a}!"],
     idle: [
       "Gugu gugu~ humming a song",
       "Tilts head at you",
