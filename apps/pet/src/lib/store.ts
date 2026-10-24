@@ -27,6 +27,7 @@ import { addDiaryEvent } from './diary';
 import { isBadWeather, weatherFor } from './weather';
 import { notify } from './notify';
 import { pickDest } from './travel';
+import { pickSticker } from './stickers';
 import {
   deleteSkinRecord,
   listSkinRecords,
@@ -76,6 +77,8 @@ const ZERO_BESTS: GameBests = { snack: 0, whack: 0, memory: 0, race: 0, toss: 0,
 interface BubbleData {
   id: number;
   text: string;
+  kind?: LineKind;
+  sticker?: string | null;
 }
 
 export interface ChatMsg {
@@ -850,7 +853,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       vars,
     });
     set({
-      bubble: { id: ++bubbleSeq, text },
+      bubble: { id: ++bubbleSeq, text, kind, sticker: pickSticker(kind) },
       recentLines: [text, ...recentLines].slice(0, 4),
     });
   },

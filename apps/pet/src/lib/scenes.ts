@@ -7,7 +7,9 @@ import { BASE_PATH } from './skins';
 
 export type SceneId =
   | 'garden' | 'lake' | 'bamboo' | 'roof' | 'meadow' | 'courtyard'
-  | 'starry-hill' | 'riverside' | 'sakura-park' | 'autumn-lane' | 'snow-town' | 'seaside-cliff';
+  | 'starry-hill' | 'riverside' | 'sakura-park' | 'autumn-lane' | 'snow-town' | 'seaside-cliff'
+  | 'greenhouse' | 'windmill' | 'library-nook' | 'lantern-street' | 'sunflower-field'
+  | 'desert-oasis' | 'alpine' | 'night-market' | 'pond' | 'maple-bridge' | 'cloud-deck' | 'terrace-cafe';
 
 export interface SceneDef {
   id: SceneId;
@@ -29,6 +31,18 @@ export const SCENES: SceneDef[] = [
   { id: 'autumn-lane', file: 'scene/autumn-lane.png', zh: '银杏小径', en: 'Autumn Lane' },
   { id: 'snow-town', file: 'scene/snow-town.png', zh: '雪镇', en: 'Snow Town' },
   { id: 'seaside-cliff', file: 'scene/seaside-cliff.png', zh: '海边悬崖', en: 'Seaside Cliff' },
+  { id: 'greenhouse', file: 'scene/greenhouse.png', zh: '小温室', en: 'Greenhouse' },
+  { id: 'windmill', file: 'scene/windmill.png', zh: '风车田野', en: 'Windmill Field' },
+  { id: 'library-nook', file: 'scene/library-nook.png', zh: '花园书角', en: 'Garden Nook' },
+  { id: 'lantern-street', file: 'scene/lantern-street.png', zh: '灯笼街', en: 'Lantern Street' },
+  { id: 'sunflower-field', file: 'scene/sunflower-field.png', zh: '向日葵田', en: 'Sunflower Field' },
+  { id: 'desert-oasis', file: 'scene/desert-oasis.png', zh: '沙漠绿洲', en: 'Desert Oasis' },
+  { id: 'alpine', file: 'scene/alpine.png', zh: '高山草甸', en: 'Alpine Meadow' },
+  { id: 'night-market', file: 'scene/night-market.png', zh: '夜市', en: 'Night Market' },
+  { id: 'pond', file: 'scene/pond.png', zh: '青蛙池塘', en: 'Frog Pond' },
+  { id: 'maple-bridge', file: 'scene/maple-bridge.png', zh: '枫桥', en: 'Maple Bridge' },
+  { id: 'cloud-deck', file: 'scene/cloud-deck.png', zh: '云上观景台', en: 'Cloud Deck' },
+  { id: 'terrace-cafe', file: 'scene/terrace-cafe.png', zh: '露台咖啡馆', en: 'Terrace Cafe' },
 ];
 
 export function sceneSrc(id: SceneId): string {

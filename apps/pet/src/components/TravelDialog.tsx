@@ -99,7 +99,8 @@ export function TravelDialog({ pet, onClose }: { pet: PetState; onClose: () => v
               const d = destById(sv.dest);
               return (
                 <div key={`${sv.at}-${i}`} className="flex flex-col items-center gap-0.5 rounded-2xl bg-amber-50/70 p-2">
-                  <span className="text-2xl leading-none">{d.souvenirIcon}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`${BASE_PATH}/skins/gugu/souvenir/${sv.dest}.png`} alt="" className="h-7 w-7 object-contain" draggable={false} />
                   <span className="w-full truncate text-center text-[10px] font-bold">
                     {locale === 'zh' ? d.souvenirZh : d.souvenirEn}
                   </span>

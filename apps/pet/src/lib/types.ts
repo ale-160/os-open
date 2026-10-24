@@ -3,7 +3,7 @@
 export type Locale = 'zh' | 'en';
 
 /** 官方三配色变体 */
-export type VariantId = 'cream' | 'mint' | 'sakura' | 'choco' | 'lavender' | 'soda';
+export type VariantId = 'cream' | 'mint' | 'sakura' | 'choco' | 'lavender' | 'soda' | 'matcha' | 'peach' | 'ocean' | 'grape' | 'lemon' | 'sakura-deep' | 'cotton' | 'charcoal' | 'caramel' | 'mint-deep' | 'coral' | 'sky' | 'rose' | 'olive';
 
 /** 成长阶段：蛋 → 幼年 → 少年 → 成年 */
 export type GrowthStage = 'egg' | 'baby' | 'teen' | 'adult';
@@ -125,10 +125,26 @@ export type AccessoryId =
   | 'bow'
   | 'flower'
   | 'glasses'
-  | 'backpack';
+  | 'backpack'
+  | 'santa' | 'pumpkin' | 'wizard' | 'chef' | 'detective' | 'beret' | 'cap' | 'bucket'
+  | 'flower-crown' | 'headphones' | 'earmuffs' | 'space-helmet'
+  | 'sunglasses' | 'star-glasses' | 'monocle'
+  | 'scarf-red' | 'scarf-yellow' | 'bandana' | 'necklace' | 'bell'
+  | 'wings' | 'cape' | 'bag-star' | 'watch' | 'hairpin' | 'pin-wheel' | 'badge-star' | 'umbrella'
+  | 'grad-cap' | 'tophat' | 'straw-circle' | 'veil' | 'crown-flower' | 'helmet-wood'
+  | 'nightcap' | 'raincoat-hood' | 'crown-ice' | 'mushroom-hat' | 'crown-laurel' | 'bonnet'
+  | 'glasses-heart' | 'glasses-3d' | 'visor'
+  | 'scarf-check' | 'scarf-rainbow' | 'tie'
+  | 'backpack-bear' | 'balloon-hand' | 'camera' | 'icecream' | 'flag' | 'book';
 
 /** 房间装饰 id（见 lib/accessories.ts） */
-export type DecoId = 'nest' | 'bowl' | 'ball' | 'plant' | 'picture' | 'rug' | 'lamp' | 'teddy';
+export type DecoId = 'nest' | 'bowl' | 'ball' | 'plant' | 'picture' | 'rug' | 'lamp' | 'teddy'
+  | 'swing' | 'bookshelf' | 'teapot' | 'cuckoo' | 'fountain' | 'mail' | 'basket-fruit' | 'candle'
+  | 'chalkboard' | 'barrel' | 'birdbath' | 'hammock' | 'lantern' | 'clock' | 'desk' | 'shelf-plant'
+  | 'watering-can' | 'butterfly-house' | 'mushroom-house' | 'well' | 'horse' | 'xylophone'
+  | 'treasure-chest' | 'gramophone'
+  | 'sock' | 'wreath' | 'snowman' | 'pumpkin-lamp' | 'moon-lamp' | 'star-jar' | 'boat' | 'kite'
+  | 'barometer' | 'vine' | 'binoculars' | 'thermos' | 'radio' | 'cuckoo-owl' | 'bathtub' | 'sign';
 
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {

@@ -5,6 +5,7 @@
 
 import { BASE_PATH } from './skins';
 import type { AccessoryId, DecoId, ShopItem } from './types';
+import { ACCESSORIES_BATCH2, DECORATIONS_BATCH2 } from './wardrobe-batch2';
 
 export interface AccessoryDef {
   id: AccessoryId;
@@ -19,7 +20,7 @@ export interface AccessoryDef {
   price: number;
 }
 
-export const ACCESSORIES: AccessoryDef[] = [
+const ACCESSORIES_BASE: AccessoryDef[] = [
   { id: 'beanie', file: 'acc/beanie.png', anchor: 'head', icon: '🧢', zh: '绒球毛线帽', en: 'Pom Beanie', zhDesc: '冬天戴最暖和', enDesc: 'Cozy for winter', price: 18 },
   { id: 'strawhat', file: 'acc/strawhat.png', anchor: 'head', icon: '👒', zh: '丝带草帽', en: 'Straw Hat', zhDesc: '出门旅行的标配', enDesc: 'A traveler classic', price: 20 },
   { id: 'crown', file: 'acc/crown.png', anchor: 'head', icon: '👑', zh: '小皇冠', en: 'Tiny Crown', zhDesc: '咕咕之王', enDesc: 'King GuGu', price: 30 },
@@ -43,7 +44,7 @@ export interface DecoDef {
   underlay?: boolean;
 }
 
-export const DECORATIONS: DecoDef[] = [
+const DECORATIONS_BASE: DecoDef[] = [
   { id: 'nest', file: 'deco/nest.png', icon: '🪹', zh: '草编小窝', en: 'Cozy Nest', price: 24 },
   { id: 'bowl', file: 'deco/bowl.png', icon: '🍚', zh: '小鱼食盆', en: 'Food Bowl', price: 14 },
   { id: 'ball', file: 'deco/ball.png', icon: '🧶', zh: '毛线球', en: 'Yarn Ball', price: 12 },
@@ -79,6 +80,9 @@ export function accessorySrc(id: AccessoryId): string {
 export function decoSrc(id: DecoId): string {
   return `${BASE_PATH}/skins/gugu/${decoById(id)?.file ?? ''}`;
 }
+
+export const ACCESSORIES: AccessoryDef[] = [...ACCESSORIES_BASE, ...ACCESSORIES_BATCH2];
+export const DECORATIONS: DecoDef[] = [...DECORATIONS_BASE, ...DECORATIONS_BATCH2];
 
 /** 装扮 + 装饰的商品条目（供商店与 SHOP_ITEMS 合并） */
 export function wardrobeShopItems(): ShopItem[] {

@@ -7,6 +7,7 @@ import { useEscClose } from '@/hooks/useEscClose';
 import { useLocale } from '@/hooks/useLocale';
 import { SHOP_ITEMS } from '@/lib/balance';
 import { wardrobeShopItems } from '@/lib/accessories';
+import { BASE_PATH } from '@/lib/skins';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -70,7 +71,7 @@ export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                     onClick={() => buyItem(item)}
                     className={`press flex items-center gap-2.5 rounded-2xl bg-amber-50/60 p-3 text-left ${disabled ? 'opacity-40' : 'hover:bg-amber-50 active:bg-amber-100'}`}
                   >
-                    {item.iconSrc ? (
+                    {(item.iconSrc ?? (kind === 'use' ? `${BASE_PATH}/skins/gugu/item/${item.id}.png` : undefined)) ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={item.iconSrc} alt="" className="h-10 w-10 shrink-0 object-contain" draggable={false} />
                     ) : (

@@ -14,6 +14,7 @@ import { DECO_SLOTS, decoById, decoSrc } from '@/lib/accessories';
 import { SCENES, dailyScene, sceneSrc, type SceneId } from '@/lib/scenes';
 import { isBadWeather } from '@/lib/weather';
 import { pickVisitor, visitorSrc } from '@/lib/visitors';
+import { pickSticker } from '@/lib/stickers';
 import { destById } from '@/lib/travel';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
@@ -139,6 +140,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
 
   // 蝴蝶动画结束即卸载（keyframes 无 forwards，动画一停就移除，避免冻在半空）
   const onButterflyEnd = useCallback(() => setButterfly(0), []);
+
 
   // 访客小剧场：低频随机小动物巡游（飞行/地面），独立本地定时器
   useEffect(() => {
@@ -388,7 +390,13 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
             key={bubble.id}
             className="anim-pop absolute -top-12 left-1/2 z-10 w-max max-w-[230px] -translate-x-1/2 rounded-2xl border border-amber-100 bg-white/95 px-3.5 py-2 text-sm font-medium shadow-lg shadow-amber-900/10"
           >
-            {bubble.text}
+            <div className="flex items-center gap-1.5">
+              {bubble.sticker && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={bubble.sticker} alt="" className="h-6 w-6 shrink-0" draggable={false} />
+              )}
+              <span>{bubble.text}</span>
+            </div>
             <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-b border-r border-amber-100 bg-white/95" />
           </div>
         )}
