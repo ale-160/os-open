@@ -16,6 +16,12 @@ export const STRINGS_ZH = {
   exportConfig: '导出配置',
   importConfig: '导入配置',
 
+  // 咕咕桌宠挂件
+  petWidgetShow: '唤出咕咕',
+  petWidgetHide: '收起咕咕',
+  petWidgetGrip: '拖动咕咕挂件',
+  petWidgetClose: '关闭挂件',
+
   // 命令面板（Spotlight）
   commandSearch: '全局搜索 (Ctrl+K)',
   commandPaletteTitle: '命令面板',
@@ -392,6 +398,12 @@ export const STRINGS_EN = {
   themeToggle: 'Toggle Theme',
   exportConfig: 'Export Config',
   importConfig: 'Import Config',
+
+  // GuGu pet widget
+  petWidgetShow: 'Show GuGu',
+  petWidgetHide: 'Hide GuGu',
+  petWidgetGrip: 'Drag the GuGu widget',
+  petWidgetClose: 'Close widget',
 
   // Command Palette (Spotlight)
   commandSearch: 'Global Search (Ctrl+K)',

@@ -18,6 +18,7 @@ import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
 import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
 import { AppStoreModal } from '@/components/app/AppStoreModal';
+import { PetWidget } from '@/components/pet/PetWidget';
 import { OS_LANGUAGE_KEY, type OsApp } from '@/config/apps';
 import { HelpCircle, Globe, Heart, Search, Store } from 'lucide-react';
 
@@ -662,6 +663,9 @@ function MainPageContent({ lang }: MainPageProps) {
           <span>{S.ale160}</span>
         </a>
       </footer>
+
+      {/* 咕咕桌宠挂件（桌面浮窗 + 角落开关；应用全屏时自动隐藏） */}
+      <PetWidget language={activeConfig.theme.language} />
       </div>
     </>
   );

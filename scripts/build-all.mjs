@@ -25,4 +25,5 @@ run('pnpm', ['--filter', 'web-img', 'build'], { APP_BASE_PATH: '/img' });
 run('pnpm', ['--filter', 'web-text', 'build'], { APP_BASE_PATH: '/text' });
 run('pnpm', ['--filter', 'nchat', 'build'], { APP_BASE_PATH: '/chat' });
 run('pnpm', ['--filter', 'typev', 'build'], { APP_BASE_PATH: '/typev' });
+run('pnpm', ['--filter', 'pet', 'build'], { APP_BASE_PATH: '/pet' });
 run('node', ['scripts/compose.mjs']);

@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-gugu-bg: #fdf3e3;
+  --color-gugu-panel: #fffdf8;
+  --color-gugu-ink: #6b4f3a;
+  --color-gugu-ink-soft: #a08870;
+  --color-gugu-accent: #ff9f45;
+  --color-gugu-accent-soft: #ffd9ae;
+  --color-gugu-good: #7bc86c;
+  --color-gugu-warn: #f6c445;
+  --color-gugu-bad: #f0716b;
+}
+
+body {
+  background: var(--color-gugu-bg);
+  color: var(--color-gugu-ink);
+  font-family:
+    ui-rounded, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui,
+    -apple-system, sans-serif;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---------- 咕咕程序动画关键帧 ---------- */
+
+/* 呼吸：身体轻微起伏 */
+@keyframes gugu-breathe {
+  from { transform: scale(1, 1); }
+  to { transform: scale(1.015, 1.045); }
+}
+.anim-breathe { animation: gugu-breathe 3.2s ease-in-out infinite alternate; transform-origin: 50% 92%; }
+
+/* 走路小跳 */
+@keyframes gugu-hop {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  40% { transform: translateY(-11%) scaleY(1.04); }
+  70% { transform: translateY(1.5%) scaleY(0.96); }
+}
+.anim-hop { animation: gugu-hop 0.55s ease-in-out infinite; transform-origin: 50% 92%; }
+
+/* 吃东西：低头三连 */
+@keyframes gugu-eat {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(9deg) translateY(4%); }
+  50% { transform: rotate(0deg); }
+  75% { transform: rotate(9deg) translateY(4%); }
+}
+.anim-eat { animation: gugu-eat 0.9s ease-in-out 2; transform-origin: 50% 30%; }
+
+/* 洗澡：左右扭动 */
+@keyframes gugu-scrub {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
+}
+.anim-scrub { animation: gugu-scrub 0.45s ease-in-out 5; transform-origin: 50% 90%; }
+
+/* 玩耍：开心蹦跳 */
+@keyframes gugu-bounce-happy {
+  0%, 100% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-16%) scale(1.03, 0.97); }
+  60% { transform: translateY(0) scale(0.97, 1.03); }
+}
+.anim-happy { animation: gugu-bounce-happy 0.6s ease-in-out 3; transform-origin: 50% 92%; }
+
+/* 打工：埋头苦干三连 */
+@keyframes gugu-work {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(11deg) translateY(3%); }
+  60% { transform: rotate(3deg); }
+}
+.anim-work { animation: gugu-work 0.9s ease-in-out 3; transform-origin: 50% 30%; }
+
+/* 学习：捧书摇摆 */
+@keyframes gugu-study {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50% { transform: rotate(2.5deg); }
+}
+.anim-study { animation: gugu-study 1.6s ease-in-out 2; transform-origin: 50% 88%; }
+
+/* ---------- 闲时小动作（tricks） ---------- */
+
+/* 歪头好奇 */
+@keyframes gugu-trick-tilt {
+  0%, 100% { transform: rotate(0deg); }
+  30% { transform: rotate(-9deg) translateX(-2%); }
+  65% { transform: rotate(7deg) translateX(2%); }
+}
+.anim-tilt { animation: gugu-trick-tilt 1.7s ease-in-out 1; transform-origin: 50% 92%; }
+
+/* 啄地两下 */
+@keyframes gugu-trick-peck {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  22% { transform: rotate(15deg) translateY(7%); }
+  40% { transform: rotate(2deg) translateY(0); }
+  60% { transform: rotate(15deg) translateY(7%); }
+  80% { transform: rotate(2deg) translateY(0); }
+}
+.anim-peck { animation: gugu-trick-peck 1.8s ease-in-out 1; transform-origin: 50% 22%; }
+
+/* 转身（跳起翻面） */
+@keyframes gugu-trick-turn {
+  0% { transform: translateY(0) scaleX(1); }
+  38% { transform: translateY(-14%) scaleX(1); }
+  50% { transform: translateY(-14%) scaleX(-1); }
+  62% { transform: translateY(-8%) scaleX(-1); }
+  100% { transform: translateY(0) scaleX(-1); }
+}
+.anim-turn { animation: gugu-trick-turn 0.7s ease-in-out 1; transform-origin: 50% 92%; }
+
+/* 扑翅膀 */
+@keyframes gugu-trick-flap {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  22% { transform: translateY(-6%) scaleY(0.94); }
+  44% { transform: translateY(-2%) scaleY(1.04); }
+  66% { transform: translateY(-7%) scaleY(0.94); }
+}
+.anim-flap { animation: gugu-trick-flap 0.7s ease-in-out 2; transform-origin: 50% 92%; }
+
+/* 哼歌摇摆 */
+@keyframes gugu-trick-sing {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-4deg) scale(1.02); }
+  50% { transform: rotate(0deg) scale(0.98); }
+  75% { transform: rotate(4deg) scale(1.02); }
+}
+.anim-sing { animation: gugu-trick-sing 2.1s ease-in-out 1; transform-origin: 50% 92%; }
+
+/* 跳舞：节奏扭动 */
+@keyframes gugu-trick-dance {
+  0%, 100% { transform: rotate(0deg) translateY(0); }
+  15% { transform: rotate(-6deg) translateY(-6%); }
+  30% { transform: rotate(5deg) translateY(0); }
+  45% { transform: rotate(-5deg) translateY(-7%); }
+  60% { transform: rotate(6deg) translateY(0); }
+  80% { transform: rotate(-3deg) translateY(-4%); }
+}
+.anim-dance { animation: gugu-trick-dance 1.9s ease-in-out 1; transform-origin: 50% 92%; }
+
+/* 蹲坐发呆 */
+@keyframes gugu-trick-sit {
+  0%, 100% { transform: translateY(0) scale(1, 1); }
+  35%, 75% { transform: translateY(5%) scale(1.06, 0.9); }
+}
+.anim-sit { animation: gugu-trick-sit 2.6s ease-in-out 1; transform-origin: 50% 92%; }
+
+/* 奔跑前倾 */
+@keyframes gugu-run-lean {
+  0%, 100% { transform: rotate(4deg); }
+  50% { transform: rotate(7deg); }
+}
+.anim-run { animation: gugu-run-lean 0.3s ease-in-out infinite, gugu-hop 0.3s ease-in-out infinite; transform-origin: 50% 92%; }
+
+/* 走路时脚下的小尘土 */
+@keyframes gugu-dust {
+  0% { opacity: 0.7; transform: translate(0, 0) scale(0.5); }
+  100% { opacity: 0; transform: translate(var(--drift, 10px), -14px) scale(1.2); }
+}
+.anim-dust { animation: gugu-dust 0.9s ease-out infinite; }
+
+/* 小剧场：蝴蝶横穿（支持 reverse 反向） */
+@keyframes gugu-fly {
+  0% { left: -8%; top: 30%; }
+  25% { top: 20%; }
+  50% { top: 33%; }
+  75% { top: 22%; }
+  100% { left: 104%; top: 30%; }
+}
+
+/* 生病：发抖 */
+@keyframes gugu-shiver {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-1.5%) rotate(-1deg); }
+  75% { transform: translateX(1.5%) rotate(1deg); }
+}
+.anim-shiver { animation: gugu-shiver 0.35s linear infinite; }
+
+/* 蛋：点击晃动 */
+@keyframes gugu-wobble {
+  0%, 100% { transform: rotate(0deg); }
+  20% { transform: rotate(-7deg); }
+  45% { transform: rotate(6deg); }
+  70% { transform: rotate(-4deg); }
+}
+.anim-wobble { animation: gugu-wobble 0.5s ease-in-out 1; transform-origin: 50% 96%; }
+
+/* 眨眼（叠加在眼睛组上） */
+@keyframes gugu-blink {
+  0%, 91%, 100% { transform: scaleY(1); }
+  95% { transform: scaleY(0.08); }
+}
+.anim-blink { animation: gugu-blink 4.2s linear infinite; transform-origin: center; }
+
+/* 嘴巴啾啾（进食时） */
+@keyframes gugu-chirp {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.35); }
+}
+.anim-chirp { animation: gugu-chirp 0.45s ease-in-out 4; transform-origin: center; }
+
+/* 粒子上浮（Zzz/爱心/泡泡/星星） */
+@keyframes gugu-float-up {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--drift, 8px), -64px) scale(1.15); }
+}
+.anim-float { animation: gugu-float-up 2.4s ease-out infinite; }
+
+/* 气泡弹出 */
+@keyframes gugu-pop {
+  0% { opacity: 0; transform: scale(0.6) translateY(8px); }
+  60% { transform: scale(1.05) translateY(0); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+.anim-pop { animation: gugu-pop 0.25s ease-out 1; }
+
+/* 彩带下落（破壳庆祝） */
+@keyframes gugu-confetti {
+  0% { opacity: 1; transform: translateY(-10%) rotate(0deg); }
+  100% { opacity: 0; transform: translateY(340px) rotate(300deg); }
+}
+.anim-confetti { animation: gugu-confetti 1.6s ease-in 1 forwards; }
+
+/* 一次性爆发粒子（摸摸爱心） */
+.anim-burst { animation: gugu-float-up 1.5s ease-out 1 forwards; }
+
+/* 状态条充满动画 */
+@keyframes gugu-bar {
+  from { width: 0; }
+}
+.anim-bar { animation: gugu-bar 0.6s ease-out 1; }
+
+/* 按钮点按反馈 */
+.press:active { transform: scale(0.94); }
+.press { transition: transform 0.08s ease; }

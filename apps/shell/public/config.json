@@ -69,6 +69,16 @@
       "isHidden": false,
       "iconType": "custom",
       "customIconUrl": "/apps/typev.png"
+    },
+    {
+      "id": "icon-app-pet",
+      "name": "咕咕",
+      "url": "app://pet",
+      "folderId": null,
+      "order": 6,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/pet.png"
     }
   ],
   "folders": [],
@@ -82,7 +92,8 @@
         "icon-app-web-text",
         "icon-app-nchat",
         "icon-app-gallery",
-        "icon-app-typev"
+        "icon-app-typev",
+        "icon-app-pet"
       ]
     },
     {
