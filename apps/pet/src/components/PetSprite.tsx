@@ -18,7 +18,7 @@ export interface ResolvedSkin {
 }
 
 /** 闲时小动作 id（与 globals.css 的 anim-<id> 一一对应） */
-export type TrickId = 'tilt' | 'peck' | 'turn' | 'flap' | 'sing';
+export type TrickId = 'tilt' | 'peck' | 'turn' | 'flap' | 'sing' | 'dance' | 'sit' | 'run';
 
 interface PetSpriteProps {
   pet: PetState;
@@ -235,6 +235,22 @@ function Particles({
               fontSize: `${14 + i * 2}px`,
               animationDelay: `${i * 0.5}s`,
               ['--drift' as string]: `${i % 2 === 0 ? -12 : 12}px`,
+            }}
+          >
+            {ch}
+          </span>
+        ))}
+      {trick === 'dance' &&
+        ['🎵', '💃', '🎵'].map((ch, i) => (
+          <span
+            key={i}
+            className="anim-float absolute text-[#f6c445]"
+            style={{
+              left: `${24 + i * 24}%`,
+              top: '16%',
+              fontSize: `${13 + i * 2}px`,
+              animationDelay: `${i * 0.45}s`,
+              ['--drift' as string]: `${i % 2 === 0 ? -14 : 14}px`,
             }}
           >
             {ch}

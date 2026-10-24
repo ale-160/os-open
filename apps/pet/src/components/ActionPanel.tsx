@@ -57,7 +57,7 @@ export function ActionPanel({
       disabled={opts.disabled}
       onClick={opts.onClick}
       className={`press flex flex-1 flex-col items-center gap-0.5 rounded-2xl px-1 py-1.5 transition-colors ${
-        opts.active ? 'bg-[#eef2ff]' : 'hover:bg-white/85 active:bg-white'
+        opts.active ? 'bg-[#eef2ff]/90' : 'hover:bg-white/60 active:bg-white/85'
       } ${opts.disabled ? 'opacity-40' : ''}`}
     >
       <span className={`text-[26px] leading-none ${opts.active ? '' : 'drop-shadow-sm'}`}>{opts.icon}</span>
@@ -68,8 +68,9 @@ export function ActionPanel({
 
   return (
     <>
-      <div className="px-4 pb-5 pt-2">
-        <div className="mx-auto flex max-w-[380px] items-stretch justify-around rounded-[26px] bg-white/65 px-2 py-1.5 shadow-[0_12px_34px_rgba(138,106,77,0.18)] backdrop-blur-md">
+      {/* 悬浮 HUD：直接铺在场景底部，无容器白框 */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center">
+        <div className="pointer-events-auto mx-auto flex max-w-[380px] items-stretch justify-around rounded-[26px] bg-white/40 px-2 py-1.5 shadow-[0_10px_28px_rgba(138,106,77,0.14)] backdrop-blur-sm">
           {dockButton('feed', {
             icon: '🍪',
             label: t.actFeed,

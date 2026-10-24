@@ -33,6 +33,12 @@ export type LineKind =
   | 'gameMeh'
   | 'achUnlock'
   | 'hintMenu'
+  | 'butterfly'
+  | 'yawn'
+  | 'greetDawn'
+  | 'greetDay'
+  | 'greetDusk'
+  | 'greetNight'
   | 'idle';
 
 const LINES: Record<Locale, Record<LineKind, string[]>> = {
@@ -117,6 +123,12 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
       "偷偷告诉你：右键我可以直接点外卖",
       "长按我试试？有快捷菜单！",
     ],
+    butterfly: ["蝴蝶！等等我！", "追追追——扑棱扑棱", "哇，会飞的小点心！", "咦？那是谁家的小鸟？"],
+    yawn: ["哈…哈欠…有点困…", "眼皮在打架…", "咕…想睡觉…"],
+    greetDawn: ["早安咕…天刚亮呀", "清晨的空气真好", "今天也一起加油！"],
+    greetDay: ["今天太阳好大！", "中午吃什么好呢", "下午要精神满满！"],
+    greetDusk: ["黄昏好美…咕！", "晚霞像蛋黄一样", "一天过得好快呀"],
+    greetNight: ["夜深了…咕咕有点困", "星星都出来了！", "睡前再玩一会儿嘛"],
     idle: [
       "咕咕咕～哼哼歌",
       "歪头看你",
@@ -207,6 +219,12 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
       "Psst — right-click me for quick actions!",
       "Try long-pressing me, pretty please?",
     ],
+    butterfly: ["A butterfly! Wait for me!", "Chase chase — flap flap!", "Wow, a flying snack!"],
+    yawn: ["Yawwwn... getting sleepy...", "Eyelids... so heavy...", "Gu... nap time soon..."],
+    greetDawn: ["Morning, gu... let's do our best", "The morning air is so fresh", "A brand new day!"],
+    greetDay: ["The sun is SO bright!", "What's for lunch?", "Full power this afternoon!"],
+    greetDusk: ["The dusk is beautiful...", "Sunset like egg yolk!", "Where did the day go?"],
+    greetNight: ["It's late... getting sleepy", "The stars are out!", "One more game before bed?"],
     idle: [
       "Gugu gugu~ humming a song",
       "Tilts head at you",

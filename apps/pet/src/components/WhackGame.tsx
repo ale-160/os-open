@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { sfx } from '@/lib/sfx';
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
@@ -105,6 +106,7 @@ export function WhackGame({ onClose }: { pet: PetState; onClose: () => void }) {
     if (!occ || phase !== 'playing') return;
     scoreRef.current = Math.max(0, scoreRef.current + (occ.kind === 'bomb' ? -2 : 1));
     setScore(scoreRef.current);
+    sfx.pop();
     holesRef.current[idx] = null;
     setHoles([...holesRef.current]);
   };

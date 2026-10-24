@@ -94,17 +94,6 @@ export function StatusBar({ pet }: { pet: PetState }) {
               : fmt(t.growthNext, { n: Math.ceil(gap) })}
         </span>
       </div>
-
-      {pet.sick && (
-        <div className="mt-2 rounded-xl bg-[#f0716b]/10 px-3 py-1.5 text-xs font-medium text-[#d9534d]">
-          🤒 {t.sickBanner}
-        </div>
-      )}
-      {pet.sleeping && !pet.sick && (
-        <div className="mt-2 rounded-xl bg-[#8aa8ff]/10 px-3 py-1.5 text-xs font-medium text-[#5f7de0]">
-          💤 {t.sleepHint}
-        </div>
-      )}
     </div>
   );
 }

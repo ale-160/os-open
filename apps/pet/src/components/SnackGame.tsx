@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MINIGAME } from '@/lib/balance';
 import { bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor } from '@/lib/skins';
+import { sfx } from '@/lib/sfx';
 import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
@@ -134,6 +135,7 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
           it.el?.remove();
           scoreRef.current = Math.max(0, scoreRef.current + (it.bomb ? -2 : 1));
           setScore(scoreRef.current);
+          sfx.pop();
           continue;
         }
         if (it.y > 108) {

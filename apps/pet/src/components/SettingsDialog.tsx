@@ -1,10 +1,11 @@
 'use client';
 
-/** 设置弹窗：语言切换 / AI（BYOK）/ 重置存档 / 关于（由父组件条件渲染） */
+/** 设置弹窗：语言切换 / 音效 / AI（BYOK）/ 重置存档 / 关于（由父组件条件渲染） */
 
 import { useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { DEFAULT_AI_SETTINGS, loadAiSettings, saveAiSettings, type AiSettings } from '@/lib/ai';
+import { isSfxMuted, setSfxMuted } from '@/lib/sfx';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 
@@ -15,11 +16,18 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const [ai, setAi] = useState<AiSettings>(() => (typeof window === 'undefined' ? DEFAULT_AI_SETTINGS : loadAiSettings()));
   const [aiSaved, setAiSaved] = useState(false);
+  const [sfxOff, setSfxOff] = useState(() => (typeof window === 'undefined' ? false : isSfxMuted()));
 
   const saveAi = () => {
     saveAiSettings(ai);
     setAiSaved(true);
     setTimeout(() => setAiSaved(false), 2000);
+  };
+
+  const toggleSfx = () => {
+    const next = !sfxOff;
+    setSfxOff(next);
+    setSfxMuted(next);
   };
 
   const aiField = (label: string, value: string, onChange: (v: string) => void, placeholder: string, type = 'text') => (
@@ -76,6 +84,12 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </div>
+
+        {/* 音效 */}
+        <label className="mb-4 flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50/40 px-3 py-2.5">
+          <span className="text-sm font-semibold">🔊 {t.sfxLabel}</span>
+          <input type="checkbox" checked={!sfxOff} onChange={toggleSfx} className="h-4 w-4 accent-[#ff9f45]" />
+        </label>
 
         {/* AI（BYOK） */}
         <div className="mb-5 rounded-2xl border border-amber-100 bg-amber-50/40 p-3">

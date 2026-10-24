@@ -21,6 +21,7 @@ import { pickLine, type LineKind } from './lines';
 import { useLocale } from '@/hooks/useLocale';
 import { aiReady, buildSystemPrompt, chatComplete, loadAiSettings } from './ai';
 import { achievementById, checkAchievements } from './achievements';
+import { sfx } from './sfx';
 import {
   deleteSkinRecord,
   listSkinRecords,
@@ -284,11 +285,12 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet || pet.stage !== 'egg') return;
     const remaining = pet.tapsToHatch - 1;
     if (remaining <= 0) {
-      const next = hatchEgg(pet, Date.now());
-      saveRaw(next);
-      set({ pet: next, burst: { id: ++burstSeq, kind: 'confetti' } });
-      get().say('hatchWelcome');
-      get().grantAchievements();
+    const next = hatchEgg(pet, Date.now());
+    saveRaw(next);
+    set({ pet: next, burst: { id: ++burstSeq, kind: 'confetti' } });
+    sfx.hatch();
+    get().say('hatchWelcome');
+    get().grantAchievements();
     } else {
       const next = { ...pet, tapsToHatch: remaining };
       saveRaw(next);
@@ -319,6 +321,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       tapStamps: stamps,
       burst: { id: ++burstSeq, kind: 'heart' },
     });
+    sfx.chirp();
     if (Math.random() < 0.55) get().say('tap');
     get().grantAchievements();
   },
@@ -503,9 +506,13 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       get().say(delta > 0 ? 'eventMoodUp' : 'eventMoodDown');
       return;
     }
-    // 偶发闲聊（睡觉时安静）；小概率插播长按/右键菜单提示
+    // 偶发闲聊（睡觉时安静）；小概率插播时段问候或长按/右键菜单提示
     if (!next.sleeping && Math.random() < 0.07) {
-      if (Math.random() < 0.12) get().say('hintMenu');
+      const roll = Math.random();
+      const h = new Date().getHours();
+      const greet = h >= 5 && h < 8 ? 'greetDawn' : h >= 8 && h < 17 ? 'greetDay' : h >= 17 && h < 20 ? 'greetDusk' : 'greetNight';
+      if (roll < 0.12) get().say('hintMenu');
+      else if (roll < 0.3) get().say(greet);
       else get().say('idle');
     }
     get().grantAchievements();
@@ -649,6 +656,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const next: PetState = { ...pet, achievements: [...pet.achievements, ...earned] };
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
+    sfx.fanfare();
     const locale = useLocale.getState().locale;
     const def = achievementById(earned[0]);
     get().say('achUnlock', { a: def ? (locale === 'zh' ? def.zh : def.en) : earned[0] });

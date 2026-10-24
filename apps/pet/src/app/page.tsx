@@ -74,7 +74,7 @@ export default function Page() {
   const tutorialText = t[`tut${Math.min(3, pet.tutorialStep + 1)}` as 'tut1'];
 
   return (
-    <main className="mx-auto flex h-dvh max-w-xl flex-col overflow-hidden">
+    <main className="relative mx-auto flex h-dvh max-w-xl flex-col overflow-hidden">
       {/* 头部：名字 / 阶段 / 元宝 / 设置 */}
       <header className="flex items-center gap-2 px-4 pt-4">
         <div className="min-w-0 flex-1">
