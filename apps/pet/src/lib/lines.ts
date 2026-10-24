@@ -36,6 +36,10 @@ export type LineKind =
   | 'butterfly'
   | 'yawn'
   | 'checkin'
+  | 'careMeal'
+  | 'careRest'
+  | 'careNight'
+  | 'careFatigue'
   | 'greetDawn'
   | 'greetDay'
   | 'greetDusk'
@@ -123,6 +127,26 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
       "签到成功！+{n} 元宝",
       "连续签到 {s} 天！+{n} 元宝",
       "每日签到 +{n} 元宝，咕咕攒着养老",
+    ],
+    careMeal: [
+      "到饭点啦，{m}吃了吗？别饿着肚子呀",
+      "我吃过小饼干了，{m}记得吃哦",
+      "{m}时间到！咕咕盯着你呢",
+    ],
+    careRest: [
+      "坐了好久啦，起来伸个懒腰吧",
+      "看看窗外 20 秒，眼睛会谢谢你",
+      "咕咕示范伸懒腰：你看～",
+    ],
+    careNight: [
+      "夜深了咕…你也该休息了，晚安",
+      "熬夜的咕咕陪着你，记得早点睡",
+      "月亮都打哈欠了，你也睡吧",
+    ],
+    careFatigue: [
+      "累不累？摸摸我歇一会儿吧",
+      "深呼吸～咕咕给你充充电",
+      "喝口水，休息一下吧",
     ],
     hintMenu: [
       "长按或右键我，有惊喜菜单哦",
@@ -224,6 +248,26 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
       "Check-in! +{n} coins",
       "{s}-day streak! +{n} coins",
       "Daily bonus +{n} coins, saving up!",
+    ],
+    careMeal: [
+      "Meal time! Have you had {m}? Don't skip it!",
+      "I had my crackers — remember your {m}!",
+      "{m} time! GuGu is watching you",
+    ],
+    careRest: [
+      "Sitting so long! Stand up and stretch",
+      "Look out the window for 20s — your eyes say thanks",
+      "GuGu demonstrates a stretch: watch!",
+    ],
+    careNight: [
+      "It's late... you should sleep too, night night",
+      "Night-owl GuGu keeps you company — sleep soon",
+      "Even the moon is yawning — bedtime!",
+    ],
+    careFatigue: [
+      "Tired? Pet me and rest a bit",
+      "Deep breath~ GuGu is recharging you",
+      "Have some water, take a break",
     ],
     hintMenu: [
       "Long-press or right-click me for a menu!",

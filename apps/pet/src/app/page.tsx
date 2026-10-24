@@ -20,6 +20,8 @@ import { ShopDialog } from '@/components/ShopDialog';
 import { SnackGame } from '@/components/SnackGame';
 import { StatusBar } from '@/components/StatusBar';
 import { TossGame } from '@/components/TossGame';
+import { TravelDialog } from '@/components/TravelDialog';
+import { TripReport } from '@/components/TripReport';
 import { WhackGame } from '@/components/WhackGame';
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
@@ -47,6 +49,7 @@ export default function Page() {
   const [chatOpen, setChatOpen] = useState(false);
   const [skinOpen, setSkinOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
+  const [travelOpen, setTravelOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
@@ -70,6 +73,17 @@ export default function Page() {
     const timer = setTimeout(clearBubble, BUBBLE_MS);
     return () => clearTimeout(timer);
   }, [bubble, clearBubble]);
+
+  // 用户活动心跳：关怀功能判断"你还在电脑前吗"
+  useEffect(() => {
+    const poke = () => usePetStore.getState().pokeActivity();
+    window.addEventListener('pointerdown', poke);
+    window.addEventListener('keydown', poke);
+    return () => {
+      window.removeEventListener('pointerdown', poke);
+      window.removeEventListener('keydown', poke);
+    };
+  }, []);
 
   if (!ready) {
     return <div className="min-h-dvh" />;
@@ -155,10 +169,13 @@ export default function Page() {
         onOpenAchievements={() => setAchOpen(true)}
         onOpenSkin={() => setSkinOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenTravel={() => setTravelOpen(true)}
       />
 
       {settingsOpen && pet.alive && <SettingsDialog pet={pet} onClose={() => setSettingsOpen(false)} />}
       {shopOpen && <ShopDialog pet={pet} onClose={() => setShopOpen(false)} />}
+      {travelOpen && <TravelDialog pet={pet} onClose={() => setTravelOpen(false)} />}
+      {pet.trip?.status === 'returned' && <TripReport pet={pet} onClose={() => usePetStore.getState().dismissTrip()} />}
       {gamePickerOpen && (
         <GameDialog
           pet={pet}

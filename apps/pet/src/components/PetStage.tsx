@@ -9,7 +9,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
-import { ui } from '@/lib/locale';
+import { destById } from '@/lib/travel';
+import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { PetSprite, type TrickId } from './PetSprite';
 
@@ -47,7 +48,8 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   const timersRef = useRef<number[]>([]);
 
   const isEgg = pet.stage === 'egg';
-  const canPerform = !isEgg && !pet.sleeping && !anim && !pet.sick;
+  const away = pet.trip?.status === 'away';
+  const canPerform = !isEgg && !away && !pet.sleeping && !anim && !pet.sick;
   const walking = canPerform && !trick;
   const running = canPerform && trick === 'run';
 
@@ -252,11 +254,23 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         </div>
       )}
 
-      {/* 咕咕（含气泡，随踱步整体移动） */}
-      <div
-        ref={wrapRef}
-        className="absolute bottom-[7%] -translate-x-1/2"
-        style={{ left: '50%' }}
+      {/* 旅行中：出门告示卡替代咕咕本体 */}
+      {away && pet.trip && (
+        <div className="absolute left-1/2 top-1/2 z-10 w-56 -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-amber-100 bg-white/95 p-4 text-center shadow-xl backdrop-blur">
+          <span className="block text-3xl">🎒</span>
+          <p className="mt-1.5 text-sm font-bold text-gugu-ink">
+            {pet.name} {fmt(t.tripNote, { dest: locale === 'zh' ? destById(pet.trip.dest).zh : destById(pet.trip.dest).en })}
+          </p>
+          <p className="mt-1 text-[11px] text-gugu-ink-soft">{t.tripBack}</p>
+        </div>
+      )}
+
+      {/* 咕咕本体（旅行时隐藏） */}
+      {!away && (
+        <div
+          ref={wrapRef}
+          className="absolute bottom-[7%] -translate-x-1/2"
+          style={{ left: '50%' }}
         onContextMenu={(e) => {
           e.preventDefault();
           openMenuAt(e.clientX, e.clientY);
@@ -294,7 +308,8 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           trick={canPerform ? trick : null}
           onTap={onTap}
         />
-      </div>
+        </div>
+      )}
 
       {/* 破壳提示 */}
       {isEgg && pet.tapsToHatch === HATCH_TAPS && (
