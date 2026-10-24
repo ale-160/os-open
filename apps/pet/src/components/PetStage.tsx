@@ -184,13 +184,6 @@ export function PetStage({ onPetMenu }: PetStageProps) {
         />
       </div>
 
-      {/* 长按/右键提示（蛋阶段除外） */}
-      {!isEgg && pet.tutorialStep >= 3 && (
-        <div className="pointer-events-none absolute bottom-[2%] left-1/2 -translate-x-1/2 text-[11px] text-gugu-ink-soft/70">
-          {locale === 'zh' ? '长按或右键咕咕有惊喜' : 'Long-press / right-click GuGu'}
-        </div>
-      )}
-
       {/* 破壳提示 */}
       {isEgg && pet.tapsToHatch === HATCH_TAPS && (
         <div className="absolute bottom-[2%] left-1/2 -translate-x-1/2 animate-pulse rounded-full bg-white/85 px-4 py-1.5 text-sm font-semibold text-gugu-accent shadow">

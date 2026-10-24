@@ -87,7 +87,6 @@ export default function Page() {
               🪙 {pet.coins}
             </span>
           </h1>
-          <p className="truncate text-xs text-gugu-ink-soft">{t.tagline}</p>
         </div>
         <div className="flex items-center gap-1.5">
           <button

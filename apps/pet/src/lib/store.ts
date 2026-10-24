@@ -503,8 +503,11 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       get().say(delta > 0 ? 'eventMoodUp' : 'eventMoodDown');
       return;
     }
-    // 偶发闲聊（睡觉时安静）
-    if (!next.sleeping && Math.random() < 0.07) get().say('idle');
+    // 偶发闲聊（睡觉时安静）；小概率插播长按/右键菜单提示
+    if (!next.sleeping && Math.random() < 0.07) {
+      if (Math.random() < 0.12) get().say('hintMenu');
+      else get().say('idle');
+    }
     get().grantAchievements();
   },
 

@@ -32,6 +32,7 @@ export type LineKind =
   | 'gameOk'
   | 'gameMeh'
   | 'achUnlock'
+  | 'hintMenu'
   | 'idle';
 
 const LINES: Record<Locale, Record<LineKind, string[]>> = {
@@ -111,6 +112,11 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
     gameOk: ["还不错！咕咕有认真接！", "接住好多！差一点点就完美", "好玩！下次接更多！"],
     gameMeh: ["呜…点心都躲着我…", "再来一次，咕咕要认真了！", "手滑了…不算不算！"],
     achUnlock: ["🏆 达成成就「{a}」！", "咕咕解锁了新成就「{a}」！", "恭喜！获得成就「{a}」！"],
+    hintMenu: [
+      "长按或右键我，有惊喜菜单哦",
+      "偷偷告诉你：右键我可以直接点外卖",
+      "长按我试试？有快捷菜单！",
+    ],
     idle: [
       "咕咕咕～哼哼歌",
       "歪头看你",
@@ -196,6 +202,11 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
     gameOk: ["Not bad! I caught a lot!", "So close to perfect!", "Fun! I'll catch more next time!"],
     gameMeh: ["Sniff... the snacks dodged me...", "One more round, I'll focus!", "Slipped... that doesn't count!"],
     achUnlock: ["🏆 Achievement unlocked: {a}!", "GuGu just earned \"{a}\"!", "Congrats! New achievement: {a}!"],
+    hintMenu: [
+      "Long-press or right-click me for a menu!",
+      "Psst — right-click me for quick actions!",
+      "Try long-pressing me, pretty please?",
+    ],
     idle: [
       "Gugu gugu~ humming a song",
       "Tilts head at you",
