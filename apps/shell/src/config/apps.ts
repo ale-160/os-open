@@ -73,6 +73,16 @@ export const OS_APPS: readonly OsApp[] = [
     repository: 'https://github.com/ale-160/os-open'
   },
   {
+    id: 'pet',
+    name: '咕咕',
+    nameEn: 'GuGu',
+    path: '/pet/',
+    icon: '/apps/pet.png',
+    description: '原创养成桌宠：喂食洗澡打工学习，离线也陪你；可换肤可对话',
+    descriptionEn: 'Original virtual pet: feed, bathe, play and grow together, even offline',
+    repository: 'https://github.com/ale-160/os-open'
+  },
+  {
     id: 'web-text',
     name: 'Markdown 编辑器',
     nameEn: 'Markdown Editor',

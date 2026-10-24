@@ -43,6 +43,7 @@ jobs:
           pnpm --filter web-img lint
           pnpm --filter web-text lint
           pnpm --filter typev lint
+          pnpm --filter pet lint
 
       - name: web-img encoder tests (GIF/TIFF roundtrip)
         run: |
@@ -57,6 +58,9 @@ jobs:
       - name: nchat unit tests
         run: pnpm --filter nchat test
 
+      - name: pet unit tests
+        run: pnpm --filter pet test
+
       - name: Build all apps + compose
         env:
           NEXT_TELEMETRY_DISABLED: 1
@@ -67,6 +71,7 @@ jobs:
           test -f out/index.html
           test -f out/img/index.html
           test -f out/text/index.html
+          test -f out/pet/index.html
           test -f out/sitemap.xml
 
       - name: Install Playwright browsers
