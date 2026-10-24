@@ -32,7 +32,7 @@ export function SingGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const [round, setRound] = useState(0);
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState(DURATION);
-  const [reward, setReward] = useState<{ coins: number; mood: number } | null>(null);
+  const [reward, setReward] = useState<{ coins: number; mood: number; newBest: boolean } | null>(null);
 
   const scoreRef = useRef(0);
   const finishedRef = useRef(false);
@@ -43,7 +43,7 @@ export function SingGame({ onClose }: { pet: PetState; onClose: () => void }) {
     setPhase('done');
     if (!finishedRef.current) {
       finishedRef.current = true;
-      setReward(finishMinigame(scoreRef.current));
+      setReward(finishMinigame('sing', scoreRef.current));
     }
   }, [finishMinigame]);
 
@@ -176,6 +176,9 @@ export function SingGame({ onClose }: { pet: PetState; onClose: () => void }) {
               {phase === 'done' && reward && (
                 <>
                   <p className="text-3xl font-extrabold">{t.gameScore} {score}</p>
+                  {reward.newBest && (
+                    <p className="anim-pop rounded-full bg-gugu-accent px-4 py-1 text-sm font-extrabold text-white shadow">{t.newRecord}</p>
+                  )}
                   <p className="text-sm font-bold text-gugu-accent">🪙 +{reward.coins}　💗 +{reward.mood}</p>
                 </>
               )}

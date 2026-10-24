@@ -50,7 +50,7 @@ export function checkAchievements(pet: PetState): string[] {
   add('adult', pet.stage === 'adult');
   add('rich', pet.coins >= 100);
   add('heal', c.heal >= 1);
-  add('game12', c.minigameBest >= 12);
+  add('game12', pet.bests.snack >= 12);
   add('aiChat', c.aiChat >= 1);
   return earned;
 }

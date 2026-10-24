@@ -44,7 +44,7 @@ export function MemoryGame({ onClose }: { pet: PetState; onClose: () => void }) 
   const [cards, setCards] = useState<Card[]>(shuffledDeck);
   const [timeLeft, setTimeLeft] = useState(DURATION);
   const [score, setScore] = useState(0);
-  const [reward, setReward] = useState<{ coins: number; mood: number } | null>(null);
+  const [reward, setReward] = useState<{ coins: number; mood: number; newBest: boolean } | null>(null);
 
   const scoreRef = useRef(0);
   const finishedRef = useRef(false);
@@ -56,7 +56,7 @@ export function MemoryGame({ onClose }: { pet: PetState; onClose: () => void }) 
     setPhase('done');
     if (!finishedRef.current) {
       finishedRef.current = true;
-      setReward(finishMinigame(scoreRef.current));
+      setReward(finishMinigame('memory', scoreRef.current));
     }
   }, [finishMinigame]);
 

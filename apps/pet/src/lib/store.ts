@@ -42,6 +42,8 @@ import type {
   ActionId,
   ActivityState,
   BurstData,
+  GameBests,
+  GameKind,
   PetCounters,
   PetState,
   ShopItem,
@@ -58,9 +60,9 @@ const ZERO_COUNTERS: PetCounters = {
   study: 0,
   tap: 0,
   heal: 0,
-  minigameBest: 0,
   aiChat: 0,
 };
+const ZERO_BESTS: GameBests = { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0 };
 
 interface BubbleData {
   id: number;
@@ -103,8 +105,8 @@ interface PetStore {
   doWork: () => void;
   doStudy: () => void;
   buyItem: (item: ShopItem) => void;
-  /** 小游戏结算：按得分发放奖励并说评语，返回奖励明细供结果页展示 */
-  finishMinigame: (score: number) => { coins: number; mood: number };
+  /** 小游戏结算：按得分发放奖励并更新该游戏最高分，返回奖励与新纪录标记 */
+  finishMinigame: (game: GameKind, score: number) => { coins: number; mood: number; newBest: boolean };
   toggleSleep: () => void;
   /** 周期调用：推进模拟并派发事件气泡 */
   tick: () => void;
@@ -127,26 +129,41 @@ interface PetStore {
   grantAchievements: () => void;
 }
 
-/** v1 → v3 迁移：补元宝、打工/学习冷却与成就系统字段 */
+/** v1 → v4 迁移：补元宝、冷却、成就系统与逐游戏最高分 */
 function migrateV1(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 3,
+    saveVersion: 4,
     coins: INITIAL_COINS,
     lastWorkedAt: 0,
     lastStudiedAt: 0,
     counters: { ...ZERO_COUNTERS },
+    bests: { ...ZERO_BESTS },
     achievements: [],
   };
 }
 
-/** v2 → v3 迁移：补成就系统字段 */
+/** v2 → v4 迁移：补成就系统与逐游戏最高分 */
 function migrateV2(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 3,
+    saveVersion: 4,
     counters: { ...ZERO_COUNTERS },
+    bests: { ...ZERO_BESTS },
     achievements: [],
+  };
+}
+
+/** v3 → v4 迁移：共享最高分拆分为逐游戏最高分（接点心继承旧值） */
+function migrateV3(raw: Record<string, unknown>): PetState {
+  const legacyCounters = (raw.counters ?? {}) as Partial<PetCounters> & { minigameBest?: number };
+  const { minigameBest = 0, ...restCounters } = legacyCounters;
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 4,
+    counters: { ...ZERO_COUNTERS, ...restCounters },
+    bests: { ...ZERO_BESTS, snack: minigameBest },
+    achievements: Array.isArray(raw.achievements) ? (raw.achievements as string[]) : [],
   };
 }
 
@@ -157,7 +174,8 @@ function loadRaw(): PetState | null {
     const parsed = JSON.parse(text) as { saveVersion?: number } & Record<string, unknown>;
     if (parsed.saveVersion === 1) return migrateV1(parsed);
     if (parsed.saveVersion === 2) return migrateV2(parsed);
-    if (parsed.saveVersion !== 3 || typeof parsed.updatedAt !== 'number') return null;
+    if (parsed.saveVersion === 3) return migrateV3(parsed);
+    if (parsed.saveVersion !== 4 || typeof parsed.updatedAt !== 'number') return null;
     return parsed as unknown as PetState;
   } catch {
     return null;
@@ -251,9 +269,11 @@ export const usePetStore = create<PetStore>()((set, get) => ({
             ? migrateV1(remote)
             : remote.saveVersion === 2
               ? migrateV2(remote)
-              : (remote as unknown as PetState);
+              : remote.saveVersion === 3
+                ? migrateV3(remote)
+                : (remote as unknown as PetState);
         if (
-          remotePet?.saveVersion === 3 &&
+          remotePet?.saveVersion === 4 &&
           (!cur || remotePet.updatedAt > cur.updatedAt)
         ) {
           set({ pet: remotePet });
@@ -416,17 +436,19 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     get().say('buy');
   },
 
-  finishMinigame: (score) => {
+  finishMinigame: (game, score) => {
     const pet = get().pet;
     const reward = minigameReward(score);
-    if (!pet) return reward;
+    if (!pet) return { ...reward, newBest: false };
     const now = Date.now();
     const { next: simmed } = simulate(pet, now);
+    const prevBest = simmed.bests[game] ?? 0;
+    const newBest = score > prevBest;
     const next: PetState = {
       ...simmed,
       coins: simmed.coins + reward.coins,
       mood: clamp01(simmed.mood + reward.mood),
-      counters: { ...simmed.counters, minigameBest: Math.max(simmed.counters.minigameBest, score) },
+      bests: { ...simmed.bests, [game]: Math.max(prevBest, score) },
       updatedAt: now,
     };
     saveRaw(next);
@@ -434,7 +456,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const tier: LineKind = score >= 12 ? 'gameGreat' : score >= 5 ? 'gameOk' : 'gameMeh';
     get().say(tier);
     get().grantAchievements();
-    return reward;
+    return { ...reward, newBest };
   },
 
   toggleSleep: () => {

@@ -27,12 +27,15 @@ export function RaceGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const [snailPct, setSnailPct] = useState(0);
   const [timeLeft, setTimeLeft] = useState(DURATION);
   const [result, setResult] = useState<'win' | 'lose' | null>(null);
-  const [reward, setReward] = useState<{ coins: number; mood: number } | null>(null);
+  const [reward, setReward] = useState<{ coins: number; mood: number; newBest: boolean } | null>(null);
 
   const playerRef = useRef(0);
   const snailRef = useRef(0);
   const finishedRef = useRef(false);
   const rafRef = useRef(0);
+  /** 每局随机：蜗牛性格（基础速度 ±12%）与中后程冲刺窗口 */
+  const snailBaseRef = useRef(SNAIL_BASE);
+  const spurtRef = useRef({ at: 0.5, until: 0.62 });
 
   const end = useCallback(
     (won: boolean, elapsed: number) => {
@@ -47,7 +50,7 @@ export function RaceGame({ onClose }: { pet: PetState; onClose: () => void }) {
           score = Math.max(2, Math.round(playerRef.current / 9));
         }
         setResult(won ? 'win' : 'lose');
-        setReward(finishMinigame(score));
+        setReward(finishMinigame('race', score));
       }
     },
     [finishMinigame]
@@ -57,6 +60,10 @@ export function RaceGame({ onClose }: { pet: PetState; onClose: () => void }) {
     finishedRef.current = false;
     playerRef.current = 0;
     snailRef.current = 0;
+    // 随机性格：速度 ±12%，45%~80% 赛程处有一次 12% 赛程的冲刺
+    snailBaseRef.current = SNAIL_BASE * (0.88 + Math.random() * 0.24);
+    const at = 0.45 + Math.random() * 0.35;
+    spurtRef.current = { at, until: Math.min(0.95, at + 0.12) };
     setPlayerPct(0);
     setSnailPct(0);
     setTimeLeft(DURATION);
@@ -81,7 +88,12 @@ export function RaceGame({ onClose }: { pet: PetState; onClose: () => void }) {
       last = now;
       setTimeLeft(DURATION - elapsed);
 
-      snailRef.current = Math.min(100, snailRef.current + (SNAIL_BASE + SNAIL_RAMP * (elapsed / 1000)) * dt);
+      const raceFrac = elapsed / DURATION;
+      const spurt = raceFrac >= spurtRef.current.at && raceFrac <= spurtRef.current.until ? 1.55 : 1;
+      snailRef.current = Math.min(
+        100,
+        snailRef.current + (snailBaseRef.current * spurt + SNAIL_RAMP * (elapsed / 1000)) * dt
+      );
       if (snailRef.current >= 100) {
         setSnailPct(100);
         end(false, elapsed);

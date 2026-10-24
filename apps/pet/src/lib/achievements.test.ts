@@ -88,7 +88,8 @@ describe('checkAchievements', () => {
   it('小游戏最高分与 AI 计数', () => {
     const pet = {
       ...hatchEgg(createPet('cream', '咕咕', 0), 0),
-      counters: { feed: 0, wash: 0, play: 0, work: 0, study: 0, tap: 0, heal: 0, minigameBest: 12, aiChat: 1 },
+      counters: { feed: 0, wash: 0, play: 0, work: 0, study: 0, tap: 0, heal: 0, aiChat: 1 },
+      bests: { snack: 12, whack: 0, memory: 0, race: 0, toss: 0, sing: 0 },
     };
     const earned = checkAchievements(pet);
     expect(earned).toContain('game12');

@@ -257,11 +257,13 @@ describe('小游戏与迁移', () => {
 
   it('新存档带初始元宝与 v3 版本号', () => {
     const pet = createPet('sakura', '咕咕', 0);
-    expect(pet.saveVersion).toBe(3);
+    expect(pet.saveVersion).toBe(4);
     expect(pet.coins).toBe(INITIAL_COINS);
     expect(pet.lastWorkedAt).toBe(0);
     expect(pet.lastStudiedAt).toBe(0);
     expect(pet.counters.feed).toBe(0);
     expect(pet.achievements).toEqual([]);
+    expect(pet.bests.snack).toBe(0);
+    expect(pet.bests.sing).toBe(0);
   });
 });

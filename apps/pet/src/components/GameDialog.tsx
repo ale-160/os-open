@@ -4,9 +4,7 @@
 
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
-import type { PetState } from '@/lib/types';
-
-export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing';
+import type { GameKind, PetState } from '@/lib/types';
 
 export function GameDialog({
   pet,
@@ -63,7 +61,7 @@ export function GameDialog({
               <span className="text-sm font-bold">{g.name}</span>
               <span className="px-2 text-center text-[10px] leading-tight text-gugu-ink-soft">{g.hint}</span>
               <span className="text-[10px] font-bold text-gugu-accent">
-                {t.gameScore}: {pet.counters.minigameBest}
+                {t.gameScore}: {pet.bests[g.kind]}
               </span>
             </button>
           ))}

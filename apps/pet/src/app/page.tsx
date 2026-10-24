@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { AchievementsDialog } from '@/components/AchievementsDialog';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ChatPanel } from '@/components/ChatPanel';
-import { GameDialog, type GameKind } from '@/components/GameDialog';
+import { GameDialog } from '@/components/GameDialog';
 import { HatchFlow } from '@/components/HatchFlow';
 import { MemoryGame } from '@/components/MemoryGame';
 import { PetMenu } from '@/components/PetMenu';
@@ -24,6 +24,7 @@ import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
 import { skyTheme } from '@/lib/sky';
 import { usePetStore } from '@/lib/store';
+import type { GameKind } from '@/lib/types';
 
 const TICK_MS = 5000;
 const BUBBLE_MS = 4200;

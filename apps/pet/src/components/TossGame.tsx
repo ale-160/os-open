@@ -30,7 +30,8 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const [pos, setPos] = useState(50);
   const [score, setScore] = useState(0);
   const [flash, setFlash] = useState<'perfect' | 'good' | 'miss' | null>(null);
-  const [reward, setReward] = useState<{ coins: number; mood: number } | null>(null);
+  const [zoneCenter, setZoneCenter] = useState(50);
+  const [reward, setReward] = useState<{ coins: number; mood: number; newBest: boolean } | null>(null);
 
   const scoreRef = useRef(0);
   const finishedRef = useRef(false);
@@ -42,7 +43,7 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
     setPhase('done');
     if (!finishedRef.current) {
       finishedRef.current = true;
-      setReward(finishMinigame(scoreRef.current));
+      setReward(finishMinigame('toss', scoreRef.current));
     }
   }, [finishMinigame]);
 
@@ -51,6 +52,7 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
     scoreRef.current = 0;
     setScore(0);
     setRound(0);
+    setZoneCenter(28 + Math.random() * 44);
     setFlash(null);
     setReward(null);
     setPhase('playing');
@@ -76,7 +78,7 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const toss = useCallback(() => {
     if (phase !== 'playing' || flash) return;
     const { half } = ROUND_CFG[round];
-    const dist = Math.abs(posRef.current - 50);
+    const dist = Math.abs(posRef.current - zoneCenter);
     const gained = dist <= half / 3 ? 5 : dist <= half ? 3 : 0;
     const verdict = dist <= half / 3 ? 'perfect' : dist <= half ? 'good' : 'miss';
     if (verdict !== 'miss') sfx.pop();
@@ -91,11 +93,12 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
         end();
       } else {
         setRound(round + 1);
+        setZoneCenter(28 + Math.random() * 44);
         setPhase('playing');
       }
     }, 850);
     timersRef.current.push(delay);
-  }, [phase, flash, round, end]);
+  }, [phase, flash, round, end, zoneCenter]);
 
   const { half } = ROUND_CFG[Math.min(round, ROUNDS - 1)];
   const zonePct = half * 2;
@@ -123,9 +126,9 @@ export function TossGame({ onClose }: { pet: PetState; onClose: () => void }) {
           <div className="relative h-12 rounded-full bg-[#e2cda2]/70 shadow-inner">
             <div
               className="absolute inset-y-1 rounded-full bg-[#7bc86c]/40 border-2 border-[#7bc86c]/70"
-              style={{ left: `calc(${50 - half}% )`, width: `${zonePct}%` }}
+              style={{ left: `calc(${zoneCenter - half}% )`, width: `${zonePct}%` }}
             />
-            <div className="absolute inset-y-1 left-1/2 w-[2px] -translate-x-1/2 bg-[#7bc86c]" />
+            <div className="absolute inset-y-1 w-[2px] bg-[#7bc86c]" style={{ left: `${zoneCenter}%` }} />
             {phase !== 'ready' && (
               <span
                 className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl transition-none"

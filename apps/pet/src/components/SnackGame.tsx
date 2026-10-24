@@ -43,13 +43,16 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
   const [score, setScore] = useState(0);
   const [timeLeft, setTimeLeft] = useState<number>(MINIGAME.durationMs);
-  const [reward, setReward] = useState<{ coins: number; mood: number } | null>(null);
+  const [reward, setReward] = useState<{ coins: number; mood: number; newBest: boolean } | null>(null);
+  const [level, setLevel] = useState(1);
+  const [combo, setCombo] = useState(0);
 
   const areaRef = useRef<HTMLDivElement>(null);
   const catcherRef = useRef<HTMLDivElement>(null);
   const itemsRef = useRef<FallingItem[]>([]);
   const catcherXRef = useRef(50);
   const scoreRef = useRef(0);
+  const comboRef = useRef(0);
   const finishedRef = useRef(false);
   const rafRef = useRef(0);
   const idSeqRef = useRef(0);
@@ -65,8 +68,11 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
     for (const it of itemsRef.current) it.el?.remove();
     itemsRef.current = [];
     scoreRef.current = 0;
+    comboRef.current = 0;
     finishedRef.current = false;
     setScore(0);
+    setLevel(1);
+    setCombo(0);
     setTimeLeft(MINIGAME.durationMs);
     setReward(null);
     setCatchX(50);
@@ -77,7 +83,7 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
     setPhase('done');
     if (!finishedRef.current) {
       finishedRef.current = true;
-      setReward(finishMinigame(scoreRef.current));
+      setReward(finishMinigame('snack', scoreRef.current));
     }
   }, [finishMinigame]);
 
@@ -98,18 +104,25 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
       const progress = elapsed / MINIGAME.durationMs;
       setTimeLeft(MINIGAME.durationMs - elapsed);
 
+      // LV 递进：每 8 分升一级，速度/生成同步加快（复玩性核心）
+      const lv = 1 + Math.floor(scoreRef.current / 8);
+      const levelBoost = 1 + (lv - 1) * 0.22;
+      const spawnBoost = 1 + (lv - 1) * 0.18;
+
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
 
-      // 生成（间隔随进度加快）
+      // 生成（间隔随进度与等级加快）
       if (now >= nextSpawnAt) {
         const interval =
-          MINIGAME.spawnIntervalStart +
-          (MINIGAME.spawnIntervalEnd - MINIGAME.spawnIntervalStart) * progress;
+          (MINIGAME.spawnIntervalStart +
+            (MINIGAME.spawnIntervalEnd - MINIGAME.spawnIntervalStart) * progress) /
+          spawnBoost;
         nextSpawnAt = now + interval * (0.75 + Math.random() * 0.5);
         const bomb = Math.random() < MINIGAME.bombRate;
         const speed =
-          MINIGAME.fallSpeedStart + (MINIGAME.fallSpeedEnd - MINIGAME.fallSpeedStart) * progress;
+          (MINIGAME.fallSpeedStart + (MINIGAME.fallSpeedEnd - MINIGAME.fallSpeedStart) * progress) *
+          levelBoost;
         itemsRef.current.push({
           id: ++idSeqRef.current,
           x: 8 + Math.random() * 84,
@@ -133,13 +146,24 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
         if ((crossed || inWindow) && Math.abs(it.x - catcherXRef.current) <= CATCH_HALF) {
           it.caught = true;
           it.el?.remove();
-          scoreRef.current = Math.max(0, scoreRef.current + (it.bomb ? -2 : 1));
+          if (it.bomb) {
+            comboRef.current = 0;
+            scoreRef.current = Math.max(0, scoreRef.current - 2);
+          } else {
+            comboRef.current += 1;
+            scoreRef.current += comboRef.current >= 5 ? 2 : 1;
+          }
           setScore(scoreRef.current);
+          setCombo(it.bomb ? 0 : comboRef.current);
           sfx.pop();
           continue;
         }
         if (it.y > 108) {
           it.el?.remove();
+          if (!it.bomb && comboRef.current >= 3) {
+            comboRef.current = 0; // 漏掉点心断连击
+            setCombo(0);
+          }
           continue;
         }
         if (it.el) {
@@ -174,6 +198,16 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
           <h2 className="text-lg font-bold">{t.gameTitle}</h2>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-amber-100/80 px-3 py-1 text-sm font-extrabold">{t.gameScore} {score}</span>
+            {level > 1 && (
+              <span className="rounded-full bg-[#7bc86c]/85 px-2.5 py-1 text-xs font-extrabold text-white">
+                {fmt(t.lvLabel, { n: level })}
+              </span>
+            )}
+            {combo >= 3 && (
+              <span className="anim-pop rounded-full bg-[#f0716b]/85 px-2.5 py-1 text-xs font-extrabold text-white">
+                {fmt(t.comboLabel, { n: combo })}
+              </span>
+            )}
             <button type="button" onClick={onClose} className="press rounded-full bg-amber-900/5 px-3 py-1 text-sm font-semibold">
               ✕
             </button>
@@ -233,6 +267,11 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
               {phase === 'done' && reward && (
                 <>
                   <p className="text-3xl font-extrabold">{t.gameScore} {score}</p>
+                  {reward.newBest && (
+                    <p className="anim-pop rounded-full bg-gugu-accent px-4 py-1 text-sm font-extrabold text-white shadow">
+                      {t.newRecord}
+                    </p>
+                  )}
                   <p className="text-sm font-bold text-gugu-accent">{fmt(t.gameReward, { c: reward.coins, m: reward.mood })}</p>
                 </>
               )}

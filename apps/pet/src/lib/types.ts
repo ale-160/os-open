@@ -57,15 +57,26 @@ export interface PetCounters {
   tap: number;
   /** 病愈次数 */
   heal: number;
-  /** 接点心最高分 */
-  minigameBest: number;
   /** AI 对话次数 */
   aiChat: number;
 }
 
+/** 各小游戏独立最高分（复玩性追逐的核心） */
+export interface GameBests {
+  snack: number;
+  whack: number;
+  memory: number;
+  race: number;
+  toss: number;
+  sing: number;
+}
+
+/** 小游戏种类（GameDialog 与结算共用） */
+export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing';
+
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {
-  saveVersion: 3;
+  saveVersion: 4;
   /** 宠物名（玩家可改，默认咕咕） */
   name: string;
   variant: VariantId;
@@ -99,6 +110,9 @@ export interface PetState {
 
   /** 行为计数器（成就系统） */
   counters: PetCounters;
+
+  /** 各小游戏独立最高分 */
+  bests: GameBests;
 
   /** 已解锁成就 id 列表 */
   achievements: string[];
