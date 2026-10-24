@@ -10,6 +10,10 @@ import { useLocale } from '@/hooks/useLocale';
 import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
 import { weatherFor, type Weather } from '@/lib/weather';
+import { DECO_SLOTS, decoById, decoSrc } from '@/lib/accessories';
+import { SCENES, dailyScene, sceneSrc, type SceneId } from '@/lib/scenes';
+import { isBadWeather } from '@/lib/weather';
+import { pickVisitor, visitorSrc } from '@/lib/visitors';
 import { destById } from '@/lib/travel';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
@@ -41,12 +45,20 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
   const [weather] = useState<Weather>(() => weatherFor(new Date()));
+  const [activeScene] = useState<SceneId | null>(() => {
+    const pick = pet.sceneId as SceneId | null | undefined;
+    if (pick && SCENES.some((x) => x.id === pick)) return pick;
+    if (pick === null || pick === undefined) return dailyScene(new Date());
+    return dailyScene(new Date());
+  });
+  const useScene = !!activeScene;
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const dirRef = useRef<1 | -1>(1);
   const [facing, setFacing] = useState<1 | -1>(1);
   const [trick, setTrick] = useState<TrickId | null>(null);
   const [butterfly, setButterfly] = useState(0); // 触发序号（0 = 无）；奇偶控制方向
+  const [visitor, setVisitor] = useState<{ n: number; id: string; mode: 'fly' | 'ground'; dur: number } | null>(null);
   const timersRef = useRef<number[]>([]);
 
   const isEgg = pet.stage === 'egg';
@@ -128,6 +140,28 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   // 蝴蝶动画结束即卸载（keyframes 无 forwards，动画一停就移除，避免冻在半空）
   const onButterflyEnd = useCallback(() => setButterfly(0), []);
 
+  // 访客小剧场：低频随机小动物巡游（飞行/地面），独立本地定时器
+  useEffect(() => {
+    if (!canPerform) return;
+    let cancelled = false;
+    const localTimers: number[] = [];
+    const schedule = (delay: number, fn: () => void) => {
+      const id = window.setTimeout(() => { if (!cancelled) fn(); }, delay);
+      localTimers.push(id);
+    };
+    const visitorLoop = () => {
+      schedule(18_000 + Math.random() * 30_000, () => {
+        const v = pickVisitor(new Date().getHours(), isBadWeather(weather));
+        const dur = v.mode === 'fly' ? 5 + Math.random() * 3 : 8 + Math.random() * 5;
+        setVisitor((n) => ({ n: (n?.n ?? 0) + 1, id: v.id, mode: v.mode, dur }));
+        schedule(dur * 1000 + 500, visitorLoop);
+      });
+    };
+    visitorLoop();
+    return () => { cancelled = true; localTimers.forEach(clearTimeout); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canPerform]);
+
   // 踱步 / 奔跑
   useEffect(() => {
     let raf = 0;
@@ -198,14 +232,21 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     <div className={`relative overflow-hidden ${className ?? 'min-h-[320px] flex-1'}`}>
       {/* 昼夜天色 */}
       <div className={`absolute inset-0 bg-gradient-to-b ${sky.sky}`} />
-      {sky.orb === 'moon' ? (
+      {useScene && activeScene && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={sceneSrc(activeScene)} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+          {sky.dark && <div className="pointer-events-none absolute inset-0 bg-slate-900/40" />}
+        </>
+      )}
+      {!useScene && sky.orb === 'moon' ? (
         <div className="absolute left-[10%] top-[24%] h-11 w-11 rounded-full bg-[#f4f1ff] shadow-[0_0_40px_14px_rgba(244,241,255,0.35)]" />
       ) : (
         <div
           className={`absolute left-[10%] top-[24%] rounded-full ${sky.orb === 'dusk' ? 'h-14 w-14 bg-[#ff9f6e] shadow-[0_0_48px_20px_rgba(255,159,110,0.5)]' : 'h-12 w-12 bg-[#ffd98a] shadow-[0_0_44px_18px_rgba(255,217,138,0.55)]'}`}
         />
       )}
-      {sky.stars &&
+      {!useScene && sky.stars &&
         [
           { l: '22%', t: '34%', d: '0s' },
           { l: '36%', t: '46%', d: '0.8s' },
@@ -217,10 +258,10 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
             ✦
           </span>
         ))}
-      <div className="absolute right-[12%] top-[36%] h-10 w-20 rounded-full bg-white/80 blur-[1px]" />
-      <div className="absolute right-[18%] top-[31%] h-8 w-14 rounded-full bg-white/70 blur-[1px]" />
-      <div className="absolute -bottom-[14%] left-1/2 h-[34%] w-[150%] -translate-x-1/2 rounded-[100%]" style={{ background: sky.floor }} />
-      <div className="absolute bottom-0 h-[7%] w-full" style={{ background: sky.floorDeep, opacity: 0.7 }} />
+      {!useScene && <div className="absolute right-[12%] top-[36%] h-10 w-20 rounded-full bg-white/80 blur-[1px]" />}
+      {!useScene && <div className="absolute right-[18%] top-[31%] h-8 w-14 rounded-full bg-white/70 blur-[1px]" />}
+      {!useScene && <div className="absolute -bottom-[14%] left-1/2 h-[34%] w-[150%] -translate-x-1/2 rounded-[100%]" style={{ background: sky.floor }} />}
+      {!useScene && <div className="absolute bottom-0 h-[7%] w-full" style={{ background: sky.floorDeep, opacity: 0.7 }} />}
 
       {/* 天气：坏天气罩层 + 粒子 */}
       {(weather === 'rain' || weather === 'snow') && (
@@ -244,6 +285,20 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
                 </span>
               ))}
         </>
+      )}
+
+      {/* 访客巡游 */}
+      {visitor && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={visitor.n}
+          src={visitorSrc(visitor.id)}
+          alt=""
+          draggable={false}
+          onAnimationEnd={() => setVisitor(null)}
+          className={visitor.mode === 'fly' ? 'anim-fly-across pointer-events-none absolute text-3xl' : 'anim-walk-across pointer-events-none absolute bottom-[7%] w-[11%] object-contain'}
+          style={{ top: visitor.mode === 'fly' ? '30%' : undefined, animationDuration: `${visitor.dur}s` }}
+        />
       )}
 
       {/* 天气图标（右上角浮动） */}
@@ -284,6 +339,22 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           📖 {locale === 'zh' ? '学习中…' : 'Studying...'}
         </div>
       )}
+
+      {/* 房间装饰：地毯垫底 + 槽位件（最多 6 件） */}
+      {pet.decorations?.filter((d) => decoById(d)?.underlay).map((d) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={`rug-${d}`} src={decoSrc(d)} alt="" draggable={false} className="pointer-events-none absolute bottom-[3%] left-1/2 w-[36%] -translate-x-1/2 opacity-95" />
+      ))}
+      {(() => {
+        const placed = pet.decorations?.filter((d) => !decoById(d)?.underlay).slice(0, DECO_SLOTS.length) ?? [];
+        return placed.map((d, i) => {
+          const slot = DECO_SLOTS[i];
+          return (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={`deco-${d}`} src={decoSrc(d)} alt="" draggable={false} className="pointer-events-none absolute" style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%` }} />
+          );
+        });
+      })()}
 
       {/* 旅行中：出门告示卡替代咕咕本体 */}
       {away && pet.trip && (

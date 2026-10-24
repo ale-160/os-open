@@ -35,7 +35,7 @@ const MS_PER_HOUR = 3_600_000;
 /** 领养：创建蛋状态 */
 export function createPet(variant: VariantId, name: string, now: number): PetState {
   return {
-    saveVersion: 6,
+    saveVersion: 7,
     name: name.trim() || '咕咕',
     variant,
     stage: 'egg',
@@ -55,6 +55,10 @@ export function createPet(variant: VariantId, name: string, now: number): PetSta
     trip: null,
     album: { photos: [], souvenirs: [] },
     diary: {},
+    accessories: [],
+    equippedAccessory: null,
+    decoOwned: [],
+    decorations: [],
     achievements: [],
     sleeping: false,
     sick: false,

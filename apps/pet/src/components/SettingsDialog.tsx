@@ -9,6 +9,7 @@ import { useLocale } from '@/hooks/useLocale';
 import { chatComplete, DEFAULT_AI_SETTINGS, loadAiSettings, saveAiSettings, type AiSettings } from '@/lib/ai';
 import { isSfxMuted, setSfxMuted } from '@/lib/sfx';
 import { isNotifyMuted, setNotifyMuted } from '@/lib/notify';
+import { isBgmMuted, setBgmMuted } from '@/lib/bgm';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -29,6 +30,7 @@ export function SettingsDialog({ pet, onClose }: { pet: PetState; onClose: () =>
   const [aiTest, setAiTest] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle');
   const [sfxOff, setSfxOff] = useState(() => (typeof window === 'undefined' ? false : isSfxMuted()));
   const [notifyOff, setNotifyOff] = useState(() => (typeof window === 'undefined' ? true : isNotifyMuted()));
+  const [bgmOff, setBgmOff] = useState(() => (typeof window === 'undefined' ? false : isBgmMuted()));
   const [nameDraft, setNameDraft] = useState(pet.name);
   const [renamed, setRenamed] = useState(false);
   const [notice, setNotice] = useState('');
@@ -61,6 +63,12 @@ export function SettingsDialog({ pet, onClose }: { pet: PetState; onClose: () =>
     const ok = await setNotifyMuted(false);
     setNotifyOff(!ok);
     if (!ok) flash(t.notifyDenied);
+  };
+
+  const toggleBgm = () => {
+    const next = !bgmOff;
+    setBgmOff(next);
+    setBgmMuted(next);
   };
 
   const doRename = () => {
@@ -170,6 +178,12 @@ export function SettingsDialog({ pet, onClose }: { pet: PetState; onClose: () =>
         <label className="mb-4 flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50/40 px-3 py-2.5">
           <span className="text-sm font-semibold">🔊 {t.sfxLabel}</span>
           <input type="checkbox" checked={!sfxOff} onChange={toggleSfx} className="h-4 w-4 accent-[#ff9f45]" />
+        </label>
+
+        {/* 背景音乐 */}
+        <label className="mb-4 flex items-center justify-between rounded-2xl border border-amber-100 bg-amber-50/40 px-3 py-2.5">
+          <span className="text-sm font-semibold">🎵 {t.bgmLabel}</span>
+          <input type="checkbox" checked={!bgmOff} onChange={toggleBgm} className="h-4 w-4 accent-[#ff9f45]" />
         </label>
 
         {/* 桌面通知 */}

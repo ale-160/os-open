@@ -27,6 +27,8 @@ import { WhackGame } from '@/components/WhackGame';
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
 import { skyTheme } from '@/lib/sky';
+import { ensureStarted as bgmStart, setBgmMood } from '@/lib/bgm';
+import { isBadWeather, weatherFor } from '@/lib/weather';
 import { usePetStore } from '@/lib/store';
 import type { GameKind } from '@/lib/types';
 
@@ -56,6 +58,8 @@ export default function Page() {
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
   const dark = sky.dark;
+  const weatherNow = weatherFor(new Date());
+  const bgmMood: 'day' | 'night' | 'rain' = isBadWeather(weatherNow) ? 'rain' : dark ? 'night' : 'day';
 
   useEffect(() => {
     init();
@@ -75,6 +79,16 @@ export default function Page() {
     const timer = setTimeout(clearBubble, BUBBLE_MS);
     return () => clearTimeout(timer);
   }, [bubble, clearBubble]);
+
+  // BGM：首次手势启动 + 情境跟随
+  useEffect(() => {
+    setBgmMood(bgmMood);
+  }, [bgmMood]);
+  useEffect(() => {
+    const start = () => bgmStart();
+    window.addEventListener('pointerdown', start, { once: true });
+    return () => window.removeEventListener('pointerdown', start);
+  }, []);
 
   // 用户活动心跳：关怀功能判断"你还在电脑前吗"
   useEffect(() => {

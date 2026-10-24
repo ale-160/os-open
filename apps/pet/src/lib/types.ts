@@ -3,7 +3,7 @@
 export type Locale = 'zh' | 'en';
 
 /** 官方三配色变体 */
-export type VariantId = 'cream' | 'mint' | 'sakura';
+export type VariantId = 'cream' | 'mint' | 'sakura' | 'choco' | 'lavender' | 'soda';
 
 /** 成长阶段：蛋 → 幼年 → 少年 → 成年 */
 export type GrowthStage = 'egg' | 'baby' | 'teen' | 'adult';
@@ -114,9 +114,25 @@ export interface AlbumSouvenir {
   at: number;
 }
 
+/** 装扮配件 id（见 lib/accessories.ts） */
+export type AccessoryId =
+  | 'beanie'
+  | 'strawhat'
+  | 'crown'
+  | 'party'
+  | 'scarf-star'
+  | 'scarf-plaid'
+  | 'bow'
+  | 'flower'
+  | 'glasses'
+  | 'backpack';
+
+/** 房间装饰 id（见 lib/accessories.ts） */
+export type DecoId = 'nest' | 'bowl' | 'ball' | 'plant' | 'picture' | 'rug' | 'lamp' | 'teddy';
+
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {
-  saveVersion: 6;
+  saveVersion: 7;
   /** 宠物名（玩家可改，默认咕咕） */
   name: string;
   variant: VariantId;
@@ -194,9 +210,20 @@ export interface PetState {
   lastTripAt?: number;
   /** 日记：按日期（toDateString）记录事件 token（见 lib/diary.ts） */
   diary: Record<string, string[]>;
+
+  /** 已拥有的装扮配件 */
+  accessories: AccessoryId[];
+  /** 当前穿戴的配件（null = 裸装） */
+  equippedAccessory: AccessoryId | null;
+  /** 已拥有的房间装饰 */
+  decoOwned: DecoId[];
+  /** 正在摆放的装饰（decoOwned 的子集，最多 6 件按槽位摆） */
+  decorations: DecoId[];
+  /** 手动选择的场景（null = 每日自动轮换） */
+  sceneId?: string | null;
 }
 
-/** 商店商品（买即用，无库存） */
+/** 商店商品（道具买即用；装扮/装饰买后拥有） */
 export interface ShopItem {
   id: string;
   icon: string;
@@ -209,6 +236,12 @@ export interface ShopItem {
   health?: number;
   /** 治愈生病 */
   cure?: boolean;
+  /** AI 图标（可选，替代 emoji） */
+  iconSrc?: string;
+  /** 商品类型：use=即时道具（默认） accessory=装扮 decoration=装饰 */
+  kind?: 'use' | 'accessory' | 'decoration';
+  accessory?: AccessoryId;
+  deco?: DecoId;
 }
 
 /** 粒子/演出触发（内存态） */
