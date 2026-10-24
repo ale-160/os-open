@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
+import { weatherFor, type Weather } from '@/lib/weather';
 import { destById } from '@/lib/travel';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
@@ -39,6 +40,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
 
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
+  const [weather] = useState<Weather>(() => weatherFor(new Date()));
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const dirRef = useRef<1 | -1>(1);
@@ -219,6 +221,35 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       <div className="absolute right-[18%] top-[31%] h-8 w-14 rounded-full bg-white/70 blur-[1px]" />
       <div className="absolute -bottom-[14%] left-1/2 h-[34%] w-[150%] -translate-x-1/2 rounded-[100%]" style={{ background: sky.floor }} />
       <div className="absolute bottom-0 h-[7%] w-full" style={{ background: sky.floorDeep, opacity: 0.7 }} />
+
+      {/* 天气：坏天气罩层 + 粒子 */}
+      {(weather === 'rain' || weather === 'snow') && (
+        <>
+          <div className="pointer-events-none absolute inset-0 z-[5] bg-slate-500/15" />
+          {weather === 'rain'
+            ? [8, 18, 30, 41, 55, 63, 74, 86, 94].map((l, i) => (
+                <span
+                  key={i}
+                  className="anim-rain pointer-events-none absolute top-0 h-5 w-[2px] rounded-full bg-white/70"
+                  style={{ left: `${l}%`, animationDelay: `${(i % 4) * 0.22}s`, animationDuration: `${0.7 + (i % 3) * 0.15}s` }}
+                />
+              ))
+            : [6, 16, 26, 38, 48, 60, 70, 82, 90, 96].map((l, i) => (
+                <span
+                  key={i}
+                  className="anim-snow pointer-events-none absolute top-0 text-sm text-white"
+                  style={{ left: `${l}%`, animationDelay: `${(i % 5) * 0.9}s`, animationDuration: `${5.5 + (i % 4) * 1.2}s` }}
+                >
+                  ❄
+                </span>
+              ))}
+        </>
+      )}
+
+      {/* 天气图标（右上角浮动） */}
+      <span className="absolute right-3 top-[120px] z-[6] rounded-full bg-white/45 px-2 py-0.5 text-xs backdrop-blur-sm">
+        {weather === 'sunny' ? '☀️' : weather === 'cloudy' ? '⛅' : weather === 'rain' ? '🌧️' : '🌨️'}
+      </span>
 
       {/* 小剧场：蝴蝶（动画结束即卸载） */}
       {butterfly > 0 && (

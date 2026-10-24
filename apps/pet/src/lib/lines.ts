@@ -40,6 +40,8 @@ export type LineKind =
   | 'careRest'
   | 'careNight'
   | 'careFatigue'
+  | 'weatherRain'
+  | 'weatherSnow'
   | 'greetDawn'
   | 'greetDay'
   | 'greetDusk'
@@ -143,6 +145,8 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
       "熬夜的咕咕陪着你，记得早点睡",
       "月亮都打哈欠了，你也睡吧",
     ],
+    weatherRain: ['滴答滴答…下雨啦，今天宅家', '雨天的被窝最舒服了', '听着雨声打盹咕…'],
+    weatherSnow: ['下雪了下雪了！白白的一片', '呼…好冷，抱紧自己', '雪花落在鼻子上凉凉的！'],
     careFatigue: [
       "累不累？摸摸我歇一会儿吧",
       "深呼吸～咕咕给你充充电",
@@ -254,6 +258,8 @@ const LINES: Record<Locale, Record<LineKind, string[]>> = {
       "I had my crackers — remember your {m}!",
       "{m} time! GuGu is watching you",
     ],
+    weatherRain: ['Rain rain... cozy day at home', 'Rainy beds are the best beds', 'Napping to the rain, gu...'],
+    weatherSnow: ['Snow! Everything is white!', 'Brr... hugging myself', 'Snowflakes feel cold on my beak!'],
     careRest: [
       "Sitting so long! Stand up and stretch",
       "Look out the window for 20s — your eyes say thanks",

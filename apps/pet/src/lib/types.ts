@@ -116,7 +116,7 @@ export interface AlbumSouvenir {
 
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {
-  saveVersion: 5;
+  saveVersion: 6;
   /** 宠物名（玩家可改，默认咕咕） */
   name: string;
   variant: VariantId;
@@ -192,6 +192,8 @@ export interface PetState {
   packedProvision?: Provision | null;
   /** 上次自主出发时间（冷却用） */
   lastTripAt?: number;
+  /** 日记：按日期（toDateString）记录事件 token（见 lib/diary.ts） */
+  diary: Record<string, string[]>;
 }
 
 /** 商店商品（买即用，无库存） */

@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { AchievementsDialog } from '@/components/AchievementsDialog';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ChatPanel } from '@/components/ChatPanel';
+import { DiaryDialog } from '@/components/DiaryDialog';
 import { GameDialog } from '@/components/GameDialog';
 import { HatchFlow } from '@/components/HatchFlow';
 import { Memorial } from '@/components/Memorial';
@@ -50,6 +51,7 @@ export default function Page() {
   const [skinOpen, setSkinOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
   const [travelOpen, setTravelOpen] = useState(false);
+  const [diaryOpen, setDiaryOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
@@ -170,11 +172,13 @@ export default function Page() {
         onOpenSkin={() => setSkinOpen(true)}
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenTravel={() => setTravelOpen(true)}
+        onOpenDiary={() => setDiaryOpen(true)}
       />
 
       {settingsOpen && pet.alive && <SettingsDialog pet={pet} onClose={() => setSettingsOpen(false)} />}
       {shopOpen && <ShopDialog pet={pet} onClose={() => setShopOpen(false)} />}
       {travelOpen && <TravelDialog pet={pet} onClose={() => setTravelOpen(false)} />}
+      {diaryOpen && <DiaryDialog pet={pet} onClose={() => setDiaryOpen(false)} />}
       {pet.trip?.status === 'returned' && <TripReport pet={pet} onClose={() => usePetStore.getState().dismissTrip()} />}
       {gamePickerOpen && (
         <GameDialog

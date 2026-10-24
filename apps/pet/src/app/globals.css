@@ -167,6 +167,25 @@ body {
   100% { left: 104%; top: 30%; }
 }
 
+/* ---------- 天气 ---------- */
+
+/* 雨丝下落 */
+@keyframes gugu-rain {
+  0% { transform: translateY(-12vh); opacity: 0; }
+  8% { opacity: 0.75; }
+  100% { transform: translateY(112vh); opacity: 0.55; }
+}
+.anim-rain { animation: gugu-rain 0.85s linear infinite; }
+
+/* 雪花飘落（带左右摆） */
+@keyframes gugu-snow {
+  0% { transform: translate(0, -10vh) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.9; }
+  50% { transform: translate(14px, 50vh) rotate(180deg); }
+  100% { transform: translate(-10px, 110vh) rotate(360deg); opacity: 0.85; }
+}
+.anim-snow { animation: gugu-snow 6.5s linear infinite; }
+
 /* 生病：发抖 */
 @keyframes gugu-shiver {
   0%, 100% { transform: translateX(0); }

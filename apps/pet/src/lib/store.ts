@@ -23,6 +23,9 @@ import { aiReady, buildSystemPrompt, chatComplete, loadAiSettings } from './ai';
 import { achievementById, checkAchievements } from './achievements';
 import { sfx } from './sfx';
 import { checkCare } from './care';
+import { addDiaryEvent } from './diary';
+import { isBadWeather, weatherFor } from './weather';
+import { notify } from './notify';
 import { pickDest } from './travel';
 import {
   deleteSkinRecord,
@@ -155,7 +158,7 @@ interface PetStore {
 function migrateV1(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 5,
+    saveVersion: 6,
     coins: INITIAL_COINS,
     lastWorkedAt: 0,
     lastStudiedAt: 0,
@@ -164,6 +167,7 @@ function migrateV1(raw: Record<string, unknown>): PetState {
     achievements: [],
     trip: null,
     album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
@@ -171,12 +175,13 @@ function migrateV1(raw: Record<string, unknown>): PetState {
 function migrateV2(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 5,
+    saveVersion: 6,
     counters: { ...ZERO_COUNTERS },
     bests: { ...ZERO_BESTS },
     achievements: [],
     trip: null,
     album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
@@ -186,22 +191,33 @@ function migrateV3(raw: Record<string, unknown>): PetState {
   const { minigameBest = 0, ...restCounters } = legacyCounters;
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 5,
+    saveVersion: 6,
     counters: { ...ZERO_COUNTERS, ...restCounters },
     bests: { ...ZERO_BESTS, snack: minigameBest },
     achievements: Array.isArray(raw.achievements) ? (raw.achievements as string[]) : [],
     trip: null,
     album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
-/** v4 → v5 迁移：补旅行系统字段 */
+/** v5 → v6 迁移：补日记字段 */
+function migrateV5(raw: Record<string, unknown>): PetState {
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 6,
+    diary: {},
+  };
+}
+
+/** v4 → v6 迁移：补旅行系统与日记字段 */
 function migrateV4(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 5,
+    saveVersion: 6,
     trip: null,
     album: { photos: [], souvenirs: [] },
+    diary: {},
   };
 }
 
@@ -210,7 +226,8 @@ function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>
   if (parsed.saveVersion === 2) return migrateV2(parsed);
   if (parsed.saveVersion === 3) return migrateV3(parsed);
   if (parsed.saveVersion === 4) return migrateV4(parsed);
-  if (parsed.saveVersion !== 5 || typeof parsed.updatedAt !== 'number') return null;
+  if (parsed.saveVersion === 5) return migrateV5(parsed);
+  if (parsed.saveVersion !== 6 || typeof parsed.updatedAt !== 'number') return null;
   return parsed as unknown as PetState;
 }
 
@@ -296,6 +313,12 @@ const ALBUM_CAP = 36;
 
 function trimAlbum<T>(list: T[]): T[] {
   return list.slice(-ALBUM_CAP);
+}
+
+/** 在宠物状态上记录一条日记事件（按今天聚合） */
+function withDiary(pet: PetState, token: string): PetState {
+  const today = new Date().toDateString();
+  return { ...pet, diary: addDiaryEvent(pet.diary, today, token) };
 }
 
 /** 旅行归来结算：照片/手信入册 + 收获（心情/成长提升，消耗少量饱食精力） */
@@ -393,7 +416,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         const yesterday = new Date(Date.now() - 86_400_000).toDateString();
         const streak = next.lastCheckinDate === yesterday ? (next.checkinStreak ?? 0) + 1 : 1;
         const checkinNext: PetState = {
-          ...next,
+          ...withDiary(next, 'checkin'),
           lastCheckinDate: today,
           checkinStreak: streak,
           coins: next.coins + 10,
@@ -439,8 +462,9 @@ export const usePetStore = create<PetStore>()((set, get) => ({
           satiety: clamp01(cur.satiety - 6),
           energy: clamp01(cur.energy - 8),
         };
-        saveRaw(tripNext);
-        set({ pet: tripNext });
+        const withTripDiary = withDiary(tripNext, 'trip:' + dest);
+        saveRaw(withTripDiary);
+        set({ pet: withTripDiary });
       }
     } else {
       set({ ready: true });
@@ -459,7 +483,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         const cur = get().pet;
         const remotePet = normalizeRaw(remote);
         if (
-          remotePet?.saveVersion === 5 &&
+          remotePet?.saveVersion === 6 &&
           (!cur || remotePet.updatedAt > cur.updatedAt)
         ) {
           set({ pet: remotePet });
@@ -491,7 +515,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet || pet.stage !== 'egg') return;
     const remaining = pet.tapsToHatch - 1;
     if (remaining <= 0) {
-    const next = hatchEgg(pet, Date.now());
+    const next = withDiary(hatchEgg(pet, Date.now()), 'hatch');
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'confetti' } });
     sfx.hatch();
@@ -542,10 +566,12 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     }
     const { ok, next } = applyAction(pet, id, now);
     if (!ok) return;
-    saveRaw(next);
+    const withD = withDiary(next, id);
+    saveRaw(withD);
+    const nextPet = withD;
     const anim = ACTION_ANIM[id];
     set({
-      pet: next,
+      pet: nextPet,
       anim,
       burst: { id: ++burstSeq, kind: id === 'wash' ? 'bubble' : id === 'play' ? 'sparkle' : 'heart' },
     });
@@ -570,9 +596,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       if (reason === 'tired') get().say('tired');
       return;
     }
-    saveRaw(next);
+    const withD = withDiary(next, 'work');
+    saveRaw(withD);
     set({
-      pet: next,
+      pet: withD,
       anim: 'working',
       burst: { id: ++burstSeq, kind: 'sparkle' },
     });
@@ -596,9 +623,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       if (reason === 'tired') get().say('tired');
       return;
     }
-    saveRaw(next);
+    const withD = withDiary(next, 'study');
+    saveRaw(withD);
     set({
-      pet: next,
+      pet: withD,
       anim: 'studying',
       burst: { id: ++burstSeq, kind: 'sparkle' },
     });
@@ -637,8 +665,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       bests: { ...simmed.bests, [game]: Math.max(prevBest, score) },
       updatedAt: now,
     };
-    saveRaw(next);
-    set({ pet: next, burst: { id: ++burstSeq, kind: 'heart' } });
+    const withGame = withDiary(next, 'game');
+    const withBest = newBest ? withDiary(withGame, `best:${game}:${score}`) : withGame;
+    saveRaw(withBest);
+    set({ pet: withBest, burst: { id: ++burstSeq, kind: 'heart' } });
     const [great, ok] = TIER_CFG[game];
     const tier: LineKind = score >= great ? 'gameGreat' : score >= ok ? 'gameOk' : 'gameMeh';
     get().say(tier);
@@ -667,7 +697,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       const text = localStorage.getItem(STORAGE_KEY);
       if (text) {
         const remote = JSON.parse(text) as { saveVersion?: number; updatedAt?: number };
-        if (remote?.saveVersion === 5 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
+        if (remote?.saveVersion === 6 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
           const latest = loadRaw();
           if (latest) set({ pet: latest });
           return;
@@ -682,9 +712,14 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (pet.trip?.status === 'away') {
       if (now >= pet.trip.returnAt) {
         const { next: simmed } = simulate(pet, now);
-        const returned = processTripReturn(simmed, simmed.trip!, now);
+        const returned = withDiary(processTripReturn(simmed, simmed.trip!, now), 'trip:' + simmed.trip!.dest);
         saveRaw(returned);
         set({ pet: returned });
+        const ln = useLocale.getState().locale;
+        notify(
+          ln === 'zh' ? `🎒 ${returned.name}旅行归来` : '🎒 Back from a trip',
+          ln === 'zh' ? '带回了照片和手信，快来看看！' : 'Photos and souvenirs await!'
+        );
       }
       return; // 旅途中舞台展示出门告示
     }
@@ -704,6 +739,14 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (get().anim) return;
     const kind = events[events.length - 1]?.kind;
     if (kind && EVENT_LINE[kind]) {
+      if (kind === 'sick' || kind === 'recover' || kind === 'stageUp') {
+        saveRaw(withDiary(next, kind));
+        set({ pet: withDiary(next, kind) });
+      }
+      if (kind === 'sick') {
+        const ln = useLocale.getState().locale;
+        notify(ln === 'zh' ? '🤒 咕咕生病了' : '🤒 GuGu is sick', ln === 'zh' ? '快回来喂药照顾它！' : 'Come back and take care of it!');
+      }
       get().say(EVENT_LINE[kind]!);
       return;
     }
@@ -727,8 +770,11 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       get().say(delta > 0 ? 'eventMoodUp' : 'eventMoodDown');
       return;
     }
-    // 自主出门：状态好、距上次旅行 20 分钟以上、小概率
-    if (canTravel(next) && now - (next.lastTripAt ?? 0) > 20 * 60_000 && Math.random() < 0.004) {
+    // 自主出门：状态好、距上次旅行 20 分钟以上、天气好、小概率（雨雪天咕咕宅家）
+    const wToday = weatherFor(new Date());
+    if (isBadWeather(wToday)) {
+      if (!next.sleeping && Math.random() < 0.02) get().say(wToday === 'snow' ? 'weatherSnow' : 'weatherRain');
+    } else if (canTravel(next) && now - (next.lastTripAt ?? 0) > 20 * 60_000 && Math.random() < 0.004) {
       const departed = departTrip(next, now);
       saveRaw(departed);
       set({ pet: departed });
@@ -872,10 +918,10 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       ]);
       const cur = get().pet;
       if (cur) {
-        const withChat: PetState = {
-          ...cur,
-          counters: { ...cur.counters, aiChat: cur.counters.aiChat + 1 },
-        };
+        const withChat: PetState = withDiary(
+          { ...cur, counters: { ...cur.counters, aiChat: cur.counters.aiChat + 1 } },
+          'chat'
+        );
         saveRaw(withChat);
         set({ pet: withChat });
       }
@@ -907,10 +953,16 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet) return;
     const earned = checkAchievements(pet);
     if (!earned.length) return;
-    const next: PetState = { ...pet, achievements: [...pet.achievements, ...earned] };
+    const withD = earned.reduce((acc, id) => withDiary(acc, 'ach:' + (achievementById(id)?.zh ?? id)), pet);
+    const next: PetState = { ...withD, achievements: [...withD.achievements, ...earned] };
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
     sfx.fanfare();
+    const l2 = useLocale.getState().locale;
+    notify(
+      l2 === 'zh' ? `🏆 ${pet.name}解锁新成就` : '🏆 New achievement',
+      l2 === 'zh' ? achievementById(earned[0])?.zh ?? '' : achievementById(earned[0])?.en ?? ''
+    );
     const locale = useLocale.getState().locale;
     const def = achievementById(earned[0]);
     get().say('achUnlock', { a: def ? (locale === 'zh' ? def.zh : def.en) : earned[0] });
