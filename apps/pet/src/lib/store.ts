@@ -399,6 +399,21 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   tick: () => {
     const pet = get().pet;
     if (!pet || !pet.alive) return;
+    // 多页面共存（独立页 + 壳内挂件）：另一页写入了明显更新的存档时直接采纳，
+    // 避免双页各自衰减导致的重复消耗与 updatedAt 版本回退
+    try {
+      const text = localStorage.getItem(STORAGE_KEY);
+      if (text) {
+        const remote = JSON.parse(text) as { saveVersion?: number; updatedAt?: number };
+        if (remote?.saveVersion === 2 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
+          const latest = loadRaw();
+          if (latest) set({ pet: latest });
+          return;
+        }
+      }
+    } catch {
+      /* 忽略坏数据，继续本页模拟 */
+    }
     const now = Date.now();
     if (pet.stage === 'egg') {
       // 蛋不衰减，只推进时间戳（避免长时间挂蛋后回来误触发离线结算）

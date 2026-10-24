@@ -28,10 +28,11 @@
 - `scripts/build-all.mjs` + `scripts/compose.mjs` 接入构建（子路径 `/pet`）
 - `apps/shell/src/config/apps.ts` 注册（应用商城/命令面板自动收录）
 - `apps/shell/public/config*.json` 桌面图标（icons 数组 + pages[0].iconIds 两处）
+- **桌面挂件（M3）**：`/pet/widget/` 透明页被壳侧 `PetWidget` 以可拖拽浮窗 iframe 加载——咕咕住进网页操作系统的桌面上；桌面角落 🐣 开关，应用全屏自动隐藏；与独立页同源共享存档（storage 事件 + tick 双写守卫）
 
 ## 里程碑
 
 - **M0（已完成）**：领养孵化 + 五维状态 + 照顾动作 + 程序动画 + 台词气泡 + 存档/离线结算 + 双语
 - **M1（已完成）**：元宝经济 + 商店 + 打工/学习 + 接点心小游戏 + 随机事件 + 存档 v2 迁移
 - **M2（已完成）**：BYOK LLM 对话 + 一句话领养（BYOK 图像）+ 形象工坊（上传/URL/分享码）+ 少年/成年全形态素材
-- **M3**：AleOS 桌面挂件（/pet/widget/）+ 图鉴成就 + 模板库（GitHub PR）
+- **M3（进行中）**：AleOS 桌面挂件（已完成）；待做：图鉴成就 + 模板库（GitHub PR）
