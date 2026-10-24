@@ -92,15 +92,16 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     };
   }, [canPerform]);
 
-  // 小剧场：蝴蝶飞过（低频），咕咕会追
+  // 小剧场：蝴蝶飞过（低频），咕咕会追。独立本地定时器，不与其他 effect 共享注册表
   useEffect(() => {
     if (!canPerform) return;
     let cancelled = false;
+    const localTimers: number[] = [];
     const schedule = (delay: number, fn: () => void) => {
       const id = window.setTimeout(() => {
         if (!cancelled) fn();
       }, delay);
-      timersRef.current.push(id);
+      localTimers.push(id);
     };
     const loop = () => {
       schedule(26_000 + Math.random() * 26_000, () => {
@@ -116,8 +117,12 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     loop();
     return () => {
       cancelled = true;
+      localTimers.forEach(clearTimeout);
     };
   }, [canPerform]);
+
+  // 蝴蝶动画结束即卸载（keyframes 无 forwards，动画一停就移除，避免冻在半空）
+  const onButterflyEnd = useCallback(() => setButterfly(0), []);
 
   // 踱步 / 奔跑
   useEffect(() => {
@@ -213,10 +218,11 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       <div className="absolute -bottom-[14%] left-1/2 h-[34%] w-[150%] -translate-x-1/2 rounded-[100%]" style={{ background: sky.floor }} />
       <div className="absolute bottom-0 h-[7%] w-full" style={{ background: sky.floorDeep, opacity: 0.7 }} />
 
-      {/* 小剧场：蝴蝶 */}
+      {/* 小剧场：蝴蝶（动画结束即卸载） */}
       {butterfly > 0 && (
         <span
           key={butterfly}
+          onAnimationEnd={onButterflyEnd}
           className="pointer-events-none absolute top-[26%] text-2xl"
           style={{ animation: 'gugu-fly 4.2s linear 1', animationDirection: butterfly % 2 === 0 ? 'reverse' : 'normal' }}
         >

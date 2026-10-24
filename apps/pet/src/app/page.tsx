@@ -86,8 +86,8 @@ export default function Page() {
   const tutorialText = t[`tut${Math.min(3, pet.tutorialStep + 1)}` as 'tut1'];
 
   return (
-    <main className="relative mx-auto h-dvh max-w-xl overflow-hidden">
-      {/* 全幅天空舞台（铺满，头部/状态条悬浮其上） */}
+    <main className="relative h-dvh overflow-hidden">
+      {/* 全幅天空舞台（铺满，头部/状态条悬浮其上；PC 宽屏即全屏场景） */}
       <div className="absolute inset-0">
         <PetStage onPetMenu={(x, y) => setMenu({ x, y })} className="h-full w-full" />
       </div>
