@@ -76,4 +76,8 @@ export const sfx = {
   pop() {
     tone(1180, 0.07, { type: 'square', gain: 0.03 });
   },
+  /** 音符（跟我唱/音感玩法用） */
+  note(freq: number, duration = 0.32, delay = 0) {
+    tone(freq, duration, { type: 'triangle', gain: 0.07, delay });
+  },
 };

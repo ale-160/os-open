@@ -11,11 +11,14 @@ import { HatchFlow } from '@/components/HatchFlow';
 import { MemoryGame } from '@/components/MemoryGame';
 import { PetMenu } from '@/components/PetMenu';
 import { PetStage } from '@/components/PetStage';
+import { RaceGame } from '@/components/RaceGame';
 import { SettingsDialog } from '@/components/SettingsDialog';
-import { ShopDialog } from '@/components/ShopDialog';
+import { SingGame } from '@/components/SingGame';
 import { SkinDialog } from '@/components/SkinDialog';
+import { ShopDialog } from '@/components/ShopDialog';
 import { SnackGame } from '@/components/SnackGame';
 import { StatusBar } from '@/components/StatusBar';
+import { TossGame } from '@/components/TossGame';
 import { WhackGame } from '@/components/WhackGame';
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
@@ -164,6 +167,9 @@ export default function Page() {
       {gameKind === 'snack' && <SnackGame pet={pet} onClose={() => setGameKind(null)} />}
       {gameKind === 'whack' && <WhackGame pet={pet} onClose={() => setGameKind(null)} />}
       {gameKind === 'memory' && <MemoryGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'race' && <RaceGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'toss' && <TossGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'sing' && <SingGame pet={pet} onClose={() => setGameKind(null)} />}
       {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
       {skinOpen && <SkinDialog pet={pet} onClose={() => setSkinOpen(false)} />}
       {achOpen && <AchievementsDialog pet={pet} onClose={() => setAchOpen(false)} />}
