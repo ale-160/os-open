@@ -2,7 +2,7 @@
 
 /**
  * 五维状态条：点击/长按任一状态弹出说明气泡（名称+含义+当前值）。
- * 视觉上不依赖常显文字标签，保持顶部轻量。
+ * 以悬浮 HUD 形态覆盖在天空上，夜晚自动切换浅色文字与半透明轨道。
  */
 
 import { useEffect, useState } from 'react';
@@ -24,7 +24,7 @@ const STAT_META: { key: 'satiety' | 'cleanliness' | 'mood' | 'energy' | 'health'
 
 const POPOVER_MS = 3200;
 
-export function StatusBar({ pet }: { pet: PetState }) {
+export function StatusBar({ pet, dark = false }: { pet: PetState; dark?: boolean }) {
   const { locale } = useLocale();
   const t = ui(locale);
   const [active, setActive] = useState<number | null>(null);
@@ -44,9 +44,11 @@ export function StatusBar({ pet }: { pet: PetState }) {
       : Math.min(100, Math.round(((pet.growth - currentFloor) / Math.max(1, pet.growth - currentFloor + gap)) * 100));
 
   const stageLabel = t[`stage${pet.stage.charAt(0).toUpperCase()}${pet.stage.slice(1)}` as 'stageEgg'];
+  const track = dark ? 'bg-white/20' : 'bg-amber-900/10';
+  const softText = dark ? 'text-white/85' : 'text-gugu-ink-soft';
 
   return (
-    <div className="px-4 pb-1 pt-2">
+    <div className="px-4 pb-1 pt-1.5">
       <div className="grid grid-cols-5 gap-2">
         {STAT_META.map((meta, i) => {
           const value = pet[meta.key];
@@ -65,12 +67,12 @@ export function StatusBar({ pet }: { pet: PetState }) {
               className="relative flex flex-col items-center gap-1 rounded-xl outline-none"
             >
               <span className={`text-base leading-none transition-transform ${isActive ? 'scale-125' : ''}`}>{meta.icon}</span>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-amber-900/10">
+              <div className={`h-1.5 w-full overflow-hidden rounded-full ${track}`}>
                 <div className={`anim-bar h-full rounded-full ${BAR_COLOR(value)}`} style={{ width: `${Math.round(value)}%` }} />
               </div>
               {isActive && (
                 <span className="anim-pop absolute top-full left-1/2 z-20 mt-1.5 w-32 -translate-x-1/2 rounded-2xl border border-amber-100 bg-white/97 px-3 py-2 text-left shadow-xl backdrop-blur">
-                  <span className="block text-[11px] font-extrabold">
+                  <span className="block text-[11px] font-extrabold text-gugu-ink">
                     {meta.icon} {t[meta.label]} · {Math.round(value)}
                   </span>
                   <span className="mt-0.5 block text-[10px] leading-snug text-gugu-ink-soft">{t[meta.desc]}</span>
@@ -81,9 +83,9 @@ export function StatusBar({ pet }: { pet: PetState }) {
         })}
       </div>
 
-      <div className="mt-2 flex items-center gap-2 text-xs text-gugu-ink-soft">
-        <span className="rounded-full bg-amber-900/5 px-2 py-0.5 font-semibold text-gugu-ink">{stageLabel}</span>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-amber-900/10">
+      <div className={`mt-2 flex items-center gap-2 text-xs ${softText}`}>
+        <span className={`rounded-full px-2 py-0.5 font-semibold ${dark ? 'bg-white/20 text-white' : 'bg-amber-900/5 text-gugu-ink'}`}>{stageLabel}</span>
+        <div className={`h-1.5 flex-1 overflow-hidden rounded-full ${track}`}>
           <div className="h-full rounded-full bg-gugu-accent" style={{ width: `${progress}%` }} />
         </div>
         <span className="whitespace-nowrap">

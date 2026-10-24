@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { HATCH_TAPS } from '@/lib/balance';
+import { skyTheme } from '@/lib/sky';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { PetSprite, type TrickId } from './PetSprite';
@@ -19,25 +20,12 @@ const TRICKS: TrickId[] = ['tilt', 'peck', 'turn', 'flap', 'sing', 'dance', 'sit
 const LONG_PRESS_MS = 550;
 const LONG_PRESS_MOVE = 12;
 
-/** 昼夜天色（按本地时段） */
-function skyFor(hour: number) {
-  if (hour >= 5 && hour < 8) {
-    return { sky: 'from-[#ffe0d1] via-[#fff3e0] to-[#ffeccb]', orb: 'sun', floor: '#f7dcae', floorDeep: '#f2d19a', stars: false };
-  }
-  if (hour >= 8 && hour < 17) {
-    return { sky: 'from-[#ffedd0] via-[#fff8ea] to-[#ffedcb]', orb: 'sun', floor: '#f7dcae', floorDeep: '#f2d19a', stars: false };
-  }
-  if (hour >= 17 && hour < 20) {
-    return { sky: 'from-[#ffd9c2] via-[#ffe8d6] to-[#f7c9a2]', orb: 'dusk', floor: '#eec394', floorDeep: '#e0b183', stars: false };
-  }
-  return { sky: 'from-[#3d4a7a] via-[#5d6ba0] to-[#8a7fae]', orb: 'moon', floor: '#a9987d', floorDeep: '#93866c', stars: true };
-}
-
 interface PetStageProps {
   onPetMenu?: (x: number, y: number) => void;
+  className?: string;
 }
 
-export function PetStage({ onPetMenu }: PetStageProps) {
+export function PetStage({ onPetMenu, className }: PetStageProps) {
   const pet = usePetStore((s) => s.pet)!;
   const anim = usePetStore((s) => s.anim);
   const burst = usePetStore((s) => s.burst);
@@ -49,7 +37,7 @@ export function PetStage({ onPetMenu }: PetStageProps) {
   const t = ui(locale);
 
   const [hour] = useState(() => new Date().getHours());
-  const sky = skyFor(hour);
+  const sky = skyTheme(hour);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const dirRef = useRef<1 | -1>(1);
@@ -198,30 +186,30 @@ export function PetStage({ onPetMenu }: PetStageProps) {
   }, [isEgg, tapEgg, tapPet]);
 
   return (
-    <div className="relative min-h-[320px] flex-1 overflow-hidden">
+    <div className={`relative overflow-hidden ${className ?? 'min-h-[320px] flex-1'}`}>
       {/* 昼夜天色 */}
       <div className={`absolute inset-0 bg-gradient-to-b ${sky.sky}`} />
       {sky.orb === 'moon' ? (
-        <div className="absolute left-[9%] top-[9%] h-11 w-11 rounded-full bg-[#f4f1ff] shadow-[0_0_40px_14px_rgba(244,241,255,0.35)]" />
+        <div className="absolute left-[10%] top-[24%] h-11 w-11 rounded-full bg-[#f4f1ff] shadow-[0_0_40px_14px_rgba(244,241,255,0.35)]" />
       ) : (
         <div
-          className={`absolute left-[9%] top-[9%] rounded-full ${sky.orb === 'dusk' ? 'h-14 w-14 bg-[#ff9f6e] shadow-[0_0_48px_20px_rgba(255,159,110,0.5)]' : 'h-12 w-12 bg-[#ffd98a] shadow-[0_0_44px_18px_rgba(255,217,138,0.55)]'}`}
+          className={`absolute left-[10%] top-[24%] rounded-full ${sky.orb === 'dusk' ? 'h-14 w-14 bg-[#ff9f6e] shadow-[0_0_48px_20px_rgba(255,159,110,0.5)]' : 'h-12 w-12 bg-[#ffd98a] shadow-[0_0_44px_18px_rgba(255,217,138,0.55)]'}`}
         />
       )}
       {sky.stars &&
         [
-          { l: '20%', t: '12%', d: '0s' },
-          { l: '34%', t: '26%', d: '0.8s' },
-          { l: '58%', t: '9%', d: '1.6s' },
-          { l: '74%', t: '20%', d: '0.4s' },
-          { l: '88%', t: '12%', d: '1.2s' },
+          { l: '22%', t: '34%', d: '0s' },
+          { l: '36%', t: '46%', d: '0.8s' },
+          { l: '58%', t: '30%', d: '1.6s' },
+          { l: '74%', t: '42%', d: '0.4s' },
+          { l: '88%', t: '34%', d: '1.2s' },
         ].map((s, i) => (
           <span key={i} className="absolute animate-pulse text-[10px] text-white/80" style={{ left: s.l, top: s.t, animationDelay: s.d }}>
             ✦
           </span>
         ))}
-      <div className="absolute right-[10%] top-[16%] h-10 w-20 rounded-full bg-white/80 blur-[1px]" />
-      <div className="absolute right-[16%] top-[11%] h-8 w-14 rounded-full bg-white/70 blur-[1px]" />
+      <div className="absolute right-[12%] top-[36%] h-10 w-20 rounded-full bg-white/80 blur-[1px]" />
+      <div className="absolute right-[18%] top-[31%] h-8 w-14 rounded-full bg-white/70 blur-[1px]" />
       <div className="absolute -bottom-[14%] left-1/2 h-[34%] w-[150%] -translate-x-1/2 rounded-[100%]" style={{ background: sky.floor }} />
       <div className="absolute bottom-0 h-[7%] w-full" style={{ background: sky.floorDeep, opacity: 0.7 }} />
 
@@ -236,14 +224,14 @@ export function PetStage({ onPetMenu }: PetStageProps) {
         </span>
       )}
 
-      {/* 生病 / 睡觉浮动胶囊 */}
+      {/* 生病 / 睡觉浮动胶囊（悬浮 HUD 下层） */}
       {pet.sick && (
-        <div className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-[#f0716b]/85 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
+        <div className="absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[#f0716b]/85 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
           🤒 {t.sickPill}
         </div>
       )}
       {pet.sleeping && !pet.sick && (
-        <div className="absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-[#5f7de0]/80 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
+        <div className="absolute left-1/2 top-[118px] z-10 -translate-x-1/2 rounded-full bg-[#5f7de0]/80 px-3.5 py-1 text-[11px] font-bold text-white shadow-lg backdrop-blur">
           💤 {t.sleepPill}
         </div>
       )}

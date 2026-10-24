@@ -19,6 +19,7 @@ import { StatusBar } from '@/components/StatusBar';
 import { WhackGame } from '@/components/WhackGame';
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
+import { skyTheme } from '@/lib/sky';
 import { usePetStore } from '@/lib/store';
 
 const TICK_MS = 5000;
@@ -42,6 +43,9 @@ export default function Page() {
   const [skinOpen, setSkinOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [hour] = useState(() => new Date().getHours());
+  const sky = skyTheme(hour);
+  const dark = sky.dark;
 
   useEffect(() => {
     init();
@@ -74,37 +78,56 @@ export default function Page() {
   const tutorialText = t[`tut${Math.min(3, pet.tutorialStep + 1)}` as 'tut1'];
 
   return (
-    <main className="relative mx-auto flex h-dvh max-w-xl flex-col overflow-hidden">
-      {/* 头部：名字 / 阶段 / 元宝 / 设置 */}
-      <header className="flex items-center gap-2 px-4 pt-4">
+    <main className="relative mx-auto h-dvh max-w-xl overflow-hidden">
+      {/* 全幅天空舞台（铺满，头部/状态条悬浮其上） */}
+      <div className="absolute inset-0">
+        <PetStage onPetMenu={(x, y) => setMenu({ x, y })} className="h-full w-full" />
+      </div>
+
+      {/* 悬浮头部 */}
+      <header className="relative z-20 flex items-center gap-2 px-4 pt-3">
         <div className="min-w-0 flex-1">
-          <h1 className="flex items-center gap-2 truncate text-lg font-extrabold">
+          <h1
+            className={`flex items-center gap-2 truncate text-lg font-extrabold ${
+              dark ? 'text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]' : 'text-gugu-ink'
+            }`}
+          >
             <span className="truncate">{pet.name}</span>
-            <span className="shrink-0 rounded-full bg-amber-900/5 px-2 py-0.5 text-xs font-bold text-gugu-ink-soft">
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${
+                dark ? 'bg-white/20 text-white' : 'bg-amber-900/5 text-gugu-ink-soft'
+              }`}
+            >
               {t[stageKey]}
             </span>
-            <span className="shrink-0 rounded-full bg-amber-100/80 px-2 py-0.5 text-xs font-extrabold text-gugu-ink">
+            <span
+              className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-extrabold ${
+                dark ? 'bg-white/20 text-white' : 'bg-amber-100/80 text-gugu-ink'
+              }`}
+            >
               🪙 {pet.coins}
             </span>
           </h1>
         </div>
-        <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            aria-label={t.settingsTitle}
-            className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
-          >
-            ⚙️
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setSettingsOpen(true)}
+          aria-label={t.settingsTitle}
+          className={`press flex h-9 w-9 items-center justify-center rounded-full text-base shadow-sm backdrop-blur ${
+            dark ? 'bg-white/15 text-white' : 'bg-white/50'
+          }`}
+        >
+          ⚙️
+        </button>
       </header>
 
-      <StatusBar pet={pet} />
-      <PetStage onPetMenu={(x, y) => setMenu({ x, y })} />
+      {/* 悬浮状态条 */}
+      <div className="relative z-10">
+        <StatusBar pet={pet} dark={dark} />
+      </div>
 
       {showTutorial && (
-        <div className="mx-4 mb-2 flex items-center gap-3 rounded-2xl border border-amber-100 bg-white/95 p-3 text-sm shadow-md shadow-amber-900/5">
+        <div className="relative z-10 mx-4 mt-1 flex items-center gap-3 rounded-2xl border border-amber-100 bg-white/95 p-3 text-sm shadow-md shadow-amber-900/5 backdrop-blur">
           <p className="flex-1 leading-snug">{tutorialText}</p>
           <button
             type="button"
