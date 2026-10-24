@@ -17,6 +17,9 @@ export interface ResolvedSkin {
   faceOverlay: boolean;
 }
 
+/** 闲时小动作 id（与 globals.css 的 anim-<id> 一一对应） */
+export type TrickId = 'tilt' | 'peck' | 'turn' | 'flap' | 'sing';
+
 interface PetSpriteProps {
   pet: PetState;
   anim: ActivityState | null;
@@ -26,6 +29,8 @@ interface PetSpriteProps {
   facing: 1 | -1;
   /** 激活的自定义皮肤（缺省用官方分层形象） */
   customSkin?: ResolvedSkin | null;
+  /** 闲时小动作（站立时随机表演） */
+  trick?: TrickId | null;
   onTap: () => void;
 }
 
@@ -33,7 +38,7 @@ const EYE_INK = '#4a3226';
 const BEAK_FILL = '#f7a64a';
 const BLUSH_FILL = '#f79892';
 
-export function PetSprite({ pet, anim, burst, walking, facing, customSkin, onTap }: PetSpriteProps) {
+export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick, onTap }: PetSpriteProps) {
   const isEgg = pet.stage === 'egg';
   const sleeping = pet.sleeping;
   const sick = pet.sick;
@@ -46,7 +51,7 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, onTap
     (anim === 'playing' || anim === 'eating' || anim === 'washing' || pet.mood >= THRESHOLD.happyFace);
   const sad = !sleeping && !sick && pet.mood <= THRESHOLD.sadFace;
 
-  // 身体动画类：动作演出 > 生病 > 走路 > 呼吸
+  // 身体动画类：动作演出 > 生病 > 闲时小动作 > 走路 > 呼吸
   let bodyAnim = 'anim-breathe';
   if (anim === 'eating') bodyAnim = 'anim-eat';
   else if (anim === 'washing') bodyAnim = 'anim-scrub';
@@ -54,6 +59,7 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, onTap
   else if (anim === 'working') bodyAnim = 'anim-work';
   else if (anim === 'studying') bodyAnim = 'anim-study';
   else if (sick) bodyAnim = 'anim-shiver';
+  else if (trick) bodyAnim = `anim-${trick}`;
   else if (walking) bodyAnim = 'anim-hop';
 
   return (
@@ -95,7 +101,7 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, onTap
       </div>
 
       {/* 常驻粒子层 */}
-      <Particles sleeping={sleeping} washing={anim === 'washing'} playing={anim === 'playing'} sick={sick} working={anim === 'working'} studying={anim === 'studying'} />
+      <Particles sleeping={sleeping} washing={anim === 'washing'} playing={anim === 'playing'} sick={sick} working={anim === 'working'} studying={anim === 'studying'} trick={trick} />
 
       {/* 摸摸爱心 / 破壳彩带 */}
       {burst?.kind === 'heart' && <BurstParticles key={`h-${burst.id}`} kind="heart" />}
@@ -197,7 +203,7 @@ export function Face({ face, sleeping, happy, sad, sick, chewing }: FaceProps) {
   );
 }
 
-/** 常驻状态粒子：Zzz / 泡泡 / 星星 / 汗 / 元宝 / 书本 */
+/** 常驻状态粒子：Zzz / 泡泡 / 星星 / 汗 / 元宝 / 书本 / 唱歌音符 */
 function Particles({
   sleeping,
   washing,
@@ -205,6 +211,7 @@ function Particles({
   sick,
   working,
   studying,
+  trick,
 }: {
   sleeping: boolean;
   washing: boolean;
@@ -212,10 +219,43 @@ function Particles({
   sick: boolean;
   working?: boolean;
   studying?: boolean;
+  trick?: TrickId | null;
 }) {
-  if (!sleeping && !washing && !playing && !sick && !working && !studying) return null;
+  if (!sleeping && !washing && !playing && !sick && !working && !studying && !trick) return null;
   return (
     <div className="pointer-events-none absolute inset-0 overflow-visible">
+      {trick === 'sing' &&
+        ['♪', '♫', '♪'].map((ch, i) => (
+          <span
+            key={i}
+            className="anim-float absolute text-[#8aa8ff]"
+            style={{
+              left: `${26 + i * 22}%`,
+              top: '18%',
+              fontSize: `${14 + i * 2}px`,
+              animationDelay: `${i * 0.5}s`,
+              ['--drift' as string]: `${i % 2 === 0 ? -12 : 12}px`,
+            }}
+          >
+            {ch}
+          </span>
+        ))}
+      {trick === 'flap' &&
+        ['🪶', '✨'].map((ch, i) => (
+          <span
+            key={i}
+            className="anim-float absolute"
+            style={{
+              left: `${i === 0 ? 12 : 74}%`,
+              top: '30%',
+              fontSize: '14px',
+              animationDelay: `${i * 0.6}s`,
+              ['--drift' as string]: `${i === 0 ? -14 : 14}px`,
+            }}
+          >
+            {ch}
+          </span>
+        ))}
       {working &&
         ['💰', '💰', '✨'].map((ch, i) => (
           <span

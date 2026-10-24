@@ -6,15 +6,19 @@ import { useEffect, useState } from 'react';
 import { AchievementsDialog } from '@/components/AchievementsDialog';
 import { ActionPanel } from '@/components/ActionPanel';
 import { ChatPanel } from '@/components/ChatPanel';
+import { GameDialog, type GameKind } from '@/components/GameDialog';
 import { HatchFlow } from '@/components/HatchFlow';
+import { MemoryGame } from '@/components/MemoryGame';
+import { PetMenu } from '@/components/PetMenu';
 import { PetStage } from '@/components/PetStage';
 import { SettingsDialog } from '@/components/SettingsDialog';
 import { ShopDialog } from '@/components/ShopDialog';
 import { SkinDialog } from '@/components/SkinDialog';
 import { SnackGame } from '@/components/SnackGame';
 import { StatusBar } from '@/components/StatusBar';
+import { WhackGame } from '@/components/WhackGame';
 import { useLocale } from '@/hooks/useLocale';
-import { fmt, ui } from '@/lib/locale';
+import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 
 const TICK_MS = 5000;
@@ -32,10 +36,12 @@ export default function Page() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [shopOpen, setShopOpen] = useState(false);
-  const [gameOpen, setGameOpen] = useState(false);
+  const [gamePickerOpen, setGamePickerOpen] = useState(false);
+  const [gameKind, setGameKind] = useState<GameKind | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [skinOpen, setSkinOpen] = useState(false);
   const [achOpen, setAchOpen] = useState(false);
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     init();
@@ -86,30 +92,6 @@ export default function Page() {
         <div className="flex items-center gap-1.5">
           <button
             type="button"
-            onClick={() => setChatOpen(true)}
-            aria-label={fmt(t.chatTitle, { name: pet.name })}
-            className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
-          >
-            💬
-          </button>
-          <button
-            type="button"
-            onClick={() => setAchOpen(true)}
-            aria-label={t.achTitle}
-            className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
-          >
-            🏆
-          </button>
-          <button
-            type="button"
-            onClick={() => setSkinOpen(true)}
-            aria-label={t.skinTitle}
-            className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
-          >
-            🎨
-          </button>
-          <button
-            type="button"
             onClick={() => setSettingsOpen(true)}
             aria-label={t.settingsTitle}
             className="press rounded-full bg-white/85 px-3 py-2 text-base shadow-sm"
@@ -120,7 +102,7 @@ export default function Page() {
       </header>
 
       <StatusBar pet={pet} />
-      <PetStage />
+      <PetStage onPetMenu={(x, y) => setMenu({ x, y })} />
 
       {showTutorial && (
         <div className="mx-4 mb-2 flex items-center gap-3 rounded-2xl border border-amber-100 bg-white/95 p-3 text-sm shadow-md shadow-amber-900/5">
@@ -135,14 +117,47 @@ export default function Page() {
         </div>
       )}
 
-      <ActionPanel pet={pet} onOpenShop={() => setShopOpen(true)} onOpenGame={() => setGameOpen(true)} />
+      <ActionPanel
+        pet={pet}
+        onOpenShop={() => setShopOpen(true)}
+        onOpenGame={() => setGamePickerOpen(true)}
+        onOpenChat={() => setChatOpen(true)}
+        onOpenAchievements={() => setAchOpen(true)}
+        onOpenSkin={() => setSkinOpen(true)}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
 
       {settingsOpen && <SettingsDialog onClose={() => setSettingsOpen(false)} />}
       {shopOpen && <ShopDialog pet={pet} onClose={() => setShopOpen(false)} />}
-      {gameOpen && <SnackGame pet={pet} onClose={() => setGameOpen(false)} />}
+      {gamePickerOpen && (
+        <GameDialog
+          pet={pet}
+          onPick={(kind) => {
+            setGameKind(kind);
+            setGamePickerOpen(false);
+          }}
+          onClose={() => setGamePickerOpen(false)}
+        />
+      )}
+      {gameKind === 'snack' && <SnackGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'whack' && <WhackGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'memory' && <MemoryGame pet={pet} onClose={() => setGameKind(null)} />}
       {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
       {skinOpen && <SkinDialog pet={pet} onClose={() => setSkinOpen(false)} />}
       {achOpen && <AchievementsDialog pet={pet} onClose={() => setAchOpen(false)} />}
+      {menu && (
+        <PetMenu
+          x={menu.x}
+          y={menu.y}
+          pet={pet}
+          onOpenChat={() => setChatOpen(true)}
+          onOpenAchievements={() => setAchOpen(true)}
+          onOpenSkin={() => setSkinOpen(true)}
+          onOpenShop={() => setShopOpen(true)}
+          onOpenGame={() => setGamePickerOpen(true)}
+          onClose={() => setMenu(null)}
+        />
+      )}
     </main>
   );
 }

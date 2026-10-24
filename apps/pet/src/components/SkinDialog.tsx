@@ -1,13 +1,14 @@
 'use client';
 
 /**
- * 形象工坊：官方配色切换 + 自定义单图皮肤（上传 / URL / 表情叠加开关 / 分享码导入导出）。
+ * 形象工坊：官方配色切换 + 社区模板（仓库 PR 渠道）+ 自定义单图皮肤（上传 / URL / 表情叠加开关 / 分享码导入导出）。
  * 自定义皮肤存 IndexedDB；分享码 = base64url(JSON)，含 dataURL（远程 URL 皮肤只含引用）。
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import {
+  BASE_PATH,
   decodeSkinCode,
   encodeSkinCode,
   VARIANTS,
@@ -19,6 +20,17 @@ import type { CustomSkinRecord } from '@/lib/db';
 import type { PetState } from '@/lib/types';
 
 const MAX_FILE_BYTES = 3 * 1024 * 1024;
+
+interface CommunitySkin {
+  id: string;
+  name: string;
+  nameEn: string;
+  author: string;
+  file: string;
+  faceOverlay: boolean;
+  zhDesc: string;
+  enDesc: string;
+}
 
 export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => void }) {
   const setVariant = usePetStore((s) => s.setVariant);
@@ -35,7 +47,24 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
   const [importCode, setImportCode] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [community, setCommunity] = useState<CommunitySkin[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // 拉取仓库社区模板清单（静态文件，失败则整区隐藏）
+  useEffect(() => {
+    let alive = true;
+    fetch(`${BASE_PATH}/templates/skins.json`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((j: { skins?: CommunitySkin[] }) => {
+        if (alive) setCommunity(j.skins ?? []);
+      })
+      .catch(() => {
+        if (alive) setCommunity(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const activeCustomId = pet.customSkinId;
   const flash = (msg: string) => {
@@ -150,6 +179,47 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
             </button>
           ))}
         </div>
+
+        {/* 社区模板（仓库 PR 渠道） */}
+        {community && community.length > 0 && (
+          <>
+            <p className="mb-2 text-xs font-bold text-gugu-ink-soft">
+              🌍 {t.communityTitle}
+              <span className="ml-2 font-normal text-gugu-ink-soft/70">{t.communitySubtitle}</span>
+            </p>
+            <div className="mb-4 grid grid-cols-3 gap-2">
+              {community.map((s) => {
+                const url = `${BASE_PATH}/templates/skins/${s.file}`;
+                const active = customSkins.some((c) => c.url === url);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() =>
+                      addCustomSkin({
+                        id: crypto.randomUUID(),
+                        name: locale === 'zh' ? s.name : s.nameEn,
+                        url,
+                        faceOverlay: s.faceOverlay,
+                        createdAt: Date.now(),
+                      })
+                    }
+                    className={`press flex flex-col items-center gap-1 rounded-2xl border-2 p-2 ${
+                      active ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50 hover:bg-amber-50'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={locale === 'zh' ? s.name : s.nameEn} className="h-14 w-12 object-contain" draggable={false} />
+                    <span className="w-full truncate text-center text-[11px] font-bold">{locale === 'zh' ? s.name : s.nameEn}</span>
+                    <span className="w-full truncate text-center text-[9px] text-gugu-ink-soft/70">
+                      {t.communityBy} {s.author}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        )}
 
         {/* 表情叠加开关 */}
         <label className="mb-3 flex items-center gap-2 text-xs font-semibold text-gugu-ink">

@@ -17,8 +17,8 @@ import type { PetState } from '@/lib/types';
 
 const SNACKS = ['🍪', '🍰', '🍩', '🍭'];
 const BOMB = '💣';
-const CATCH_Y = 78; // 判定线（%）
-const CATCH_HALF = 12; // 接住判定半宽（%）
+const CATCH_Y = 80; // 判定线（%）
+const CATCH_HALF = 15; // 接住判定半宽（%）
 
 interface FallingItem {
   id: number;
@@ -121,12 +121,15 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
         });
       }
 
-      // 移动 + 判定
+      // 移动 + 判定（按穿越判定线检测，杜绝高帧损导致的"看着接住却没判到"）
       const remain: FallingItem[] = [];
       for (const it of itemsRef.current) {
         if (it.caught) continue;
+        const prevY = it.y;
         it.y += it.v * dt;
-        if (it.y >= CATCH_Y && it.y <= CATCH_Y + 10 && Math.abs(it.x - catcherXRef.current) <= CATCH_HALF) {
+        const crossed = prevY < CATCH_Y && it.y >= CATCH_Y;
+        const inWindow = it.y >= CATCH_Y && it.y <= CATCH_Y + 12;
+        if ((crossed || inWindow) && Math.abs(it.x - catcherXRef.current) <= CATCH_HALF) {
           it.caught = true;
           it.el?.remove();
           scoreRef.current = Math.max(0, scoreRef.current + (it.bomb ? -2 : 1));
@@ -267,7 +270,7 @@ function Spawner({ itemsRef }: { itemsRef: React.RefObject<FallingItem[]> }) {
         if (!it.el) {
           const span = document.createElement('span');
           span.textContent = it.kind;
-          span.className = 'pointer-events-none absolute text-2xl';
+          span.className = 'pointer-events-none absolute text-[30px]';
           span.style.transform = 'translateX(-50%)';
           span.style.left = `${it.x}%`;
           span.style.top = `${it.y}%`;
