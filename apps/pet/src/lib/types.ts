@@ -98,7 +98,8 @@ export interface PetTrip {
   status: 'away' | 'returned';
   departAt: number;
   returnAt: number;
-  dest: DestId;
+  /** DestId 或平顶山目的地 id（pingdingshan.ts） */
+  dest: string;
   provision: Provision | null;
   /** 已寄回的照片文案序号 */
   photos: number[];
@@ -107,14 +108,16 @@ export interface PetTrip {
 
 /** 相册照片（旅行寄回） */
 export interface AlbumPhoto {
-  dest: DestId;
+  /** DestId 或平顶山目的地 id */
+  dest: string;
   cap: number;
   at: number;
 }
 
 /** 手信收藏 */
 export interface AlbumSouvenir {
-  dest: DestId;
+  /** DestId 或平顶山目的地 id */
+  dest: string;
   at: number;
 }
 

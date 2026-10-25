@@ -28,6 +28,7 @@ import { isBadWeather, weatherFor } from './weather';
 import { notify } from './notify';
 import { pickDest } from './travel';
 import { pickSticker } from './stickers';
+import { PDS_DESTS } from './pingdingshan';
 import {
   deleteSkinRecord,
   listSkinRecords,
@@ -376,7 +377,11 @@ function processTripReturn(pet: PetState, trip: NonNullable<PetState['trip']>, n
 
 /** 自主出发：状态好才会出门 */
 function departTrip(pet: PetState, now: number): PetState {
-  const dest = pickDest(pet.packedProvision ?? null);
+  // 30% 概率去平顶山文旅远门（鹰悦拍联动），其余本地 8 目的地
+  const goPds = Math.random() < 0.3;
+  const dest = goPds
+    ? PDS_DESTS[Math.floor(Math.random() * PDS_DESTS.length)].id
+    : pickDest(pet.packedProvision ?? null);
   return {
     ...pet,
     packedProvision: null,
@@ -384,11 +389,11 @@ function departTrip(pet: PetState, now: number): PetState {
     trip: {
       status: 'away',
       departAt: now,
-      returnAt: now + (3 + Math.random() * 1.5) * 60_000,
+      returnAt: now + (goPds ? 4 + Math.random() * 2 : 3 + Math.random() * 1.5) * 60_000,
       dest,
       provision: pet.packedProvision ?? null,
       photos: [],
-      souvenir: pet.packedProvision === 'charm',
+      souvenir: pet.packedProvision === 'charm' || goPds,
     },
   };
 }
@@ -468,8 +473,11 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         Math.random() < 0.65
       ) {
         const provision = cur.packedProvision ?? null;
-        const dest = pickDest(provision);
-        const durMin = provision === 'bento' ? 25 + Math.random() * 15 : 12 + Math.random() * 13;
+        const goPds = Math.random() < 0.3;
+        const dest = goPds
+          ? PDS_DESTS[Math.floor(Math.random() * PDS_DESTS.length)].id
+          : pickDest(provision);
+        const durMin = goPds ? 20 + Math.random() * 15 : provision === 'bento' ? 25 + Math.random() * 15 : 12 + Math.random() * 13;
         const window = Math.max(60_000, awayMs - durMin * 60_000);
         const departAt = now - awayMs + Math.random() * window;
         const returnAt = departAt + durMin * 60_000;

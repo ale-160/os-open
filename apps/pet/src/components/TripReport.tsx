@@ -7,6 +7,7 @@ import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { destById, photoCaption } from '@/lib/travel';
 import { BASE_PATH } from '@/lib/skins';
+import { PDS_DESTS, yypPhotoUrl } from '@/lib/pingdingshan';
 import { useEscClose } from '@/hooks/useEscClose';
 import type { PetState } from '@/lib/types';
 
@@ -17,7 +18,33 @@ export function TripReport({ pet, onClose }: { pet: PetState; onClose: () => voi
   useEscClose(onClose);
 
   const trip = pet.trip!;
-  const d = destById(trip.dest);
+  const pds = PDS_DESTS.find((x) => x.id === trip.dest);
+  const d = pds
+    ? {
+        icon: '📍',
+        name: locale === 'zh' ? pds.zh : pds.en,
+        scenery: ['🏞️'] as string[],
+        img: yypPhotoUrl(pds),
+        photoBg: yypPhotoUrl(pds),
+        caps: locale === 'zh' ? pds.capsZh : pds.capsEn,
+        souvenirIcon: pds.souvenirIcon,
+        souvenirZh: pds.souvenirZh,
+        souvenirEn: pds.souvenirEn,
+      }
+    : (() => {
+        const dd = destById(trip.dest as never);
+        return {
+          icon: dd.icon,
+          name: locale === 'zh' ? dd.zh : dd.en,
+          scenery: dd.scenery as string[],
+          img: null as string | null,
+          photoBg: `${BASE_PATH}/skins/gugu/pc/${trip.dest}.png`,
+          caps: locale === 'zh' ? dd.capsZh : dd.capsEn,
+          souvenirIcon: dd.souvenirIcon,
+          souvenirZh: dd.souvenirZh,
+          souvenirEn: dd.souvenirEn,
+        };
+      })();
   const photos = trip.photos.length ? trip.photos : [0];
 
   const close = () => {
@@ -35,20 +62,25 @@ export function TripReport({ pet, onClose }: { pet: PetState; onClose: () => voi
 
         <div className="space-y-2.5 px-4 pb-4">
           {photos.map((cap, i) => (
-            <div key={i} className="relative overflow-hidden rounded-2xl border border-amber-100" style={{ backgroundImage: `url(${BASE_PATH}/skins/gugu/pc/${trip.dest}.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+            <div key={i} className="relative overflow-hidden rounded-2xl border border-amber-100" style={{ backgroundImage: `url(${d.photoBg})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+              {d.img && (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={d.img} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+              )}
               <div className="absolute inset-0 bg-white/10" />
-              <div className="flex h-24 items-center justify-center gap-1.5 text-3xl">
-                {d.scenery.map((e, j) => (
-                  <span key={j} style={{ opacity: 1 - j * 0.25 }}>
-                    {e}
-                  </span>
-                ))}
+              <div className="relative flex h-24 items-center justify-center gap-1.5 text-3xl">
+                {!d.img &&
+                  (d.scenery ?? []).map((e, j) => (
+                    <span key={j} style={{ opacity: 1 - j * 0.25 }}>
+                      {e}
+                    </span>
+                  ))}
               </div>
               <div className="relative bg-white/80 px-3 py-2 backdrop-blur-sm">
                 <p className="text-xs font-bold text-gugu-ink">
-                  {d.icon} {locale === 'zh' ? d.zh : d.en}
+                  {d.icon} {d.name}
                 </p>
-                <p className="text-[11px] text-gugu-ink-soft">{photoCaption(trip.dest, cap, locale)}</p>
+                <p className="text-[11px] text-gugu-ink-soft">{d.caps[cap % d.caps.length]}</p>
               </div>
             </div>
           ))}

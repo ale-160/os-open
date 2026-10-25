@@ -16,6 +16,7 @@ import { isBadWeather } from '@/lib/weather';
 import { pickVisitor, visitorSrc } from '@/lib/visitors';
 import { pickSticker } from '@/lib/stickers';
 import { destById } from '@/lib/travel';
+import { PDS_DESTS } from '@/lib/pingdingshan';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { PetSprite, type TrickId } from './PetSprite';
@@ -363,7 +364,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         <div className="absolute left-1/2 top-1/2 z-10 w-56 -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-amber-100 bg-white/95 p-4 text-center shadow-xl backdrop-blur">
           <span className="block text-3xl">🎒</span>
           <p className="mt-1.5 text-sm font-bold text-gugu-ink">
-            {pet.name} {fmt(t.tripNote, { dest: locale === 'zh' ? destById(pet.trip.dest).zh : destById(pet.trip.dest).en })}
+            {pet.name} {fmt(t.tripNote, { dest: (function () { const pds = PDS_DESTS.find(function (x) { return x.id === (pet.trip && pet.trip.dest); }); if (pds) return locale === 'zh' ? pds.zh : pds.en; const d = destById((pet.trip && pet.trip.dest) as never); return locale === 'zh' ? d.zh : d.en; })() })}
           </p>
           <p className="mt-1 text-[11px] text-gugu-ink-soft">{t.tripBack}</p>
         </div>
