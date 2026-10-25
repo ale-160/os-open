@@ -2,11 +2,11 @@
 
 > 一个站点，多个应用。OS 式桌面作壳，工具以 App 图标嵌入——像手机主屏一样点击打开。
 
-![Ale OS 桌面](docs/screenshot-desktop.png)
+![Ale OS 桌面](https://public.ale160.com/repo-assets/docs/screenshot-desktop.png?v=20261026a)
 
 <details>
 <summary>应用窗口（多任务）</summary>
-<img src="docs/screenshot-app.png" alt="Ale OS 应用窗口" width="800" />
+<img src="https://public.ale160.com/repo-assets/docs/screenshot-app.png?v=20261026a" alt="Ale OS 应用窗口" width="800" />
 </details>
 
 线上：**[os.ale160.com](https://os.ale160.com)**（Cloudflare Pages）
@@ -21,22 +21,39 @@
 - **统一语言管理**：中文为主，根目录即中文站；壳与应用共享语言设置，切换全系统即时生效。
 - **统一毛玻璃视觉**：亮/暗主题下的玻璃层（顶栏 / dock / 弹窗）与极光渐变桌面底。
 
+## 应用
+
+| 应用 | 路径 | 说明 |
+|---|---|---|
+| 桌面壳 shell | `/` | 网格桌面、多任务、主题、命令面板 |
+| 图片工具箱 web-img | `/img/` | 纯前端图片压缩/水印/格式转换/GIF/PDF |
+| Markdown 编辑器 web-text | `/text/` | 实时预览、历史版本、多文档 |
+| P2P 聊天室 nchat | `/chat/` | Ed25519 身份、端到端私聊、文件传输 |
+| 文字动画 TypeV | `/typev/` | 脚本驱动打字动画、录制导出 |
+| 咕咕 GuGu | `/pet/` | 原创养成桌宠：旅行、天气、日记、十款小游戏 |
+| 麦堡突击队 Burger Commando | `/burger/` | 第三方作者的非官方同人横版街机射击原型 |
+
 ## 架构
 
 ```
 os-open/
 ├── apps/
-│   ├── shell/      # 桌面壳（基于 hub-nav）：网格、文件夹、多页、主题、多任务
-│   ├── web-img/    # App：图片工具箱（/img/，纯前端图片处理）
-│   └── web-text/   # App：Markdown 编辑器（/text/，实时预览+历史版本）
+│   ├── shell/      # 桌面壳（网格、文件夹、多页、主题、多任务）
+│   ├── web-img/    # 图片工具箱（/img/）
+│   ├── web-text/   # Markdown 编辑器（/text/）
+│   ├── nchat/      # P2P 聊天室（/chat/）
+│   ├── typev/      # 文字动画（/typev/）
+│   ├── pet/        # 咕咕桌宠（/pet/）
+│   └── burger/     # 麦堡突击队静态游戏（/burger/）
 ├── scripts/
-│   ├── build-all.mjs   # 依次构建三应用（子应用带 basePath）并合成
-│   └── compose.mjs     # 把三个静态导出合成单一 out/
+│   ├── build-all.mjs   # 依次构建全部应用（子应用带 basePath）并合成
+│   └── compose.mjs     # 把全部静态导出合成单一 out/
 └── pnpm-workspace.yaml
 ```
 
-- 桌面壳构建到根路径 `/`；两个应用分别以 `basePath=/img`、`/text` 静态导出后合入同一次部署，同源不同子路径。
+- 桌面壳构建到根路径 `/`；子应用分别以 `basePath` 静态导出后合入同一次部署，同源不同子路径。
 - 各应用保留独立构建与测试，互不影响；壳的原有单测 + Playwright e2e 全量保留。
+- **图片/音视频素材不打包进仓库**：咕咕与 burger 的运行时素材走 R2 `https://public.ale160.com`（`gugu/**`、`burger/**`），素材 URL 带 `ASSET_VERSION` 防 CDN 旧缓存。
 
 ## 添加新应用（三步）
 
@@ -72,7 +89,7 @@ pnpm deploy:cf                              # wrangler pages deploy out（需 wr
 node scripts/attach-domain.mjs              # （仅首次）绑定自定义域
 ```
 
-推送仓库后 GitHub Actions 运行 CI 门禁（lint / 单测 / 构建 / e2e），部署为手动直传。
+推送 master 后 Cloudflare Pages 从 git 构建并部署（素材不打包，运行时从 R2 加载）；也可以本地 `pnpm build` 后 `pnpm deploy:cf` 直传。
 
 ## 许可
 

@@ -20,6 +20,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${SITE_URL}/text/`, priority: 0.7 },
     { url: `${SITE_URL}/chat/`, priority: 0.7 },
     { url: `${SITE_URL}/typev/`, priority: 0.7 },
+    { url: `${SITE_URL}/burger/`, priority: 0.7 },
   ];
 
   return routes.map((r) => ({

@@ -72,6 +72,7 @@ jobs:
           test -f out/img/index.html
           test -f out/text/index.html
           test -f out/pet/index.html
+          test -f out/burger/index.html
           test -f out/sitemap.xml
 
       - name: Install Playwright browsers

@@ -79,6 +79,16 @@
       "isHidden": false,
       "iconType": "custom",
       "customIconUrl": "/apps/pet.png"
+    },
+    {
+      "id": "icon-app-burger",
+      "name": "麦堡突击队",
+      "url": "app://burger",
+      "folderId": null,
+      "order": 7,
+      "isHidden": false,
+      "iconType": "custom",
+      "customIconUrl": "/apps/burger.png"
     }
   ],
   "folders": [],
@@ -93,7 +103,8 @@
         "icon-app-nchat",
         "icon-app-gallery",
         "icon-app-typev",
-        "icon-app-pet"
+        "icon-app-pet",
+        "icon-app-burger"
       ]
     },
     {
@@ -107,7 +118,8 @@
     "icon-app-web-img",
     "icon-app-web-text",
     "icon-app-nchat",
-    "icon-app-gallery"
+    "icon-app-gallery",
+    "icon-app-burger"
   ],
   "version": "0.1.8",
   "searchEngine": "https://www.bing.com/search?q=",

@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "generatedAtUtc": "2026-10-25T10:22:52.0306543Z",
+  "source": "AI-generated using user-authorized OpenAI-compatible image generation API",
+  "endpoint": "https://api.vllmproxy.com/v1/images/generations",
+  "model": "gpt-image-2",
+  "requestedSize": "1536x1024",
+  "style": "Polished 2D hand-painted arcade cartoon with bold dark outlines",
+  "notes": [
+    "Contains no API credentials.",
+    "Characters image is a concept lineup, not individual transparent sprites.",
+    "Backgrounds are environment plates intended behind Canvas gameplay elements.",
+    "No game source files modified."
+  ],
+  "assets": [
+    {
+      "file": "characters.webp",
+      "purpose": "Four anthropomorphic burger commando character concept lineup; visual reference, not a ready-to-use sprite atlas.",
+      "model": "gpt-image-2",
+      "prompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. Character design sheet: exactly FOUR different anthropomorphic hamburger soldier heroes evenly spaced in one horizontal row, all fully visible head to toe with generous empty space between them, each a walking stacked burger with expressive eyes on sesame bun, lettuce, cheese, beef patty, little gloved arms and sturdy combat boots. McDonalds-inspired red and golden yellow fast-food color palette, playful premium cartoon, no official logos or readable text. Hero 1 classic cheeseburger red headband and toy-like ketchup blaster, hero 2 double beef burger yellow visor with chunky mustard cannon, hero 3 crispy chicken burger green goggles and pickle grenade gadget, hero 4 fish burger blue scarf and soda-powered sci-fi carbine. Friendly determined faces, distinct silhouettes, dynamic three-quarter standing combat-ready poses, unified scale, cream warm neutral plain background with subtle ground shadows, no environment, no frames, no props obscuring adjacent characters. Beautiful hand-painted arcade key art, not pixel art, not 3D.",
+      "source": "AI-generated",
+      "bytes": 1858788,
+      "revisedPrompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. Character design sheet: exactly FOUR different anthropomorphic hamburger soldier heroes evenly spaced in one horizontal row, all fully visible head to toe with generous empty space between them, each a walking stacked burger with expressive eyes on sesame bun, lettuce, cheese, beef patty, little gloved arms and sturdy combat boots. McDonalds-inspired red and golden yellow fast-food color palette, playful premium cartoon, no official logos or readable text. Hero 1 classic cheeseburger red headband and toy-like ketchup blaster, hero 2 double beef burger yellow visor with chunky mustard cannon, hero 3 crispy chicken burger green goggles and pickle grenade gadget, hero 4 fish burger blue scarf and soda-powered sci-fi carbine. Friendly determined faces, distinct silhouettes, dynamic three-quarter standing combat-ready poses, unified scale, cream warm neutral plain background with subtle ground shadows, no environment, no frames, no props obscuring adjacent characters. Beautiful hand-painted arcade key art, not pixel art, not 3D.",
+      "width": 1536,
+      "height": 1024,
+      "format": "WEBP"
+    },
+    {
+      "file": "stage-1.webp",
+      "purpose": "Stage 1 sunset fast-food district background, for Canvas layering behind gameplay.",
+      "model": "gpt-image-2",
+      "prompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. EMPTY ENVIRONMENT BACKGROUND PLATE ONLY for a horizontal side-scrolling platform shooter. A whimsical fast-food city block at sunset, warm peach and orange sky, distant red-and-gold burger restaurants with iconic golden double-arch sculptural roof shapes but absolutely no text or wordmarks, rooftop ventilation, diner windows with warm lights, distant city silhouettes, cheerful dramatic clouds, slight urban battle-worn details. View straight sideways, architecture occupies distant and middle ground with strong depth separation, upper two thirds richly composed, lower third open unobtrusive soft atmospheric backdrop for gameplay overlay. No people, no characters, no animals, no vehicles in foreground, no weapons, no foreground platforms, no ground ledges, no floating blocks, no large foreground objects. No text anywhere. Not pixel art, not 3D.",
+      "source": "AI-generated",
+      "bytes": 1844582,
+      "revisedPrompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. EMPTY ENVIRONMENT BACKGROUND PLATE ONLY for a horizontal side-scrolling platform shooter. A whimsical fast-food city block at sunset, warm peach and orange sky, distant red-and-gold burger restaurants with iconic golden double-arch sculptural roof shapes but absolutely no text or wordmarks, rooftop ventilation, diner windows with warm lights, distant city silhouettes, cheerful dramatic clouds, slight urban battle-worn details. View straight sideways, architecture occupies distant and middle ground with strong depth separation, upper two thirds richly composed, lower third open unobtrusive soft atmospheric backdrop for gameplay overlay. No people, no characters, no animals, no vehicles in foreground, no weapons, no foreground platforms, no ground ledges, no floating blocks, no large foreground objects. No text anywhere. Not pixel art, not 3D.",
+      "width": 1536,
+      "height": 1024,
+      "format": "WEBP"
+    },
+    {
+      "file": "stage-2.webp",
+      "purpose": "Stage 2 teal freezer factory background, for Canvas layering behind gameplay.",
+      "model": "gpt-image-2",
+      "prompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. EMPTY ENVIRONMENT BACKGROUND PLATE ONLY for a horizontal side-scrolling platform shooter. Vast whimsical frozen-food industrial factory interior, teal and cyan refrigeration chambers, frosted steel wall panels, giant circular cooling fans, hanging insulated pipes, freezer doors and ice crystals, tiny warm yellow control lights with no labels, soft cold mist, turquoise rim light and deep navy shadows. View straight sideways, machinery entirely in distant and middle ground, readable layered parallax depth, upper two thirds detailed, lower third open unobtrusive soft atmospheric backdrop for gameplay overlay. No people, no characters, no animals, no foreground platforms, no ground ledges, no floating blocks, no large foreground objects, no conveyor in foreground. No text anywhere. Not pixel art, not 3D.",
+      "source": "AI-generated",
+      "bytes": 2103956,
+      "revisedPrompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. EMPTY ENVIRONMENT BACKGROUND PLATE ONLY for a horizontal side-scrolling platform shooter. Vast whimsical frozen-food industrial factory interior, teal and cyan refrigeration chambers, frosted steel wall panels, giant circular cooling fans, hanging insulated pipes, freezer doors and ice crystals, tiny warm yellow control lights with no labels, soft cold mist, turquoise rim light and deep navy shadows. View straight sideways, machinery entirely in distant and middle ground, readable layered parallax depth, upper two thirds detailed, lower third open unobtrusive soft atmospheric backdrop for gameplay overlay. No people, no characters, no animals, no foreground platforms, no ground ledges, no floating blocks, no large foreground objects, no conveyor in foreground. No text anywhere. Not pixel art, not 3D.",
+      "width": 1536,
+      "height": 1024,
+      "format": "WEBP"
+    },
+    {
+      "file": "stage-3.webp",
+      "purpose": "Stage 3 magenta furnace kitchen background, for Canvas layering behind gameplay.",
+      "model": "gpt-image-2",
+      "prompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. EMPTY ENVIRONMENT BACKGROUND PLATE ONLY for a horizontal side-scrolling platform shooter. Epic oversized industrial fast-food furnace kitchen interior, enormous glowing burger grill ovens in the background, purple steel extraction hoods, red-magenta hot pipes, copper ducts, distant glowing molten orange heating elements, dramatic violet steam and ember-lit atmosphere, deep plum shadows and saturated pink-red highlights, playful stylized final-stage mood. View straight sideways, kitchen machinery entirely in distant and middle ground, strong layered depth, upper two thirds detailed, lower third open unobtrusive soft atmospheric backdrop for gameplay overlay. No people, no characters, no animals, no foreground platforms, no ground ledges, no floating blocks, no large foreground objects, no food close to camera. No text anywhere. Not pixel art, not 3D.",
+      "source": "AI-generated",
+      "bytes": 2021644,
+      "revisedPrompt": "Premium polished 2D hand-painted arcade run-and-gun game concept art, bold clean dark ink outlines, tactile painted cel shading, vibrant controlled colors, chunky readable silhouettes, playful fast-food action adventure, consistent professional art direction, side view, landscape 1536 by 1024 composition. No written words, no letters, no numbers, no watermark, no UI. EMPTY ENVIRONMENT BACKGROUND PLATE ONLY for a horizontal side-scrolling platform shooter. Epic oversized industrial fast-food furnace kitchen interior, enormous glowing burger grill ovens in the background, purple steel extraction hoods, red-magenta hot pipes, copper ducts, distant glowing molten orange heating elements, dramatic violet steam and ember-lit atmosphere, deep plum shadows and saturated pink-red highlights, playful stylized final-stage mood. View straight sideways, kitchen machinery entirely in distant and middle ground, strong layered depth, upper two thirds detailed, lower third open unobtrusive soft atmospheric backdrop for gameplay overlay. No people, no characters, no animals, no foreground platforms, no ground ledges, no floating blocks, no large foreground objects, no food close to camera. No text anywhere. Not pixel art, not 3D.",
+      "width": 1536,
+      "height": 1024,
+      "format": "WEBP"
+    }
+  ],
+  "attempts": [
+    {
+      "status": "success",
+      "file": "characters.png"
+    },
+    {
+      "status": "success",
+      "file": "stage-1.png"
+    },
+    {
+      "status": "success",
+      "file": "stage-2.png"
+    },
+    {
+      "status": "success",
+      "file": "stage-3.png"
+    }
+  ]
+}

@@ -112,13 +112,54 @@ export const VISITORS: VisitorDef[] = [
   { id: 'firefly', mode: 'fly' },
   { id: 'jellyfish', mode: 'fly' },
   { id: 'pufferfish', mode: 'ground' },
+  // 第 6 批季节/幻想访客
+  { id: 'v4-snow-fox', mode: 'ground' },
+  { id: 'v4-ice-penguin', mode: 'ground' },
+  { id: 'v4-snow-owl', mode: 'fly' },
+  { id: 'v4-aurora-deer', mode: 'ground' },
+  { id: 'v4-spring-lamb', mode: 'ground' },
+  { id: 'v4-cherry-bird', mode: 'fly' },
+  { id: 'v4-rain-frog', mode: 'ground' },
+  { id: 'v4-puddle-duck', mode: 'ground' },
+  { id: 'v4-summer-crab', mode: 'ground' },
+  { id: 'v4-sun-moth', mode: 'fly' },
+  { id: 'v4-sea-turtle', mode: 'ground' },
+  { id: 'v4-jellyfish-pink', mode: 'fly' },
+  { id: 'v4-autumn-squirrel', mode: 'ground' },
+  { id: 'v4-maple-fox', mode: 'ground' },
+  { id: 'v4-harvest-mouse', mode: 'ground' },
+  { id: 'v4-mushroom-snail', mode: 'ground' },
+  { id: 'v4-tea-bee', mode: 'fly' },
+  { id: 'v4-lantern-fish', mode: 'fly' },
+  { id: 'v4-moon-rabbit', mode: 'ground' },
+  { id: 'v4-star-cat', mode: 'ground' },
+  { id: 'v4-cloud-sheep', mode: 'fly' },
+  { id: 'v4-wind-fox', mode: 'ground' },
+  { id: 'v4-crystal-beetle', mode: 'fly' },
+  { id: 'v4-amber-butterfly', mode: 'fly' },
+  { id: 'v4-moss-turtle', mode: 'ground' },
+  { id: 'v4-rainbow-finch', mode: 'fly' },
+  { id: 'v4-dusk-bat', mode: 'fly' },
+  { id: 'v4-dawn-lark', mode: 'fly' },
+  { id: 'v4-midnight-cat', mode: 'ground' },
+  { id: 'v4-firefly-sprite', mode: 'fly' },
+  { id: 'v4-garden-hedgehog', mode: 'ground' },
+  { id: 'v4-pond-koi', mode: 'ground' },
+  { id: 'v4-bamboo-panda', mode: 'ground' },
+  { id: 'v4-sakura-crane', mode: 'fly' },
+  { id: 'v4-desert-fennec', mode: 'ground' },
+  { id: 'v4-oasis-camel', mode: 'ground' },
+  { id: 'v4-cave-bat', mode: 'fly' },
+  { id: 'v4-mountain-goat', mode: 'ground' },
+  { id: 'v4-sea-otter', mode: 'ground' },
+  { id: 'v4-sky-whale', mode: 'fly' },
 ];
 
 /** 夜行访客（仅夜晚时段出现） */
-export const NIGHT_VISITORS = new Set(['owl', 'moth', 'bat', 'firefly', 'jellyfish', 'moth-owl', 'moth-pink', 'v3-wisp', 'v3-jade-rabbit', 'v3-thunderbird']);
+export const NIGHT_VISITORS = new Set(['owl', 'moth', 'bat', 'firefly', 'jellyfish', 'moth-owl', 'moth-pink', 'v3-wisp', 'v3-jade-rabbit', 'v3-thunderbird', 'v4-snow-owl', 'v4-moon-rabbit', 'v4-star-cat', 'v4-dusk-bat', 'v4-midnight-cat', 'v4-firefly-sprite', 'v4-cave-bat', 'v4-lantern-fish']);
 
 /** 昼行访客（夜晚不出） */
-export const DAY_ONLY_VISITORS = new Set(['bee', 'hummingbird', 'duckling', 'squirrel']);
+export const DAY_ONLY_VISITORS = new Set(['bee', 'hummingbird', 'duckling', 'squirrel', 'v4-dawn-lark', 'v4-rainbow-finch', 'v4-tea-bee', 'v4-sun-moth', 'v4-cherry-bird', 'v4-sakura-crane']);
 
 export function visitorSrc(id: string): string {
   return `${BASE_PATH}/skins/gugu/vis/${id}.png`;

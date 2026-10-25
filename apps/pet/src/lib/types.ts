@@ -263,6 +263,8 @@ export interface ShopItem {
   cleanliness?: number;
   mood?: number;
   health?: number;
+  /** 精力（新道具用） */
+  energy?: number;
   /** 治愈生病 */
   cure?: boolean;
   /** AI 图标（可选，替代 emoji） */

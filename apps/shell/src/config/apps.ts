@@ -83,6 +83,17 @@ export const OS_APPS: readonly OsApp[] = [
     repository: 'https://github.com/ale-160/os-open'
   },
   {
+    id: 'burger',
+    name: '麦堡突击队',
+    nameEn: 'Burger Commando',
+    path: '/burger/',
+    icon: '/apps/burger.png',
+    description: '非官方麦当劳主题横版街机射击原型：4 位汉堡战士、3 关 3 Boss、可继承食物配件',
+    descriptionEn:
+      'Unofficial fast-food arcade run-and-gun prototype: 4 burger heroes, 3 stages and bosses, inheritable gear',
+    repository: 'https://github.com/ale-160/os-open'
+  },
+  {
     id: 'web-text',
     name: 'Markdown 编辑器',
     nameEn: 'Markdown Editor',

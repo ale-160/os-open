@@ -18,7 +18,8 @@ const parts = [
   ['apps/web-text/out', 'text'],
   ['apps/nchat/out', 'chat'],
   ['apps/typev/out', 'typev'],
-  ['apps/pet/out', 'pet']
+  ['apps/pet/out', 'pet'],
+  ['apps/burger/out', 'burger']
 ];
 
 rmSync(outDir, { recursive: true, force: true });

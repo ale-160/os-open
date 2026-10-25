@@ -36,7 +36,7 @@ export const METADATA_ZH = {
     type: "website",
     images: [
       {
-        url: "https://os.ale160.com/text/og-image.png",
+        url: "https://public.ale160.com/repo-assets/web-text/og-image.png?v=20261026a",
         width: 1024,
         height: 576,
         alt: "web-text 预览图"
@@ -47,7 +47,7 @@ export const METADATA_ZH = {
     card: "summary_large_image",
     title: "web-text · 美观的在线 Markdown 编辑器",
     description: "简洁优雅的在线 Markdown 编辑器，支持实时预览、代码高亮、自动保存、暗色模式和多语言。100% 纯前端。",
-    images: ["https://os.ale160.com/text/og-image.png"],
+    images: ["https://public.ale160.com/repo-assets/web-text/og-image.png?v=20261026a"],
     creator: "@ale160"
   },
   alternates: {
@@ -91,7 +91,7 @@ export const METADATA_EN = {
     type: "website",
     images: [
       {
-        url: "https://os.ale160.com/text/og-image.png",
+        url: "https://public.ale160.com/repo-assets/web-text/og-image.png?v=20261026a",
         width: 1024,
         height: 576,
         alt: "web-text Preview"
@@ -102,7 +102,7 @@ export const METADATA_EN = {
     card: "summary_large_image",
     title: "web-text · Beautiful Online Markdown Editor",
     description: "A beautiful, privacy-focused online Markdown editor with real-time preview, code highlighting, auto-save, dark mode, and bilingual support. 100% client-side.",
-    images: ["https://os.ale160.com/text/og-image.png"],
+    images: ["https://public.ale160.com/repo-assets/web-text/og-image.png?v=20261026a"],
     creator: "@ale160"
   },
   alternates: {

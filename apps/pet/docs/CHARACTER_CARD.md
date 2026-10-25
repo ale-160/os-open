@@ -1,6 +1,6 @@
 # 主角卡（1024 游戏赛道提交物）
 
-成品：`apps/pet/docs/character-card.png`（1080×1440 PNG）。
+成品：`https://public.ale160.com/repo-assets/pet/character-card.png?v=20261026a`（1080×1440 PNG；R2 存储，仓库不再保存大图）。
 
 ## 内容构成
 
@@ -15,6 +15,6 @@
    - 桌面+挂件 1280×800（`ale-os-pet-widget=on`）→ `.asset-tmp/card/desktop.png`
    - 身体素材直接复制 `apps/pet/public/skins/gugu/cream-baby.png`
 2. 排版 HTML（源见会话记录/本文件末尾提示）：`.asset-tmp/card/character-card.html`，引用上述三图
-3. 渲染：`page.screenshot({ path: 'apps/pet/docs/character-card.png' })`（viewport 1080×1440）
+3. 渲染：本地临时截图后上传 R2 `repo-assets/pet/character-card.png`（viewport 1080×1440）
 
 > 表情定位参数与游戏内 `FACE_LAYOUTS.cream.baby` 一致（eyeY .395 / eyeDX .105 / beakY .455）。

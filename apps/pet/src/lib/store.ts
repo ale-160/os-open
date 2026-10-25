@@ -258,6 +258,16 @@ function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>
 
 /** 老档兜底：补齐各版本新增字段，避免旧存档读取 undefined.length / 新游戏最高分空白 */
 function withDefaults(pet: PetState): PetState {
+  const variantOwned = Array.isArray(pet.variantOwned) && pet.variantOwned.length
+    ? [...pet.variantOwned]
+    : [pet.variant];
+  if (!variantOwned.includes(pet.variant)) variantOwned.push(pet.variant);
+  const sceneOwned = Array.isArray(pet.sceneOwned)
+    ? [...pet.sceneOwned]
+    : pet.sceneId
+      ? [pet.sceneId]
+      : [];
+  if (pet.sceneId && !sceneOwned.includes(pet.sceneId)) sceneOwned.push(pet.sceneId);
   return {
     ...pet,
     counters: { ...ZERO_COUNTERS, ...pet.counters },
@@ -268,14 +278,8 @@ function withDefaults(pet: PetState): PetState {
     decoOwned: Array.isArray(pet.decoOwned) ? pet.decoOwned : [],
     decorations: Array.isArray(pet.decorations) ? pet.decorations : [],
     // 老档：当前配色/场景视为已解锁，保证已有选择不被收回
-    variantOwned: Array.isArray(pet.variantOwned) && pet.variantOwned.length
-      ? pet.variantOwned
-      : [pet.variant],
-    sceneOwned: Array.isArray(pet.sceneOwned)
-      ? pet.sceneOwned
-      : pet.sceneId
-        ? [pet.sceneId]
-        : [],
+    variantOwned,
+    sceneOwned,
     trip: pet.trip ?? null,
     album: pet.album ?? { photos: [], souvenirs: [] },
     diary: pet.diary ?? {},

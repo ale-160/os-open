@@ -284,6 +284,7 @@ export function buyItem(prev: PetState, item: ShopItem, now: number): ActionOutc
   if (item.cleanliness !== undefined) next.cleanliness = clamp01(next.cleanliness + item.cleanliness);
   if (item.mood !== undefined) next.mood = clamp01(next.mood + item.mood);
   if (item.health !== undefined) next.health = clamp01(next.health + item.health);
+  if (item.energy !== undefined) next.energy = clamp01(next.energy + item.energy);
   if (item.cure) next.sick = false;
   next.updatedAt = now;
   return { ok: true, next };

@@ -156,6 +156,19 @@ export const SHOP_ITEMS: ShopItem[] = [
   { id: 'soap', icon: '🧼', zh: '香香皂', en: 'Soap', price: 5, cleanliness: 100, mood: 1 },
   { id: 'balloon', icon: '🎈', zh: '气球', en: 'Balloon', price: 4, mood: 18 },
   { id: 'medicine', icon: '💊', zh: '感冒药', en: 'Medicine', price: 12, cure: true, health: 35 },
+  // 第 6 批季节道具
+  { id: 'snow-cone', icon: '🍧', zh: '雪花冰沙', en: 'Snow Cone', price: 14, satiety: 18, mood: 6 },
+  { id: 'strawberry-daifuku', icon: '🍓', zh: '草莓大福', en: 'Strawberry Daifuku', price: 18, satiety: 22, mood: 5 },
+  { id: 'honey-toast', icon: '🍞', zh: '蜂蜜吐司', en: 'Honey Toast', price: 16, satiety: 20, energy: 5 },
+  { id: 'peach-soda', icon: '🥤', zh: '蜜桃汽水', en: 'Peach Soda', price: 15, mood: 10, energy: 5 },
+  { id: 'pumpkin-pie', icon: '🥧', zh: '南瓜派', en: 'Pumpkin Pie', price: 20, satiety: 24, mood: 4 },
+  { id: 'chestnut-cake', icon: '🌰', zh: '栗子蛋糕', en: 'Chestnut Cake', price: 22, satiety: 20, mood: 8 },
+  { id: 'ginger-tea', icon: '🍵', zh: '姜茶', en: 'Ginger Tea', price: 18, mood: 4, health: 6 },
+  { id: 'snowman-cookie', icon: '⛄', zh: '雪人饼干', en: 'Snowman Cookie', price: 14, satiety: 16, mood: 7 },
+  { id: 'sakura-mochi', icon: '🌸', zh: '樱花麻糬', en: 'Sakura Mochi', price: 16, satiety: 18, mood: 6 },
+  { id: 'sunflower-seeds', icon: '🌻', zh: '向日葵瓜子', en: 'Sunflower Seeds', price: 8, satiety: 10, mood: 3 },
+  { id: 'ocean-smoothie', icon: '🌊', zh: '海洋奶昔', en: 'Ocean Smoothie', price: 20, satiety: 20, energy: 8 },
+  { id: 'wish-star-candy', icon: '⭐', zh: '许愿星糖', en: 'Wish Star Candy', price: 12, mood: 8, energy: 4 },
 ];
 
 /** 接点心小游戏 */

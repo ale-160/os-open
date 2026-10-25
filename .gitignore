@@ -16,3 +16,6 @@ dist/
 !.github/
 # 开发期素材生成/上传脚本与清单（仅本地使用，不入库）
 apps/pet/tools/
+
+# burger 游戏原图（已上传 R2，本地仅保留用于重传）
+apps/burger/assets-local/

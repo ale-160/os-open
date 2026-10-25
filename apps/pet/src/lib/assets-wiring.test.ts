@@ -13,6 +13,7 @@ import { VISITORS } from './visitors';
 import { EXTRA_FACES } from './stickers';
 import { sceneShopItems, variantShopItems } from './shop-extra';
 import { VARIANTS } from './skins';
+import { SHOP_ITEMS } from './balance';
 
 const ROOT = path.join(process.cwd(), 'public', 'skins', 'gugu');
 const GAME_DIR = path.join(ROOT, 'game');
@@ -144,7 +145,7 @@ assetDescribe('第 5 批装扮 / 装饰 / 表情 / 访客', () => {
   });
 
   it('场景表情 40 张齐全', () => {
-    expect(EXTRA_FACES.length).toBe(40);
+    expect(EXTRA_FACES.length).toBe(80);
     expect(EXTRA_FACES.filter((name) => !existsSync(asset(`face/${name}.png`)))).toEqual([]);
   });
 
@@ -168,6 +169,12 @@ describe('商店配色 / 场景', () => {
     expect(variants.every((i) => i.kind === 'variant' && !!i.variant && i.price > 0)).toBe(true);
     expect(scenes.every((i) => i.kind === 'scene' && !!i.scene && i.price > 0)).toBe(true);
     expect(new Set([...variants, ...scenes].map((i) => i.id)).size).toBe(VARIANTS.length + SCENES.length);
+  });
+
+  assetIt('月度日记插画与季节道具齐全', () => {
+    const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    expect(months.filter((m) => !existsSync(asset(`illus/month-${m}.png`)))).toEqual([]);
+    expect(SHOP_ITEMS.filter((i) => !existsSync(asset(`item/${i.id}.png`))).map((i) => i.id)).toEqual([]);
   });
 
   assetIt('配色蛋图与场景图齐全', () => {

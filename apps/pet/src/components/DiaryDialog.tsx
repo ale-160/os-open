@@ -6,9 +6,15 @@ import { useLocale } from '@/hooks/useLocale';
 import { useEscClose } from '@/hooks/useEscClose';
 import { diaryDayLines } from '@/lib/diary';
 import { ui } from '@/lib/locale';
+import { BASE_PATH } from '@/lib/skins';
+import { assetThumbUrl, fallbackAsset } from '@/lib/assetUrl';
 import type { PetState } from '@/lib/types';
 
 const DAY_NAMES_ZH = ['日', '一', '二', '三', '四', '五', '六'];
+const MONTH_ILLUS = [
+  'month-jan', 'month-feb', 'month-mar', 'month-apr', 'month-may', 'month-jun',
+  'month-jul', 'month-aug', 'month-sep', 'month-oct', 'month-nov', 'month-dec',
+] as const;
 
 function dayTitle(dateStr: string, locale: 'zh' | 'en'): string {
   const d = new Date(dateStr);
@@ -27,6 +33,8 @@ export function DiaryDialog({ pet, onClose }: { pet: PetState; onClose: () => vo
   const days = Object.keys(pet.diary)
     .filter((k) => pet.diary[k].length > 0)
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+  const monthIllus = MONTH_ILLUS[new Date().getMonth()];
+  const monthIllusLocal = `${BASE_PATH}/skins/gugu/illus/${monthIllus}.png`;
 
   return (
     <div
@@ -45,6 +53,20 @@ export function DiaryDialog({ pet, onClose }: { pet: PetState; onClose: () => vo
           <button type="button" onClick={onClose} className="press rounded-full bg-amber-900/5 px-3 py-1 text-sm font-semibold">
             ✕
           </button>
+        </div>
+
+        {/* 当月的日记插画 */}
+        <div className="mb-4 overflow-hidden rounded-2xl bg-amber-50/60">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={assetThumbUrl(monthIllusLocal)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={(e) => fallbackAsset(e, monthIllusLocal)}
+            className="h-28 w-full object-cover"
+            draggable={false}
+          />
         </div>
 
         {days.length === 0 ? (

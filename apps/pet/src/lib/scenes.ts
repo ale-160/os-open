@@ -11,7 +11,9 @@ export type SceneId =
   | 'garden' | 'lake' | 'bamboo' | 'roof' | 'meadow' | 'courtyard'
   | 'starry-hill' | 'riverside' | 'sakura-park' | 'autumn-lane' | 'snow-town' | 'seaside-cliff'
   | 'greenhouse' | 'windmill' | 'library-nook' | 'lantern-street' | 'sunflower-field'
-  | 'desert-oasis' | 'alpine' | 'night-market' | 'pond' | 'maple-bridge' | 'cloud-deck' | 'terrace-cafe';
+  | 'desert-oasis' | 'alpine' | 'night-market' | 'pond' | 'maple-bridge' | 'cloud-deck' | 'terrace-cafe'
+  | 'observatory' | 'seaside-pier' | 'snow-cabin' | 'tea-garden' | 'sakura-shrine' | 'desert-caravan'
+  | 'moonlit-dock' | 'sunflower-maze' | 'bamboo-bath';
 
 export interface SceneDef {
   id: SceneId;
@@ -45,6 +47,15 @@ export const SCENES: SceneDef[] = [
   { id: 'maple-bridge', file: 'scene/maple-bridge.png', zh: '枫桥', en: 'Maple Bridge' },
   { id: 'cloud-deck', file: 'scene/cloud-deck.png', zh: '云上观景台', en: 'Cloud Deck' },
   { id: 'terrace-cafe', file: 'scene/terrace-cafe.png', zh: '露台咖啡馆', en: 'Terrace Cafe' },
+  { id: 'observatory', file: 'scene/observatory.png', zh: '星空天文台', en: 'Star Observatory' },
+  { id: 'seaside-pier', file: 'scene/seaside-pier.png', zh: '海边栈桥', en: 'Seaside Pier' },
+  { id: 'snow-cabin', file: 'scene/snow-cabin.png', zh: '雪地木屋', en: 'Snow Cabin' },
+  { id: 'tea-garden', file: 'scene/tea-garden.png', zh: '茶园梯田', en: 'Tea Garden' },
+  { id: 'sakura-shrine', file: 'scene/sakura-shrine.png', zh: '樱花神社', en: 'Sakura Shrine' },
+  { id: 'desert-caravan', file: 'scene/desert-caravan.png', zh: '沙漠商队', en: 'Desert Caravan' },
+  { id: 'moonlit-dock', file: 'scene/moonlit-dock.png', zh: '月夜码头', en: 'Moonlit Dock' },
+  { id: 'sunflower-maze', file: 'scene/sunflower-maze.png', zh: '向日葵迷宫', en: 'Sunflower Maze' },
+  { id: 'bamboo-bath', file: 'scene/bamboo-bath.png', zh: '竹林温泉', en: 'Bamboo Bath' },
 ];
 
 /** 场景时态变体（每个场景都有全套图，见 tools/gen-prompts-batch4.mjs） */
