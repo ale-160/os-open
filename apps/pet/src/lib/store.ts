@@ -464,7 +464,9 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const raw = loadRaw();
     if (raw) {
       const awayMs = now - raw.updatedAt;
-      const { next, events } = simulate(raw, now);
+      const simulated = raw.stage === 'egg' ? null : simulate(raw, now);
+      const next = simulated ? simulated.next : { ...raw, updatedAt: now };
+      const events = simulated ? simulated.events : [];
       saveRaw(next);
       set({ pet: next, ready: true });
       if (next.stage !== 'egg' && awayMs > OFFLINE.thresholdMs) {
@@ -721,7 +723,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       bought = {
         ...bought,
         decoOwned: [...bought.decoOwned, item.deco],
-        decorations: [...bought.decorations, item.deco].slice(0, 7),
+        decorations: [...bought.decorations, item.deco].slice(0, 6),
       };
     }
     if (item.variant) {
@@ -829,6 +831,12 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const { next, events } = simulate(pet, now);
     saveRaw(next);
     set({ pet: next });
+    if (!next.alive) {
+      const dead = withDiary(next, 'dead');
+      saveRaw(dead);
+      set({ pet: dead });
+      return;
+    }
     if (get().anim) return;
     const kind = events[events.length - 1]?.kind;
     if (kind && EVENT_LINE[kind]) {
@@ -892,15 +900,22 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         sent: get().careSent,
       });
       if (decision) {
+        const CARE_LINE: Record<string, LineKind> = {
+          mealBreakfast: 'careMeal',
+          mealLunch: 'careMeal',
+          mealDinner: 'careMeal',
+          rest: 'careRest',
+          night: 'careNight',
+          fatigue: 'careFatigue',
+        };
+        const line = CARE_LINE[decision.kind];
+        if (!line) return;
         const sent = new Set(get().careSent);
         sent.add(decision.dedupeKey);
         persistCareSent(sent);
         set({ careSent: sent });
         const l = useLocale.getState().locale;
-        const CARE_LINE: Record<string, LineKind> = { careMeal: 'careMeal', careRest: 'careRest', careNight: 'careNight', careFatigue: 'careFatigue' };
-        const line = CARE_LINE[decision.kind];
-        if (!line) return;
-        if (decision.kind === 'mealBreakfast') {
+        if (decision.kind.startsWith('meal')) {
           get().say(line, { m: l === 'zh' ? decision.mealZh ?? '' : decision.mealEn ?? '' });
         } else {
           get().say(line);
@@ -954,7 +969,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const pet = get().pet;
     if (!pet) return;
     if (!pet.variantOwned.includes(variant)) return; // 未购买配色不可切换
-    const next = { ...pet, variant, customSkinId: undefined };
+    const next = { ...pet, variant, customSkinId: undefined, updatedAt: Date.now() };
     saveRaw(next);
     set({ pet: next });
   },
@@ -962,7 +977,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   applySkin: (skinId) => {
     const pet = get().pet;
     if (!pet) return;
-    const next: PetState = { ...pet };
+    const next: PetState = { ...pet, updatedAt: Date.now() };
     if (skinId) next.customSkinId = skinId;
     else delete next.customSkinId;
     saveRaw(next);
@@ -1067,7 +1082,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet) return;
     const trimmed = name.trim().slice(0, 12);
     if (!trimmed) return;
-    const next = { ...pet, name: trimmed };
+    const next = { ...pet, name: trimmed, updatedAt: Date.now() };
     saveRaw(next);
     set({ pet: next });
   },
@@ -1107,7 +1122,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const pet = get().pet;
     if (!pet) return;
     if (id && !pet.accessories.includes(id)) return;
-    const next = { ...pet, equippedAccessory: id };
+    const next = { ...pet, equippedAccessory: id, updatedAt: Date.now() };
     saveRaw(next);
     set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
   },
@@ -1116,7 +1131,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const pet = get().pet;
     if (!pet) return;
     if (id && !pet.sceneOwned.includes(id)) return; // 未购买场景不可选择
-    const next = { ...pet, sceneId: id };
+    const next = { ...pet, sceneId: id, updatedAt: Date.now() };
     saveRaw(next);
     set({ pet: next });
   },
@@ -1126,8 +1141,8 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     if (!pet || !pet.decoOwned.includes(id)) return;
     const placed = pet.decorations.includes(id)
       ? pet.decorations.filter((d) => d !== id)
-      : [...pet.decorations, id].slice(0, 7);
-    const next = { ...pet, decorations: placed };
+      : [...pet.decorations, id].slice(0, 6);
+    const next = { ...pet, decorations: placed, updatedAt: Date.now() };
     saveRaw(next);
     set({ pet: next });
   },

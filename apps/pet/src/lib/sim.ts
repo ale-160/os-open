@@ -227,6 +227,7 @@ export function applyAction(prev: PetState, id: ActionId, now: number): ActionOu
     next.counters.play += 1;
     next.lastPlayedAt = now;
   }
+  next.updatedAt = now;
 
   return { ok: true, next };
 }
@@ -250,6 +251,7 @@ export function applyWork(prev: PetState, now: number): ActionOutcome {
     cleanliness: clamp01(prev.cleanliness - 2),
     counters: { ...prev.counters, work: prev.counters.work + 1 },
     lastWorkedAt: now,
+    updatedAt: now,
   };
   return { ok: true, next };
 }
@@ -268,6 +270,7 @@ export function applyStudy(prev: PetState, now: number): ActionOutcome {
     energy: clamp01(prev.energy - STUDY.energyCost),
     growth: prev.growth + STUDY.growth,
     lastStudiedAt: now,
+    updatedAt: now,
   };
   return { ok: true, next };
 }

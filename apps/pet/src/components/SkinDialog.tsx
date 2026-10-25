@@ -317,15 +317,20 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                   <button
                     key={s.id}
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      const existing = customSkins.find((c) => c.url === url || c.url === localUrl);
+                      if (existing) {
+                        applySkin(existing.id);
+                        return;
+                      }
                       addCustomSkin({
                         id: crypto.randomUUID(),
                         name: locale === 'zh' ? s.name : s.nameEn,
                         url,
                         faceOverlay: s.faceOverlay,
                         createdAt: Date.now(),
-                      })
-                    }
+                      });
+                    }}
                     className={`press flex flex-col items-center gap-1 rounded-2xl border-2 p-2 ${
                       active ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50 hover:bg-amber-50'
                     }`}

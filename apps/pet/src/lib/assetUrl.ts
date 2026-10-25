@@ -67,6 +67,15 @@ export function fallbackToLocal(e: { currentTarget: HTMLImageElement }, localSrc
   img.src = localSrc;
 }
 
+/** <img onLoad>：重置兜底状态，避免复用的图片节点沿用上一次失败状态 */
+export function resetAssetState(e: { currentTarget: HTMLImageElement }): void {
+  const img = e.currentTarget;
+  img.style.display = '';
+  delete img.dataset.assetStage;
+  delete img.dataset.localFallback;
+  delete img.dataset.thumbFallback;
+}
+
 /** 本地缩略图路径：/pet/skins/gugu/acc/x.png → /pet/skins/gugu/thumb/acc/x.png（已带 thumb 则原样返回） */
 export function thumbLocalSrc(localUrl: string): string {
   const marker = '/skins/gugu/';

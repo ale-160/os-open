@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react';
 import { THRESHOLD } from '@/lib/balance';
 import { bodyLocalSrc, bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
 import { accessoryById, accessoryLocalSrc, accessorySrc } from '@/lib/accessories';
-import { fallbackToLocal } from '@/lib/assetUrl';
+import { fallbackToLocal, resetAssetState } from '@/lib/assetUrl';
+import { usePetStore } from '@/lib/store';
 import type { AccessoryId, ActivityState, BurstData, PetState } from '@/lib/types';
 
 export interface ResolvedSkin {
@@ -64,9 +65,11 @@ function AccessoryLayer({
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img
+        key={def.id}
         src={accessorySrc(def.id)}
         alt=""
         draggable={false}
+        onLoad={resetAssetState}
         onError={(e) => fallbackToLocal(e, accessoryLocalSrc(def.id))}
         className="pointer-events-none absolute object-contain"
         style={{
@@ -81,9 +84,11 @@ function AccessoryLayer({
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      key={def.id}
       src={accessorySrc(def.id)}
       alt=""
       draggable={false}
+      onLoad={resetAssetState}
       onError={(e) => fallbackToLocal(e, accessoryLocalSrc(def.id))}
       className="pointer-events-none absolute object-contain"
       style={{ left: `${l.x - l.w / 2}%`, top: `${l.y}%`, width: `${l.w}%` }}
@@ -140,10 +145,16 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
         <img
           src={!isEgg && customSkin ? customSkin.src : bodySrc(pet.variant, pet.stage)}
           alt={pet.name}
+          key={customSkin ? 'custom' : `${pet.variant}-${pet.stage}`}
           className="h-full w-full object-contain"
           draggable={false}
+          onLoad={resetAssetState}
           onError={(e) => {
-            if (!customSkin) fallbackToLocal(e, bodyLocalSrc(pet.variant, pet.stage));
+            if (customSkin) {
+              usePetStore.getState().applySkin(null); // 自定义皮肤失效时回官方形象
+              return;
+            }
+            fallbackToLocal(e, bodyLocalSrc(pet.variant, pet.stage));
           }}
         />
         {/* 蛋裂纹（随啄壳进度增多） */}

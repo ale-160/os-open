@@ -5,6 +5,7 @@
 
 import type { Locale } from './types';
 import { destById } from './travel';
+import { PDS_DESTS } from './pingdingshan';
 
 export type Diary = Record<string, string[]>;
 
@@ -77,7 +78,8 @@ export function diaryLine(token: string, locale: Locale): string {
       return zh ? `玩了 ${n} 局小游戏` : `Played ${n} mini game(s)`;
     }
     case 'trip': {
-      const d = destById(a as never);
+      const pds = PDS_DESTS.find((x) => x.id === a);
+      const d = pds ?? destById(a as never);
       return zh ? `我自己去${d.zh}旅行啦，${d.souvenirZh}送你` : `I traveled to ${d.en} and brought you a ${d.souvenirEn}`;
     }
     case 'checkin':

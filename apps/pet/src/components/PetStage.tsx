@@ -5,7 +5,7 @@
  * + 气泡 + 长按/右键菜单钩子。生病/睡觉提示以浮动胶囊呈现，不再堆叠在底部。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { stickerFullSrc } from '@/lib/stickers';
 import { HATCH_TAPS } from '@/lib/balance';
@@ -14,7 +14,7 @@ import { sfx } from '@/lib/sfx';
 import { weatherFor, type Weather } from '@/lib/weather';
 import { DECO_SLOTS, decoById, decoLocalSrc } from '@/lib/accessories';
 import { SCENES, dailyScene, sceneLocalSrc, sceneSrc, sceneVariantFor, type SceneId } from '@/lib/scenes';
-import { assetThumbUrl, fallbackAsset, fallbackToLocal } from '@/lib/assetUrl';
+import { assetThumbUrl, fallbackAsset, fallbackToLocal, resetAssetState } from '@/lib/assetUrl';
 import { isBadWeather } from '@/lib/weather';
 import { pickVisitor, visitorSrc } from '@/lib/visitors';
 import { destById } from '@/lib/travel';
@@ -56,7 +56,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     const pick = pet.sceneId as SceneId | null | undefined;
     if (pick && SCENES.some((x) => x.id === pick)) return pick;
     if (pick === null || pick === undefined) return dailyScene(new Date());
-    return null;
+    return dailyScene(new Date()); // 已移除/未知场景回落到每日轮换
   })();
   const useScene = !!activeScene;
   // 场景时态随天气/时段/季节走（雨雪/节日/夜/晨昏/季节变体），同一小时稳定
@@ -182,6 +182,9 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   useEffect(() => {
     const el = visitorRef.current;
     if (!visitor || !el) return;
+    el.style.display = '';
+    delete el.dataset.assetStage;
+    delete el.dataset.localFallback;
     el.style.animationName = 'none';
     void el.offsetWidth;
     el.style.animationName = '';
@@ -260,7 +263,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {useScene && activeScene && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={sceneSrc(activeScene, sceneVariant)} alt="" onError={(e) => fallbackToLocal(e, sceneLocalSrc(activeScene, sceneVariant))} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+          <img key={`${activeScene}-${sceneVariant}`} src={sceneSrc(activeScene, sceneVariant)} alt="" onLoad={resetAssetState} onError={(e) => fallbackToLocal(e, sceneLocalSrc(activeScene, sceneVariant))} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
           {sky.dark && <div className="pointer-events-none absolute inset-0 bg-slate-900/40" />}
         </>
       )}
@@ -318,6 +321,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         src={visitor ? assetThumbUrl(visitorSrc(visitor.id)) : EMPTY_IMG}
         alt={visitor?.id ?? ''}
         draggable={false}
+        onLoad={resetAssetState}
         onError={(e) => {
           if (visitor) fallbackAsset(e, visitorSrc(visitor.id), () => setVisitor(null));
           else setVisitor(null);
@@ -331,13 +335,14 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         className={visitor ? (visitor.mode === 'fly' ? 'anim-fly-across absolute cursor-pointer' : 'anim-walk-x absolute bottom-[7%] w-[13%] cursor-pointer object-contain') : 'hidden'}
         style={
           visitor
-            ? {
+            ? ({
                 top: visitor.mode === 'fly' ? '30%' : undefined,
-                left: visitor.dir === -1 ? '104%' : '-10%',
-                transform: visitor.dir === -1 ? 'scaleX(-1)' : undefined,
+                left: visitor.mode === 'fly' ? (visitor.dir === -1 ? '104%' : '-10%') : '-10%',
+                transform: visitor.mode === 'fly' && visitor.dir === -1 ? 'scaleX(-1)' : undefined,
+                '--flip': visitor.mode === 'ground' && visitor.dir === -1 ? -1 : 1,
                 animationDuration: `${visitor.dur}s`,
                 animationDirection: visitor.dir === -1 ? 'reverse' : 'normal',
-              }
+              } as CSSProperties)
             : undefined
         }
       />

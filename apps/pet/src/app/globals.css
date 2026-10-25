@@ -278,10 +278,10 @@ body {
 
 /* 访客地面巡游 v2：translateX 全程（避免 left 动画抖动） */
 @keyframes gugu-walk-x {
-  0% { transform: translateX(0) translateY(0); }
-  25% { transform: translateX(12vw) translateY(-1.5%); }
-  50% { transform: translateX(50vw) translateY(0); }
-  75% { transform: translateX(88vw) translateY(-1.5%); }
-  100% { transform: translateX(116vw) translateY(0); }
+  0% { transform: translateX(0) translateY(0) scaleX(var(--flip, 1)); }
+  25% { transform: translateX(12vw) translateY(-1.5%) scaleX(var(--flip, 1)); }
+  50% { transform: translateX(50vw) translateY(0) scaleX(var(--flip, 1)); }
+  75% { transform: translateX(88vw) translateY(-1.5%) scaleX(var(--flip, 1)); }
+  100% { transform: translateX(116vw) translateY(0) scaleX(var(--flip, 1)); }
 }
 .anim-walk-x { animation: gugu-walk-x var(--dur, 9s) linear 1 forwards; }

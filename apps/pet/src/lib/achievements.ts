@@ -32,6 +32,8 @@ export const ACHIEVEMENTS: AchievementDef[] = [
   { id: 'travel1', icon: '🎒', zh: '第一次旅行', en: 'First Trip', zhDesc: '咕咕旅行归来', enDesc: 'GuGu returns from a trip' },
   { id: 'album6', icon: '📸', zh: '旅行摄影师', en: 'Shutterbug', zhDesc: '相册集齐 6 张照片', enDesc: 'Collect 6 travel photos' },
   { id: 'souvenir4', icon: '🎁', zh: '手信收藏家', en: 'Collector', zhDesc: '收集 4 种不同手信', enDesc: 'Collect 4 different souvenirs' },
+  { id: 'dressup', icon: '🎀', zh: '初次打扮', en: 'First Outfit', zhDesc: '拥有第一件装扮', enDesc: 'Own your first accessory' },
+  { id: 'decor8', icon: '🪴', zh: '装饰达人', en: 'Decorator', zhDesc: '拥有 8 件房间装饰', enDesc: 'Own 8 decorations' },
 ];
 
 /** 判定新解锁（纯函数；返回未解锁且条件已达成的 id 列表） */
@@ -59,7 +61,7 @@ export function checkAchievements(pet: PetState): string[] {
   add('album6', pet.album.photos.length >= 6);
   add('souvenir4', new Set(pet.album.souvenirs.map((s) => s.dest)).size >= 4);
   add('dressup', pet.accessories.length >= 1);
-  add('decor8', pet.decoOwned.length >= 3);
+  add('decor8', pet.decoOwned.length >= 8);
   return earned;
 }
 
