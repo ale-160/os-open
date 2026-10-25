@@ -103,8 +103,8 @@ importers:
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.1)
       '@wrksz/themes':
-        specifier: ^1.2.0
-        version: 1.2.0(next@16.4.2(@playwright/test@1.64.1)(@types/node@24.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3)
+        specifier: ^2.1.1
+        version: 2.1.1(next@16.4.2(@playwright/test@1.64.1)(@types/node@24.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2844,13 +2844,13 @@ packages:
   '@vue/shared@3.5.44':
     resolution: {integrity: sha512-H82XLH0DjmSOdbEwO15x3QTo1f5PWEtv237eLpYKc0mqLu+B8hnq16lFWmuBmNurkeiG3wr+oM1FhOll/YVFRg==}
 
-  '@wrksz/themes@1.2.0':
-    resolution: {integrity: sha512-jAyeKHnhvouLTsNCbTZXXX45gCYIJ3eLAFgktIdYHRotGz4ufhs8PMQd3baiZO0EPIXyf0vzPlasbuOfM5J5Gg==}
+  '@wrksz/themes@2.1.1':
+    resolution: {integrity: sha512-43gM888C0KmFJpVQAaVvyNcIhtbnA1l0MEY6SWspnANYVSfw3P4VFUlYwLZK0TS70gej/GaWRzLRPMBd9ezy5Q==}
     peerDependencies:
       next: '>=16.0.0'
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
-      typescript: '>=4.5.0'
+      typescript: '>=5.9'
     peerDependenciesMeta:
       next:
         optional: true
@@ -8124,7 +8124,7 @@ snapshots:
 
   '@vue/shared@3.5.44': {}
 
-  '@wrksz/themes@1.2.0(next@16.4.2(@playwright/test@1.64.1)(@types/node@24.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3)':
+  '@wrksz/themes@2.1.1(next@16.4.2(@playwright/test@1.64.1)(@types/node@24.19.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@5.9.3)':
     dependencies:
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
