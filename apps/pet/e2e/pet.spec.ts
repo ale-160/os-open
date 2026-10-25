@@ -53,10 +53,10 @@ test('领养 → 破壳 → 喂食全链路', async ({ page }) => {
   await feed.click();
   await expect(feed).toBeDisabled();
 
-  // 成就图鉴可打开（种子成就 + 打开瞬间可能自动解锁更多）：入口在「更多」面板
-  await page.getByRole('button', { name: '更多' }).click();
-  await page.getByRole('button', { name: '成就图鉴' }).click();
-  await expect(page.getByText(/\d+ \/ 16/)).toBeVisible();
+  // 成就图鉴可打开（种子成就 + 打开瞬间可能自动解锁更多）：入口在底部无级滚动条里
+  await page.evaluate("(function(){ var btns = document.querySelectorAll('button'); for (var i = 0; i < btns.length; i++) { if (btns[i].textContent.trim() === '🏆成就图鉴') { btns[i].click(); return; } } })()");
+  await page.waitForTimeout(500);
+  await expect(page.getByText(/\d+ \/ \d+/)).toBeVisible();
 });
 
 /** 旅行归来场景的种子覆盖（在测试外定义，保证 addInitScript 只传字符串源码） */

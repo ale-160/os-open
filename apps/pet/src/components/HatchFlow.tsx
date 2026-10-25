@@ -75,7 +75,7 @@ export function HatchFlow() {
         <p className="mt-1 text-sm text-gugu-ink-soft">{t.adoptSubtitle}</p>
       </header>
 
-      <div className="grid w-full grid-cols-3 gap-3">
+      <div className="grid w-full grid-cols-3 gap-2 sm:gap-3">
         {VARIANTS.map((v) => (
           <button
             key={v.id}
@@ -86,7 +86,7 @@ export function HatchFlow() {
             }`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={bodySrc(v.id, 'egg')} alt={locale === 'zh' ? v.zh : v.en} className="h-20 w-16 object-contain" draggable={false} />
+            <img src={bodySrc(v.id, 'egg')} alt={locale === 'zh' ? v.zh : v.en} className="h-16 w-13 object-contain" draggable={false} />
             <span className="text-sm font-bold">{locale === 'zh' ? v.zh : v.en}</span>
           </button>
         ))}

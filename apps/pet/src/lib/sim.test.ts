@@ -255,9 +255,9 @@ describe('小游戏与迁移', () => {
     expect(capped.mood).toBeLessThanOrEqual(25);
   });
 
-  it('新存档带初始元宝与 v6 版本号', () => {
+  it('新存档带初始元宝与 v7 版本号', () => {
     const pet = createPet('sakura', '咕咕', 0);
-    expect(pet.saveVersion).toBe(6);
+    expect(pet.saveVersion).toBe(7);
     expect(pet.coins).toBe(INITIAL_COINS);
     expect(pet.lastWorkedAt).toBe(0);
     expect(pet.lastStudiedAt).toBe(0);
@@ -266,6 +266,8 @@ describe('小游戏与迁移', () => {
     expect(pet.trip).toBeNull();
     expect(pet.album.photos).toEqual([]);
     expect(pet.bests.sing).toBe(0);
+    expect(pet.accessories).toEqual([]);
+    expect(pet.decorations).toEqual([]);
     expect(pet.bests.snack).toBe(0);
     expect(pet.bests.sing).toBe(0);
   });

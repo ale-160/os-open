@@ -9,6 +9,8 @@ import { useEscClose } from '@/hooks/useEscClose';
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
+import { ACCESSORIES, DECORATIONS, accessorySrc, decoSrc } from '@/lib/accessories';
+import { SCENES, sceneSrc } from '@/lib/scenes';
 import {
   BASE_PATH,
   decodeSkinCode,
@@ -36,6 +38,9 @@ interface CommunitySkin {
 
 export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => void }) {
   const setVariant = usePetStore((s) => s.setVariant);
+  const equipAccessory = usePetStore((s) => s.equipAccessory);
+  const toggleDecoration = usePetStore((s) => s.toggleDecoration);
+  const setScene = usePetStore((s) => s.setScene);
   const applySkin = usePetStore((s) => s.applySkin);
   const addCustomSkin = usePetStore((s) => s.addCustomSkin);
   const removeCustomSkin = usePetStore((s) => s.removeCustomSkin);
@@ -179,6 +184,77 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={bodySrc(v.id, pet.stage)} alt={locale === 'zh' ? v.zh : v.en} className="h-14 w-12 object-contain" draggable={false} />
               <span className="text-[11px] font-bold">{locale === 'zh' ? v.zh : v.en}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* 装扮配件（拥有才可穿） */}
+        <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🎩 装扮</p>
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          {ACCESSORIES.map((a) => {
+            const owned = pet.accessories?.includes(a.id);
+            const active = pet.equippedAccessory === a.id;
+            return (
+              <button
+                key={a.id}
+                type="button"
+                disabled={!owned}
+                onClick={() => equipAccessory(active ? null : a.id)}
+                title={owned ? (locale === 'zh' ? a.zh : a.en) : locale === 'zh' ? '商店购买解锁' : 'Buy in shop'}
+                className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${active ? 'border-gugu-accent bg-amber-50' : owned ? 'border-transparent bg-amber-50/50' : 'border-transparent bg-amber-50/30 opacity-45'}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={accessorySrc(a.id)} alt="" className="h-9 w-9 object-contain" draggable={false} />
+                <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? a.zh : a.en}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 房间装饰（拥有可摆/收） */}
+        <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🪴 房间装饰</p>
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          {DECORATIONS.map((d) => {
+            const owned = pet.decoOwned?.includes(d.id);
+            const placed = pet.decorations?.includes(d.id);
+            return (
+              <button
+                key={d.id}
+                type="button"
+                disabled={!owned}
+                onClick={() => toggleDecoration(d.id)}
+                title={owned ? (locale === 'zh' ? d.zh : d.en) : locale === 'zh' ? '商店购买解锁' : 'Buy in shop'}
+                className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${placed ? 'border-gugu-accent bg-amber-50' : owned ? 'border-transparent bg-amber-50/50' : 'border-transparent bg-amber-50/30 opacity-45'}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={decoSrc(d.id)} alt="" className="h-9 w-9 object-contain" draggable={false} />
+                <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? d.zh : d.en}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* 场景（每日自动 / 手动选择） */}
+        <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🏞️ 场景</p>
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          <button
+            type="button"
+            onClick={() => setScene(null)}
+            className={`press flex flex-col items-center justify-center gap-0.5 rounded-2xl border-2 p-1.5 ${!pet.sceneId ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
+          >
+            <span className="text-xl leading-none">🎲</span>
+            <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? '每日轮换' : 'Daily'}</span>
+          </button>
+          {SCENES.map((sc) => (
+            <button
+              key={sc.id}
+              type="button"
+              onClick={() => setScene(sc.id)}
+              className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${pet.sceneId === sc.id ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={sceneSrc(sc.id)} alt="" className="h-9 w-9 rounded-lg object-cover" draggable={false} />
+              <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? sc.zh : sc.en}</span>
             </button>
           ))}
         </div>

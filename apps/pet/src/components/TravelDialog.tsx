@@ -6,6 +6,7 @@ import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { PROVISIONS, destById, photoCaption } from '@/lib/travel';
+import { BASE_PATH } from '@/lib/skins';
 import { useEscClose } from '@/hooks/useEscClose';
 import type { PetState, Provision } from '@/lib/types';
 
@@ -68,8 +69,8 @@ export function TravelDialog({ pet, onClose }: { pet: PetState; onClose: () => v
             {photos.map((ph, i) => {
               const d = destById(ph.dest);
               return (
-                <div key={`${ph.at}-${i}`} className={`overflow-hidden rounded-2xl border border-amber-100 bg-gradient-to-b ${d.scene}`}>
-                  <div className="flex h-16 items-center justify-center gap-1 text-2xl">
+                <div key={`${ph.at}-${i}`} className="relative overflow-hidden rounded-2xl border border-amber-100" style={{ backgroundImage: `url(${BASE_PATH}/skins/gugu/pc/${ph.dest}.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                  <div className="flex h-16 items-end justify-end gap-0.5 p-1 text-xl drop-shadow">
                     {d.scenery.map((e, j) => (
                       <span key={j} style={{ opacity: 1 - j * 0.25 }}>
                         {e}
@@ -98,7 +99,8 @@ export function TravelDialog({ pet, onClose }: { pet: PetState; onClose: () => v
               const d = destById(sv.dest);
               return (
                 <div key={`${sv.at}-${i}`} className="flex flex-col items-center gap-0.5 rounded-2xl bg-amber-50/70 p-2">
-                  <span className="text-2xl leading-none">{d.souvenirIcon}</span>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={`${BASE_PATH}/skins/gugu/souvenir/${sv.dest}.png`} alt="" className="h-7 w-7 object-contain" draggable={false} />
                   <span className="w-full truncate text-center text-[10px] font-bold">
                     {locale === 'zh' ? d.souvenirZh : d.souvenirEn}
                   </span>

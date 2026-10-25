@@ -27,6 +27,7 @@ import { addDiaryEvent } from './diary';
 import { isBadWeather, weatherFor } from './weather';
 import { notify } from './notify';
 import { pickDest } from './travel';
+import { pickSticker } from './stickers';
 import {
   deleteSkinRecord,
   listSkinRecords,
@@ -44,9 +45,11 @@ import {
   simulate,
 } from './sim';
 import type {
+  AccessoryId,
   ActionId,
   ActivityState,
   BurstData,
+  DecoId,
   GameBests,
   GameKind,
   PetCounters,
@@ -69,11 +72,13 @@ const ZERO_COUNTERS: PetCounters = {
   heal: 0,
   aiChat: 0,
 };
-const ZERO_BESTS: GameBests = { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0 };
+const ZERO_BESTS: GameBests = { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0, lianliankan: 0, match3: 0, monopoly: 0, merge: 0 };
 
 interface BubbleData {
   id: number;
   text: string;
+  kind?: LineKind;
+  sticker?: string | null;
 }
 
 export interface ChatMsg {
@@ -128,6 +133,12 @@ interface PetStore {
 
   /** 切换官方配色（整体重上色） */
   setVariant: (variant: VariantId) => void;
+  /** 穿/脱配件（null = 脱下） */
+  equipAccessory: (id: AccessoryId | null) => void;
+  /** 摆放/收起装饰 */
+  toggleDecoration: (id: DecoId) => void;
+  /** 选择场景（null = 每日自动轮换） */
+  setScene: (id: string | null) => void;
   /** 应用/取消自定义皮肤（null = 回到官方） */
   applySkin: (skinId: string | null) => void;
   addCustomSkin: (record: CustomSkinRecord) => Promise<void>;
@@ -158,7 +169,7 @@ interface PetStore {
 function migrateV1(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 6,
+    saveVersion: 7,
     coins: INITIAL_COINS,
     lastWorkedAt: 0,
     lastStudiedAt: 0,
@@ -175,7 +186,7 @@ function migrateV1(raw: Record<string, unknown>): PetState {
 function migrateV2(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 6,
+    saveVersion: 7,
     counters: { ...ZERO_COUNTERS },
     bests: { ...ZERO_BESTS },
     achievements: [],
@@ -191,7 +202,7 @@ function migrateV3(raw: Record<string, unknown>): PetState {
   const { minigameBest = 0, ...restCounters } = legacyCounters;
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 6,
+    saveVersion: 7,
     counters: { ...ZERO_COUNTERS, ...restCounters },
     bests: { ...ZERO_BESTS, snack: minigameBest },
     achievements: Array.isArray(raw.achievements) ? (raw.achievements as string[]) : [],
@@ -201,11 +212,23 @@ function migrateV3(raw: Record<string, unknown>): PetState {
   };
 }
 
-/** v5 → v6 迁移：补日记字段 */
+/** v6 → v7 迁移：补装扮与装饰字段 */
+function migrateV6(raw: Record<string, unknown>): PetState {
+  return {
+    ...(raw as unknown as PetState),
+    saveVersion: 7,
+    accessories: [],
+    equippedAccessory: null,
+    decoOwned: [],
+    decorations: [],
+  };
+}
+
+/** v5 → v7 迁移：补日记与装扮字段 */
 function migrateV5(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 6,
+    saveVersion: 7,
     diary: {},
   };
 }
@@ -214,7 +237,7 @@ function migrateV5(raw: Record<string, unknown>): PetState {
 function migrateV4(raw: Record<string, unknown>): PetState {
   return {
     ...(raw as unknown as PetState),
-    saveVersion: 6,
+    saveVersion: 7,
     trip: null,
     album: { photos: [], souvenirs: [] },
     diary: {},
@@ -227,8 +250,10 @@ function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>
   if (parsed.saveVersion === 3) return migrateV3(parsed);
   if (parsed.saveVersion === 4) return migrateV4(parsed);
   if (parsed.saveVersion === 5) return migrateV5(parsed);
-  if (parsed.saveVersion !== 6 || typeof parsed.updatedAt !== 'number') return null;
-  return parsed as unknown as PetState;
+  if (parsed.saveVersion === 6) return migrateV6(parsed);
+  if (parsed.saveVersion !== 7 || typeof parsed.updatedAt !== 'number') return null;
+  const pet7 = parsed as unknown as PetState;
+  return { ...pet7, bests: { ...ZERO_BESTS, ...pet7.bests } };
 }
 
 function loadRaw(): PetState | null {
@@ -288,6 +313,10 @@ const TIER_CFG: Record<GameKind, [great: number, ok: number]> = {
   race: [14, 6],
   toss: [11, 5],
   sing: [12, 5],
+  lianliankan: [8, 3],
+  match3: [1500, 600],
+  monopoly: [18, 8],
+  merge: [600, 200],
 };
 
 /** 关怀去重记录（localStorage，保留最近 60 条 key） */
@@ -483,7 +512,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
         const cur = get().pet;
         const remotePet = normalizeRaw(remote);
         if (
-          remotePet?.saveVersion === 6 &&
+          remotePet?.saveVersion === 7 &&
           (!cur || remotePet.updatedAt > cur.updatedAt)
         ) {
           set({ pet: remotePet });
@@ -697,7 +726,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       const text = localStorage.getItem(STORAGE_KEY);
       if (text) {
         const remote = JSON.parse(text) as { saveVersion?: number; updatedAt?: number };
-        if (remote?.saveVersion === 6 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
+        if (remote?.saveVersion === 7 && (remote.updatedAt ?? 0) > pet.updatedAt + 2000) {
           const latest = loadRaw();
           if (latest) set({ pet: latest });
           return;
@@ -829,7 +858,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       vars,
     });
     set({
-      bubble: { id: ++bubbleSeq, text },
+      bubble: { id: ++bubbleSeq, text, kind, sticker: pickSticker(kind) },
       recentLines: [text, ...recentLines].slice(0, 4),
     });
   },
@@ -1005,6 +1034,34 @@ export const usePetStore = create<PetStore>()((set, get) => ({
     const pet = get().pet;
     if (!pet) return;
     const next = { ...pet, mode };
+    saveRaw(next);
+    set({ pet: next });
+  },
+
+  equipAccessory: (id) => {
+    const pet = get().pet;
+    if (!pet) return;
+    if (id && !pet.accessories.includes(id)) return;
+    const next = { ...pet, equippedAccessory: id };
+    saveRaw(next);
+    set({ pet: next, burst: { id: ++burstSeq, kind: 'sparkle' } });
+  },
+
+  setScene: (id) => {
+    const pet = get().pet;
+    if (!pet) return;
+    const next = { ...pet, sceneId: id };
+    saveRaw(next);
+    set({ pet: next });
+  },
+
+  toggleDecoration: (id) => {
+    const pet = get().pet;
+    if (!pet || !pet.decoOwned.includes(id)) return;
+    const placed = pet.decorations.includes(id)
+      ? pet.decorations.filter((d) => d !== id)
+      : [...pet.decorations, id].slice(0, 7);
+    const next = { ...pet, decorations: placed };
     saveRaw(next);
     set({ pet: next });
   },

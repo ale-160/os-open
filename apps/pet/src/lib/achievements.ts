@@ -58,6 +58,8 @@ export function checkAchievements(pet: PetState): string[] {
   add('travel1', pet.album.photos.length >= 1);
   add('album6', pet.album.photos.length >= 6);
   add('souvenir4', new Set(pet.album.souvenirs.map((s) => s.dest)).size >= 4);
+  add('dressup', pet.accessories.length >= 1);
+  add('decor8', pet.decoOwned.length >= 3);
   return earned;
 }
 

@@ -35,7 +35,7 @@ const MS_PER_HOUR = 3_600_000;
 /** 领养：创建蛋状态 */
 export function createPet(variant: VariantId, name: string, now: number): PetState {
   return {
-    saveVersion: 6,
+    saveVersion: 7,
     name: name.trim() || '咕咕',
     variant,
     stage: 'egg',
@@ -51,10 +51,14 @@ export function createPet(variant: VariantId, name: string, now: number): PetSta
     coins: INITIAL_COINS,
     personality: { foodie: 0, lively: 0, artsy: 0, chill: 0 },
     counters: { feed: 0, wash: 0, play: 0, work: 0, study: 0, tap: 0, heal: 0, aiChat: 0 },
-    bests: { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0 },
+    bests: { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0, lianliankan: 0, match3: 0, monopoly: 0, merge: 0 },
     trip: null,
     album: { photos: [], souvenirs: [] },
     diary: {},
+    accessories: [],
+    equippedAccessory: null,
+    decoOwned: [],
+    decorations: [],
     achievements: [],
     sleeping: false,
     sick: false,

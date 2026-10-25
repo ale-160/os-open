@@ -8,7 +8,8 @@
 import { useEffect, useState } from 'react';
 import { THRESHOLD } from '@/lib/balance';
 import { bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
-import type { ActivityState, BurstData, PetState } from '@/lib/types';
+import { accessoryById, accessorySrc } from '@/lib/accessories';
+import type { AccessoryId, ActivityState, BurstData, PetState } from '@/lib/types';
 
 export interface ResolvedSkin {
   /** 身体图地址（dataURL / 远程 URL / 官方素材路径） */
@@ -32,6 +33,59 @@ interface PetSpriteProps {
   /** 闲时小动作（站立时随机表演） */
   trick?: TrickId | null;
   onTap: () => void;
+}
+
+/** 配件锚点布局（百分比相对精灵容器；head/side/scarf 固定，eyes 跟随表情布局） */
+const ACCESSORY_LAYOUT: Record<'head' | 'side' | 'scarf', { x: number; y: number; w: number }> = {
+  head: { x: 50, y: 7, w: 36 },
+  side: { x: 69, y: 13, w: 18 },
+  scarf: { x: 50, y: 45, w: 44 },
+};
+
+/** 配件层：蛋阶段与自定义无叠加皮肤时不渲染 */
+function AccessoryLayer({
+  accessory,
+  face,
+  isEgg,
+  hasFaceOverlay,
+}: {
+  accessory: AccessoryId;
+  face: FaceLayout;
+  isEgg: boolean;
+  hasFaceOverlay: boolean;
+}) {
+  if (isEgg) return null;
+  const def = accessoryById(accessory);
+  if (!def) return null;
+  if (def.anchor === 'eyes') {
+    // 眼镜：跟随表情布局（眼部中线）
+    const layout = hasFaceOverlay ? DEFAULT_CUSTOM_FACE : face;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={accessorySrc(def.id)}
+        alt=""
+        draggable={false}
+        className="pointer-events-none absolute object-contain"
+        style={{
+          left: `${50 - 19}%`,
+          top: `${layout.eyeY * 100 - 7}%`,
+          width: '38%',
+        }}
+      />
+    );
+  }
+  const l = ACCESSORY_LAYOUT[def.anchor];
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={accessorySrc(def.id)}
+      alt=""
+      draggable={false}
+      className="pointer-events-none absolute object-contain"
+      style={{ left: `${l.x - l.w / 2}%`, top: `${l.y}%`, width: `${l.w}%` }}
+    />
+  );
 }
 
 const EYE_INK = '#4a3226';
@@ -96,6 +150,14 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
             sad={sad}
             sick={sick}
             chewing={anim === 'eating'}
+          />
+        )}
+        {pet.equippedAccessory && (
+          <AccessoryLayer
+            accessory={pet.equippedAccessory}
+            face={face}
+            isEgg={isEgg}
+            hasFaceOverlay={!!customSkin?.faceOverlay}
           />
         )}
       </div>

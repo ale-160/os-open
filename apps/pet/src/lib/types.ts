@@ -3,7 +3,7 @@
 export type Locale = 'zh' | 'en';
 
 /** 官方三配色变体 */
-export type VariantId = 'cream' | 'mint' | 'sakura';
+export type VariantId = 'cream' | 'mint' | 'sakura' | 'choco' | 'lavender' | 'soda' | 'matcha' | 'peach' | 'ocean' | 'grape' | 'lemon' | 'sakura-deep' | 'cotton' | 'charcoal' | 'caramel' | 'mint-deep' | 'coral' | 'sky' | 'rose' | 'olive';
 
 /** 成长阶段：蛋 → 幼年 → 少年 → 成年 */
 export type GrowthStage = 'egg' | 'baby' | 'teen' | 'adult';
@@ -70,10 +70,14 @@ export interface GameBests {
   race: number;
   toss: number;
   sing: number;
+  lianliankan: number;
+  match3: number;
+  monopoly: number;
+  merge: number;
 }
 
 /** 小游戏种类（GameDialog 与结算共用） */
-export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing';
+export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing' | 'lianliankan' | 'match3' | 'monopoly' | 'merge';
 
 /** 旅行目的地 id（见 lib/travel.ts） */
 export type DestId =
@@ -114,9 +118,41 @@ export interface AlbumSouvenir {
   at: number;
 }
 
+/** 装扮配件 id（见 lib/accessories.ts） */
+export type AccessoryId =
+  | 'beanie'
+  | 'strawhat'
+  | 'crown'
+  | 'party'
+  | 'scarf-star'
+  | 'scarf-plaid'
+  | 'bow'
+  | 'flower'
+  | 'glasses'
+  | 'backpack'
+  | 'santa' | 'pumpkin' | 'wizard' | 'chef' | 'detective' | 'beret' | 'cap' | 'bucket'
+  | 'flower-crown' | 'headphones' | 'earmuffs' | 'space-helmet'
+  | 'sunglasses' | 'star-glasses' | 'monocle'
+  | 'scarf-red' | 'scarf-yellow' | 'bandana' | 'necklace' | 'bell'
+  | 'wings' | 'cape' | 'bag-star' | 'watch' | 'hairpin' | 'pin-wheel' | 'badge-star' | 'umbrella'
+  | 'grad-cap' | 'tophat' | 'straw-circle' | 'veil' | 'crown-flower' | 'helmet-wood'
+  | 'nightcap' | 'raincoat-hood' | 'crown-ice' | 'mushroom-hat' | 'crown-laurel' | 'bonnet'
+  | 'glasses-heart' | 'glasses-3d' | 'visor'
+  | 'scarf-check' | 'scarf-rainbow' | 'tie'
+  | 'backpack-bear' | 'balloon-hand' | 'camera' | 'icecream' | 'flag' | 'book';
+
+/** 房间装饰 id（见 lib/accessories.ts） */
+export type DecoId = 'nest' | 'bowl' | 'ball' | 'plant' | 'picture' | 'rug' | 'lamp' | 'teddy'
+  | 'swing' | 'bookshelf' | 'teapot' | 'cuckoo' | 'fountain' | 'mail' | 'basket-fruit' | 'candle'
+  | 'chalkboard' | 'barrel' | 'birdbath' | 'hammock' | 'lantern' | 'clock' | 'desk' | 'shelf-plant'
+  | 'watering-can' | 'butterfly-house' | 'mushroom-house' | 'well' | 'horse' | 'xylophone'
+  | 'treasure-chest' | 'gramophone'
+  | 'sock' | 'wreath' | 'snowman' | 'pumpkin-lamp' | 'moon-lamp' | 'star-jar' | 'boat' | 'kite'
+  | 'barometer' | 'vine' | 'binoculars' | 'thermos' | 'radio' | 'cuckoo-owl' | 'bathtub' | 'sign';
+
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {
-  saveVersion: 6;
+  saveVersion: 7;
   /** 宠物名（玩家可改，默认咕咕） */
   name: string;
   variant: VariantId;
@@ -194,9 +230,20 @@ export interface PetState {
   lastTripAt?: number;
   /** 日记：按日期（toDateString）记录事件 token（见 lib/diary.ts） */
   diary: Record<string, string[]>;
+
+  /** 已拥有的装扮配件 */
+  accessories: AccessoryId[];
+  /** 当前穿戴的配件（null = 裸装） */
+  equippedAccessory: AccessoryId | null;
+  /** 已拥有的房间装饰 */
+  decoOwned: DecoId[];
+  /** 正在摆放的装饰（decoOwned 的子集，最多 6 件按槽位摆） */
+  decorations: DecoId[];
+  /** 手动选择的场景（null = 每日自动轮换） */
+  sceneId?: string | null;
 }
 
-/** 商店商品（买即用，无库存） */
+/** 商店商品（道具买即用；装扮/装饰买后拥有） */
 export interface ShopItem {
   id: string;
   icon: string;
@@ -209,6 +256,12 @@ export interface ShopItem {
   health?: number;
   /** 治愈生病 */
   cure?: boolean;
+  /** AI 图标（可选，替代 emoji） */
+  iconSrc?: string;
+  /** 商品类型：use=即时道具（默认） accessory=装扮 decoration=装饰 */
+  kind?: 'use' | 'accessory' | 'decoration';
+  accessory?: AccessoryId;
+  deco?: DecoId;
 }
 
 /** 粒子/演出触发（内存态） */
