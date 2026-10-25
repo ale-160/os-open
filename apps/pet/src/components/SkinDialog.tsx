@@ -9,15 +9,17 @@ import { useEscClose } from '@/hooks/useEscClose';
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
-import { ACCESSORIES, DECORATIONS, accessorySrc, decoSrc } from '@/lib/accessories';
-import { SCENES, sceneSrc } from '@/lib/scenes';
+import { ACCESSORIES, DECORATIONS, accessoryLocalSrc, accessorySrc, decoLocalSrc, decoSrc } from '@/lib/accessories';
+import { SCENES, sceneLocalSrc, sceneSrc } from '@/lib/scenes';
+import { fallbackToLocal } from '@/lib/assetUrl';
 import {
   BASE_PATH,
+  bodyLocalSrc,
+  bodySrc,
   decodeSkinCode,
   encodeSkinCode,
   VARIANTS,
 } from '@/lib/skins';
-import { bodySrc } from '@/lib/skins';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { CustomSkinRecord } from '@/lib/db';
@@ -182,7 +184,7 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={bodySrc(v.id, pet.stage)} alt={locale === 'zh' ? v.zh : v.en} className="h-14 w-12 object-contain" draggable={false} />
+              <img src={bodySrc(v.id, pet.stage)} alt={locale === 'zh' ? v.zh : v.en} onError={(e) => fallbackToLocal(e, bodyLocalSrc(v.id, pet.stage))} className="h-14 w-12 object-contain" draggable={false} />
               <span className="text-[11px] font-bold">{locale === 'zh' ? v.zh : v.en}</span>
             </button>
           ))}
@@ -202,7 +204,13 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                 className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${active ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={accessorySrc(a.id)} alt="" className="h-9 w-9 object-contain" draggable={false} />
+                <img
+                  src={accessorySrc(a.id)}
+                  alt=""
+                  className="h-9 w-9 object-contain"
+                  draggable={false}
+                  onError={(e) => fallbackToLocal(e, accessoryLocalSrc(a.id))}
+                />
                 <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? a.zh : a.en}</span>
               </button>
             );
@@ -223,7 +231,13 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                 className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${placed ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={decoSrc(d.id)} alt="" className="h-9 w-9 object-contain" draggable={false} />
+                <img
+                  src={decoSrc(d.id)}
+                  alt=""
+                  className="h-9 w-9 object-contain"
+                  draggable={false}
+                  onError={(e) => fallbackToLocal(e, decoLocalSrc(d.id))}
+                />
                 <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? d.zh : d.en}</span>
               </button>
             );
@@ -249,7 +263,7 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${pet.sceneId === sc.id ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={sceneSrc(sc.id)} alt="" className="h-9 w-9 rounded-lg object-cover" draggable={false} />
+              <img src={sceneSrc(sc.id)} alt="" onError={(e) => fallbackToLocal(e, sceneLocalSrc(sc.id))} className="h-9 w-9 rounded-lg object-cover" draggable={false} />
               <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? sc.zh : sc.en}</span>
             </button>
           ))}

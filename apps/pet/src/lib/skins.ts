@@ -17,8 +17,12 @@ const STAGE_SEGMENT: Record<GrowthStage, string> = {
   adult: 'adult',
 };
 
+export function bodyLocalSrc(variant: VariantId, stage: GrowthStage): string {
+  return `${SKIN_BASE}/${variant}-${STAGE_SEGMENT[stage]}.png`;
+}
+
 export function bodySrc(variant: VariantId, stage: GrowthStage): string {
-  return assetUrl(`${SKIN_BASE}/${variant}-${STAGE_SEGMENT[stage]}.png`);
+  return assetUrl(bodyLocalSrc(variant, stage));
 }
 
 export interface VariantInfo {

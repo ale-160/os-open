@@ -246,15 +246,31 @@ function migrateV4(raw: Record<string, unknown>): PetState {
 }
 
 function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>): PetState | null {
-  if (parsed.saveVersion === 1) return migrateV1(parsed);
-  if (parsed.saveVersion === 2) return migrateV2(parsed);
-  if (parsed.saveVersion === 3) return migrateV3(parsed);
-  if (parsed.saveVersion === 4) return migrateV4(parsed);
-  if (parsed.saveVersion === 5) return migrateV5(parsed);
-  if (parsed.saveVersion === 6) return migrateV6(parsed);
+  if (parsed.saveVersion === 1) return withDefaults(migrateV1(parsed));
+  if (parsed.saveVersion === 2) return withDefaults(migrateV2(parsed));
+  if (parsed.saveVersion === 3) return withDefaults(migrateV3(parsed));
+  if (parsed.saveVersion === 4) return withDefaults(migrateV4(parsed));
+  if (parsed.saveVersion === 5) return withDefaults(migrateV5(parsed));
+  if (parsed.saveVersion === 6) return withDefaults(migrateV6(parsed));
   if (parsed.saveVersion !== 7 || typeof parsed.updatedAt !== 'number') return null;
-  const pet7 = parsed as unknown as PetState;
-  return { ...pet7, bests: { ...ZERO_BESTS, ...pet7.bests } };
+  return withDefaults(parsed as unknown as PetState);
+}
+
+/** 老档兜底：补齐各版本新增字段，避免旧存档读取 undefined.length / 新游戏最高分空白 */
+function withDefaults(pet: PetState): PetState {
+  return {
+    ...pet,
+    counters: { ...ZERO_COUNTERS, ...pet.counters },
+    bests: { ...ZERO_BESTS, ...pet.bests },
+    achievements: Array.isArray(pet.achievements) ? pet.achievements : [],
+    accessories: Array.isArray(pet.accessories) ? pet.accessories : [],
+    equippedAccessory: pet.equippedAccessory ?? null,
+    decoOwned: Array.isArray(pet.decoOwned) ? pet.decoOwned : [],
+    decorations: Array.isArray(pet.decorations) ? pet.decorations : [],
+    trip: pet.trip ?? null,
+    album: pet.album ?? { photos: [], souvenirs: [] },
+    diary: pet.diary ?? {},
+  };
 }
 
 function loadRaw(): PetState | null {

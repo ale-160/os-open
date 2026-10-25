@@ -11,8 +11,9 @@ import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
 import { sfx } from '@/lib/sfx';
 import { weatherFor, type Weather } from '@/lib/weather';
-import { DECO_SLOTS, decoById, decoSrc } from '@/lib/accessories';
-import { SCENES, dailyScene, sceneSrc, type SceneId } from '@/lib/scenes';
+import { DECO_SLOTS, decoById, decoLocalSrc, decoSrc } from '@/lib/accessories';
+import { SCENES, dailyScene, sceneLocalSrc, sceneSrc, sceneVariantFor, type SceneId } from '@/lib/scenes';
+import { fallbackToLocal } from '@/lib/assetUrl';
 import { isBadWeather } from '@/lib/weather';
 import { pickVisitor, visitorSrc } from '@/lib/visitors';
 import { destById } from '@/lib/travel';
@@ -55,6 +56,8 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     return null;
   })();
   const useScene = !!activeScene;
+  // 场景时态随天气/时段/季节走（雨雪/节日/夜/晨昏/季节变体），同一小时稳定
+  const sceneVariant = useScene ? sceneVariantFor(new Date(), weather) : null;
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const dirRef = useRef<1 | -1>(1);
@@ -241,7 +244,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {useScene && activeScene && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={sceneSrc(activeScene)} alt="" className="absolute inset-0 h-full w-full object-cover" draggable={false} />
+          <img src={sceneSrc(activeScene, sceneVariant)} alt="" onError={(e) => fallbackToLocal(e, sceneLocalSrc(activeScene, sceneVariant))} className="absolute inset-0 h-full w-full object-cover" draggable={false} />
           {sky.dark && <div className="pointer-events-none absolute inset-0 bg-slate-900/40" />}
         </>
       )}
@@ -301,6 +304,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           src={visitorSrc(visitor.id)}
           alt={visitor.id}
           draggable={false}
+          onError={() => setVisitor(null)}
           onAnimationEnd={() => setVisitor(null)}
           onClick={() => {
             sfx.pop();
@@ -359,7 +363,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {/* 房间装饰：地毯垫底 + 槽位件（最多 6 件） */}
       {pet.decorations?.filter((d) => decoById(d)?.underlay).map((d) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={`rug-${d}`} src={decoSrc(d)} alt="" draggable={false} className="pointer-events-none absolute bottom-[3%] left-1/2 w-[36%] -translate-x-1/2 opacity-95" />
+        <img key={`rug-${d}`} src={decoSrc(d)} alt="" draggable={false} onError={(e) => fallbackToLocal(e, decoLocalSrc(d))} className="pointer-events-none absolute bottom-[3%] left-1/2 w-[36%] -translate-x-1/2 opacity-95" />
       ))}
       {(() => {
         const placed = pet.decorations?.filter((d) => !decoById(d)?.underlay).slice(0, DECO_SLOTS.length) ?? [];
@@ -367,7 +371,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           const slot = DECO_SLOTS[i];
           return (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`deco-${d}`} src={decoSrc(d)} alt="" draggable={false} className="pointer-events-none absolute" style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%` }} />
+            <img key={`deco-${d}`} src={decoSrc(d)} alt="" draggable={false} onError={(e) => fallbackToLocal(e, decoLocalSrc(d))} className="pointer-events-none absolute" style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%` }} />
           );
         });
       })()}

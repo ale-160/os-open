@@ -142,7 +142,8 @@ export type AccessoryId =
   | 'nightcap' | 'raincoat-hood' | 'crown-ice' | 'mushroom-hat' | 'crown-laurel' | 'bonnet'
   | 'glasses-heart' | 'glasses-3d' | 'visor'
   | 'scarf-check' | 'scarf-rainbow' | 'tie'
-  | 'backpack-bear' | 'balloon-hand' | 'camera' | 'icecream' | 'flag' | 'book';
+  | 'backpack-bear' | 'balloon-hand' | 'camera' | 'icecream' | 'flag' | 'book'
+  | `b4b-${number}`;
 
 /** 房间装饰 id（见 lib/accessories.ts） */
 export type DecoId = 'nest' | 'bowl' | 'ball' | 'plant' | 'picture' | 'rug' | 'lamp' | 'teddy'
@@ -151,7 +152,8 @@ export type DecoId = 'nest' | 'bowl' | 'ball' | 'plant' | 'picture' | 'rug' | 'l
   | 'watering-can' | 'butterfly-house' | 'mushroom-house' | 'well' | 'horse' | 'xylophone'
   | 'treasure-chest' | 'gramophone'
   | 'sock' | 'wreath' | 'snowman' | 'pumpkin-lamp' | 'moon-lamp' | 'star-jar' | 'boat' | 'kite'
-  | 'barometer' | 'vine' | 'binoculars' | 'thermos' | 'radio' | 'cuckoo-owl' | 'bathtub' | 'sign';
+  | 'barometer' | 'vine' | 'binoculars' | 'thermos' | 'radio' | 'cuckoo-owl' | 'bathtub' | 'sign'
+  | `b4b-${number}`;
 
 /** 宠物存档（localStorage `ale-pet-save`，版本化） */
 export interface PetState {

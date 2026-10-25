@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useEscClose } from '@/hooks/useEscClose';
 
 /** 咕咕商店：元宝购买道具，买即用（无库存） */
@@ -10,7 +11,20 @@ import { wardrobeShopItems } from '@/lib/accessories';
 import { BASE_PATH } from '@/lib/skins';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
-import type { PetState } from '@/lib/types';
+import type { PetState, ShopItem } from '@/lib/types';
+
+/** 商品图标：素材缺失时自动退回 emoji，避免出现破图 */
+function ShopIcon({ item, kind }: { item: ShopItem; kind: 'use' | 'accessory' | 'decoration' }) {
+  const [failed, setFailed] = useState(false);
+  const src = item.iconSrc ?? (kind === 'use' ? `${BASE_PATH}/skins/gugu/item/${item.id}.png` : undefined);
+  if (src && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt="" onError={() => setFailed(true)} className="h-10 w-10 shrink-0 object-contain" draggable={false} />
+    );
+  }
+  return <span className="text-3xl leading-none">{item.icon}</span>;
+}
 
 export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => void }) {
   const buyItem = usePetStore((s) => s.buyItem);
@@ -72,8 +86,7 @@ export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                     className={`press flex items-center gap-2.5 rounded-2xl bg-amber-50/60 p-3 text-left ${disabled ? 'opacity-40' : 'hover:bg-amber-50 active:bg-amber-100'}`}
                   >
                     {(item.iconSrc ?? (kind === 'use' ? `${BASE_PATH}/skins/gugu/item/${item.id}.png` : undefined)) ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={item.iconSrc} alt="" className="h-10 w-10 shrink-0 object-contain" draggable={false} />
+                      <ShopIcon item={item} kind={kind} />
                     ) : (
                       <span className="text-3xl leading-none">{item.icon}</span>
                     )}

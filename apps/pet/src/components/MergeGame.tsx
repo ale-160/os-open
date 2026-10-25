@@ -2,8 +2,9 @@
 
 /**
  * 幻咕合成：点击合并进化。
- * 5×5 棋盘、8 个系族各 3 阶；点选一块后点相邻同系同阶块合成下一阶，
- * 三阶现身即额外 +50 并消散；棋盘满且无相邻可合并对时结算。
+ * 5×5 棋盘、8 个幻兽系族各 3 阶（素材取 merge2 的 1/3/5 阶）；点选一块后点相邻同系同阶块合成下一阶，
+ * 三阶现身即额外 +50 并消散。每次合成自动召唤一只一阶；无可合成对时补一只同伴。
+ * 40 次合成后结算，走统一的 finishMinigame 奖励。
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -12,24 +13,30 @@ import { useEscClose } from '@/hooks/useEscClose';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { BASE_PATH } from '@/lib/skins';
+import { gameBgStyle } from '@/lib/gamebg';
 import { sfx } from '@/lib/sfx';
 import type { PetState } from '@/lib/types';
 
 const SIZE = 5;
-const FAMILIES = ['star', 'cloud', 'flame', 'leaf', 'wave', 'moon', 'sun', 'crystal'] as const;
+const MAX_MERGES = 40;
+const START_CELLS = 10;
+const FAMILIES = ['shadow', 'light', 'thunder', 'frost', 'blossom', 'rock', 'gale', 'abyss'] as const;
 
 type Family = (typeof FAMILIES)[number];
 
+/** 阶 1/2/3 对应的素材等级（1/3/5 阶全量齐图，避开第 5 批未生成的偶数阶） */
+const ART_LEVEL = [1, 3, 5] as const;
+
 /** 阶 1/2/3 的 emoji 兜底（图片加载失败时显示） */
 const EMOJI: Record<Family, readonly string[]> = {
-  star: ['⭐', '🌟', '✨'],
-  cloud: ['☁️', '🌥️', '⛈️'],
-  flame: ['🕯️', '💥', '🔥'],
-  leaf: ['🌱', '🌿', '🌳'],
-  wave: ['💧', '🌊', '💦'],
-  moon: ['🌙', '🌜', '🌕'],
-  sun: ['🌤️', '☀️', '🌞'],
-  crystal: ['💠', '💎', '🔮'],
+  shadow: ['🌑', '🌫️', '🦇'],
+  light: ['✨', '🌟', '☀️'],
+  thunder: ['⚡', '🌩️', '⛈️'],
+  frost: ['❄️', '🧊', '🌨️'],
+  blossom: ['🌸', '🌺', '🌷'],
+  rock: ['🪨', '⛰️', '🗿'],
+  gale: ['🍃', '🌬️', '🌪️'],
+  abyss: ['💧', '🌊', '🌀'],
 };
 
 interface Cell {
@@ -54,7 +61,8 @@ function spawnTier1(board: Board): void {
 
 function initialBoard(): Board {
   const board: Board = Array.from({ length: SIZE * SIZE }, () => null);
-  for (let n = 0; n < 4; n++) spawnTier1(board);
+  for (let n = 0; n < START_CELLS; n++) spawnTier1(board);
+  if (!hasPair(board)) summonMate(board); // 保底至少一组可合成
   return board;
 }
 
@@ -65,19 +73,45 @@ function isAdjacent(a: number, b: number): boolean {
   );
 }
 
-/** 棋盘满且无任何相邻同系同阶对 → 无路可走 */
-function isStuck(board: Board): boolean {
+/** 是否存在相邻同系同阶的一对可合成块 */
+function hasPair(board: Board): boolean {
   for (let r = 0; r < SIZE; r++) {
     for (let c = 0; c < SIZE; c++) {
       const cur = board[r * SIZE + c];
-      if (!cur) return false;
+      if (!cur) continue;
       const right = c + 1 < SIZE ? board[r * SIZE + c + 1] : null;
       const down = r + 1 < SIZE ? board[(r + 1) * SIZE + c] : null;
-      if (right && right.family === cur.family && right.tier === cur.tier) return false;
-      if (down && down.family === cur.family && down.tier === cur.tier) return false;
+      if (right && right.family === cur.family && right.tier === cur.tier) return true;
+      if (down && down.family === cur.family && down.tier === cur.tier) return true;
     }
   }
-  return true;
+  return false;
+}
+
+/** 无可合成对时召唤一只同伴（把随机一块复制到相邻空格），返回 false = 棋盘已满无法召唤 */
+function summonMate(board: Board): boolean {
+  const order = Array.from({ length: SIZE * SIZE }, (_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  for (const i of order) {
+    const cell = board[i];
+    if (!cell) continue;
+    const r = Math.floor(i / SIZE);
+    const c = i % SIZE;
+    const neighbors = [
+      [r - 1, c],
+      [r + 1, c],
+      [r, c - 1],
+      [r, c + 1],
+    ].filter(([nr, nc]) => nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && !board[nr * SIZE + nc]);
+    if (neighbors.length === 0) continue;
+    const [nr, nc] = neighbors[Math.floor(Math.random() * neighbors.length)];
+    board[nr * SIZE + nc] = { family: cell.family, tier: cell.tier };
+    return true;
+  }
+  return false;
 }
 
 export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
@@ -89,6 +123,7 @@ export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
   const [board, setBoard] = useState<Board>(initialBoard);
   const [sel, setSel] = useState<number | null>(null);
   const [score, setScore] = useState(0);
+  const [merges, setMerges] = useState(0);
   const [ultimates, setUltimates] = useState(0);
   const [reward, setReward] = useState<{ coins: number; mood: number; newBest: boolean } | null>(null);
   const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set<string>());
@@ -117,8 +152,10 @@ export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
     setBoard(initialBoard());
     setSel(null);
     setScore(0);
+    setMerges(0);
     setUltimates(0);
     setReward(null);
+    setFailed(new Set());
     setPhase('playing');
   }, []);
 
@@ -162,14 +199,18 @@ export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
     }
 
     mergeCountRef.current += 1;
-    if (mergeCountRef.current % 2 === 0) spawnTier1(next); // 每 2 次成功合并补 1 个一阶
+    spawnTier1(next); // 每次合成召唤一只一阶，保证棋盘不会被耗尽
+    const playable = hasPair(next) || summonMate(next); // 无合成对时补一只同伴（棋盘满则补不了）
     sfx.pop();
 
     scoreRef.current += gained;
     setScore(scoreRef.current);
     setBoard(next);
     setSel(null);
-    if (isStuck(next)) end();
+
+    const nextMerges = merges + 1;
+    setMerges(nextMerges);
+    if (nextMerges >= MAX_MERGES || !playable) end();
   };
 
   return (
@@ -190,10 +231,13 @@ export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
           </button>
         </div>
 
-        <div className="relative bg-gradient-to-b from-[#f3ecff] to-[#e6dcff] p-3">
+        <div className="relative p-3" style={gameBgStyle('rgba(243,236,255,0.85)')}>
           <div className="mb-2 flex items-center justify-between pt-1">
             <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-extrabold text-gugu-ink-soft">
               {t.gameScore} {score}
+            </span>
+            <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-extrabold text-gugu-ink-soft">
+              {fmt(locale === 'zh' ? '合成 {n}/{m}' : 'Merges {n}/{m}', { n: merges, m: MAX_MERGES })}
             </span>
             <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-extrabold text-gugu-ink-soft">
               {fmt(locale === 'zh' ? '终极形态 ×{n}' : 'Ultimate ×{n}', { n: ultimates })}
@@ -220,7 +264,7 @@ export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`${BASE_PATH}/skins/gugu/game/merge-${cell.family}-${cell.tier}.png`}
+                      src={`${BASE_PATH}/skins/gugu/game/merge2-${cell.family}-${ART_LEVEL[cell.tier - 1]}.png`}
                       alt=""
                       draggable={false}
                       onError={() => markFailed(`${cell.family}-${cell.tier}`)}

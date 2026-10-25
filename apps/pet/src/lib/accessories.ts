@@ -7,6 +7,7 @@ import { BASE_PATH } from './skins';
 import { assetUrl } from './assetUrl';
 import type { AccessoryId, DecoId, ShopItem } from './types';
 import { ACCESSORIES_BATCH2, DECORATIONS_BATCH2 } from './wardrobe-batch2';
+import { ACCESSORIES_BATCH3, DECORATIONS_BATCH3 } from './wardrobe-batch3';
 
 export interface AccessoryDef {
   id: AccessoryId;
@@ -74,16 +75,24 @@ export function decoById(id: DecoId): DecoDef | undefined {
   return DECORATIONS.find((d) => d.id === id);
 }
 
+export function accessoryLocalSrc(id: AccessoryId): string {
+  return `${BASE_PATH}/skins/gugu/${accessoryById(id)?.file ?? ''}`;
+}
+
+export function decoLocalSrc(id: DecoId): string {
+  return `${BASE_PATH}/skins/gugu/${decoById(id)?.file ?? ''}`;
+}
+
 export function accessorySrc(id: AccessoryId): string {
-  return assetUrl(`${BASE_PATH}/skins/gugu/${accessoryById(id)?.file ?? ''}`);
+  return assetUrl(accessoryLocalSrc(id));
 }
 
 export function decoSrc(id: DecoId): string {
-  return assetUrl(`${BASE_PATH}/skins/gugu/${decoById(id)?.file ?? ''}`);
+  return assetUrl(decoLocalSrc(id));
 }
 
-export const ACCESSORIES: AccessoryDef[] = [...ACCESSORIES_BASE, ...ACCESSORIES_BATCH2];
-export const DECORATIONS: DecoDef[] = [...DECORATIONS_BASE, ...DECORATIONS_BATCH2];
+export const ACCESSORIES: AccessoryDef[] = [...ACCESSORIES_BASE, ...ACCESSORIES_BATCH2, ...ACCESSORIES_BATCH3];
+export const DECORATIONS: DecoDef[] = [...DECORATIONS_BASE, ...DECORATIONS_BATCH2, ...DECORATIONS_BATCH3];
 
 /** 装扮 + 装饰的商品条目（供商店与 SHOP_ITEMS 合并） */
 export function wardrobeShopItems(): ShopItem[] {

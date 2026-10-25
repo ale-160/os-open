@@ -15,6 +15,8 @@ import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { BASE_PATH } from '@/lib/skins';
+import { buildBoard, type BoardDef, type TileDef } from '@/lib/monopoly';
+import { gameBgStyle } from '@/lib/gamebg';
 import type { PetState } from '@/lib/types';
 
 const START_CASH = 300;
@@ -23,41 +25,6 @@ const PASS_BONUS = 20;
 const STEP_MS = 160;
 
 type Side = 'p' | 'a';
-
-interface TileDef {
-  id: string;
-  zh: string;
-  en: string;
-  /** 可买地价；null = 起点/事件格不可买 */
-  price: number | null;
-  rent: number | null;
-  emoji: string;
-}
-
-const TILES: TileDef[] = [
-  { id: 'start', zh: '起点', en: 'Start', price: null, rent: null, emoji: '🚩' },
-  { id: 'park', zh: '公园', en: 'Park', price: 60, rent: 12, emoji: '🌳' },
-  { id: 'bakery', zh: '面包房', en: 'Bakery', price: 80, rent: 16, emoji: '🥖' },
-  { id: 'library', zh: '图书馆', en: 'Library', price: 90, rent: 18, emoji: '📚' },
-  { id: 'fountain', zh: '喷泉广场', en: 'Fountain', price: 100, rent: 20, emoji: '⛲' },
-  { id: 'luck', zh: '幸运星', en: 'Lucky Star', price: null, rent: null, emoji: '⭐' },
-  { id: 'toy', zh: '玩具店', en: 'Toy Shop', price: 110, rent: 22, emoji: '🧸' },
-  { id: 'pond', zh: '池塘', en: 'Pond', price: 70, rent: 14, emoji: '🪷' },
-  { id: 'hill', zh: '小山丘', en: 'Hill', price: 90, rent: 18, emoji: '⛰️' },
-  { id: 'bus', zh: '公交站', en: 'Bus Stop', price: null, rent: null, emoji: '🚌' },
-  { id: 'museum', zh: '博物馆', en: 'Museum', price: 130, rent: 26, emoji: '🏛️' },
-  { id: 'tax', zh: '税务局', en: 'Tax Office', price: null, rent: null, emoji: '🏦' },
-  { id: 'flower', zh: '花店', en: 'Flower Shop', price: 100, rent: 20, emoji: '💐' },
-  { id: 'camp', zh: '营地', en: 'Camp', price: 120, rent: 24, emoji: '⛺' },
-  { id: 'river', zh: '溪流', en: 'Creek', price: null, rent: null, emoji: '🏞️' },
-  { id: 'chest', zh: '宝箱', en: 'Treasure Box', price: null, rent: null, emoji: '🎁' },
-  { id: 'train', zh: '火车站', en: 'Station', price: 140, rent: 28, emoji: '🚉' },
-  { id: 'observatory', zh: '天文台', en: 'Observatory', price: 150, rent: 30, emoji: '🔭' },
-  { id: 'beach', zh: '海滩', en: 'Beach', price: 130, rent: 26, emoji: '🏖️' },
-  { id: 'farm', zh: '农场', en: 'Farm', price: 110, rent: 22, emoji: '🌾' },
-  { id: 'festival', zh: '灯会', en: 'Lantern Fair', price: null, rent: null, emoji: '🏮' },
-  { id: 'hospital', zh: '医院', en: 'Hospital', price: null, rent: null, emoji: '🏥' },
-];
 
 /** 22 格在 6 列 × 4 行网格中的落位（1 起始 [行, 列]）：0 在左上，沿外圈顺时针 */
 const GRID_POS: [number, number][] = [
@@ -84,13 +51,15 @@ interface GameState {
   stage: Stage;
   dice: number | null;
   sides: Record<Side, SideState>;
+  /** 本局棋盘（经典咕咕镇 / 第二季环游小镇） */
+  board: BoardDef;
   owners: (Side | null)[];
   logs: string[];
   winner: Side | null;
   finalScore: number;
 }
 
-function createGame(locale: 'zh' | 'en'): GameState {
+function createGame(locale: 'zh' | 'en', board: BoardDef): GameState {
   return {
     round: 1,
     turn: 'p',
@@ -100,11 +69,12 @@ function createGame(locale: 'zh' | 'en'): GameState {
       p: { pos: 0, cash: START_CASH, skip: false },
       a: { pos: 0, cash: START_CASH, skip: false },
     },
-    owners: Array.from({ length: TILES.length }, () => null as Side | null),
+    board,
+    owners: Array.from({ length: board.tiles.length }, () => null as Side | null),
     logs: [
       locale === 'zh'
-        ? `🎲 开局！双方各 ${START_CASH} 🪙，${MAX_ROUNDS} 轮后比资产`
-        : `🎲 Start! ${START_CASH} 🪙 each, compare assets after ${MAX_ROUNDS} rounds`,
+        ? `🎲 开局！${board.nameZh} · 双方各 ${START_CASH} 🪙，${MAX_ROUNDS} 轮后比资产`
+        : `🎲 Start! ${board.nameEn} · ${START_CASH} 🪙 each, compare assets after ${MAX_ROUNDS} rounds`,
     ],
     winner: null,
     finalScore: 0,
@@ -114,7 +84,7 @@ function createGame(locale: 'zh' | 'en'): GameState {
 function assetsOf(g: GameState, side: Side): number {
   let sum = g.sides[side].cash;
   g.owners.forEach((owner, i) => {
-    if (owner === side) sum += TILES[i].price ?? 0;
+    if (owner === side) sum += g.board.tiles[i].price ?? 0;
   });
   return sum;
 }
@@ -135,7 +105,7 @@ function createEngine(opts: EngineOpts) {
   const sideName = (side: Side) => (side === 'p' ? opts.petName : L('蜗牛', 'Snail'));
 
   const timers: number[] = [];
-  const g = createGame(opts.locale);
+  const g = createGame(opts.locale, buildBoard());
 
   const wait = (ms: number, fn: () => void) => {
     const id = window.setTimeout(() => {
@@ -201,7 +171,7 @@ function createEngine(opts: EngineOpts) {
     const tick = () => {
       if (g.stage === 'over') return;
       const s = g.sides[side];
-      s.pos = (s.pos + 1) % TILES.length;
+      s.pos = (s.pos + 1) % g.board.tiles.length;
       if (s.pos === 0) {
         s.cash += PASS_BONUS;
         log(L(`🚩 ${sideName(side)}经过起点 +${PASS_BONUS} 🪙`, `🚩 ${sideName(side)} passed Start +${PASS_BONUS} 🪙`));
@@ -218,7 +188,7 @@ function createEngine(opts: EngineOpts) {
   const resolveLand = (side: Side, chainDepth: number) => {
     if (g.stage === 'over') return;
     const idx = g.sides[side].pos;
-    const tile = TILES[idx];
+    const tile = g.board.tiles[idx];
     const marker = side === 'p' ? '🐥' : '🐌';
 
     if (tile.price !== null) {
@@ -365,7 +335,7 @@ function createEngine(opts: EngineOpts) {
     chooseBuy(buy: boolean) {
       if (g.stage !== 'buy') return;
       const idx = g.sides.p.pos;
-      const tile = TILES[idx];
+      const tile = g.board.tiles[idx];
       const price = tile.price ?? 0;
       if (buy) {
         g.sides.p.cash -= price;
@@ -401,7 +371,7 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
   const [failed, setFailed] = useState<Set<string>>(() => new Set());
   const [, setTick] = useState(0);
   /** 引擎持有的可变棋局对象（就地修改 + setTick 重渲染；重开局换新对象） */
-  const [g, setG] = useState<GameState>(() => createGame(locale));
+  const [g, setG] = useState<GameState>(() => createGame(locale, buildBoard()));
   const engineRef = useRef<Engine | null>(null);
 
   useEffect(() => () => engineRef.current?.dispose(), []);
@@ -428,7 +398,7 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
   const chooseBuy = (buy: boolean) => engineRef.current?.chooseBuy(buy);
   const nextTurn = () => engineRef.current?.nextTurn();
 
-  const buyTile = g.stage === 'buy' ? TILES[g.sides.p.pos] : null;
+  const buyTile = g.stage === 'buy' ? g.board.tiles[g.sides.p.pos] : null;
   const ownCount = (side: Side) => g.owners.filter((o) => o === side).length;
   const round = Math.min(g.round, MAX_ROUNDS);
 
@@ -440,7 +410,8 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
           <button type="button" onClick={onClose} className="press rounded-full bg-amber-900/5 px-3 py-1 text-sm font-semibold">✕</button>
         </div>
 
-        <div className="relative bg-gradient-to-b from-[#f6ecd2] to-[#e8d5ab] p-3">
+        <div className="relative p-3" style={gameBgStyle('rgba(246,236,210,0.82)')}>
+          {/* 季节棋盘背景（春/夏/秋/冬 白天插画） */}
           {/* 双方资产侧栏 */}
           <div className="mb-2 flex items-center justify-between gap-1 text-[11px] font-bold">
             <span className={`rounded-full px-2 py-1 shadow-sm ${g.turn === 'p' ? 'bg-amber-200/90' : 'bg-white/70'}`}>
@@ -460,12 +431,25 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
               style={{ gridRow: 3, gridColumn: '2 / span 2' }}
               className="flex flex-col items-center justify-center rounded-xl bg-white/70"
             >
-              <span className="text-xl leading-none">{g.dice !== null ? '🎲' : '🏘️'}</span>
+              <span className="flex h-8 items-center justify-center">
+                {g.dice !== null ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={`${BASE_PATH}/skins/gugu/game/mono2-prop-${g.turn === 'a' ? 6 + g.dice : g.dice}.png`}
+                    alt="🎲"
+                    draggable={false}
+                    className="h-8 w-8 object-contain"
+                  />
+                ) : (
+                  <span className="text-xl leading-none">🏘️</span>
+                )}
+              </span>
               <span className="text-[10px] font-extrabold text-gugu-ink-soft">
-                {g.dice !== null ? g.dice : L('咕咕镇', 'GuGu Town')}
+                {g.dice !== null ? g.dice : L(g.board.nameZh, g.board.nameEn)}
               </span>
             </div>
-            {TILES.map((tile, i) => {
+            {g.board.tiles.map((tile, i) => {
+              const art = tile.art ?? `mono-${tile.id}`;
               const owner = g.owners[i];
               const pHere = g.sides.p.pos === i;
               const aHere = g.sides.a.pos === i;
@@ -482,16 +466,16 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
                   } ${pHere ? 'ring-2 ring-gugu-accent/80' : aHere ? 'ring-2 ring-sky-400/80' : ''}`}
                   title={nameOf(tile)}
                 >
-                  {failed.has(tile.id) ? (
+                  {failed.has(art) ? (
                     <span className="text-xl leading-none">{tile.emoji}</span>
                   ) : (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
-                      src={`${BASE_PATH}/skins/gugu/game/mono-${tile.id}.png`}
+                      src={`${BASE_PATH}/skins/gugu/game/${art}.png`}
                       alt=""
                       draggable={false}
                       className="h-4/5 w-4/5 object-contain"
-                      onError={() => setFailed((prev) => new Set(prev).add(tile.id))}
+                      onError={() => setFailed((prev) => new Set(prev).add(art))}
                     />
                   )}
                   {/* 双方棋子标记 🐥/🐌 */}

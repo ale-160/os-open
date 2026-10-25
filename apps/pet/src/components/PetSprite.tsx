@@ -7,8 +7,9 @@
 
 import { useEffect, useState } from 'react';
 import { THRESHOLD } from '@/lib/balance';
-import { bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
-import { accessoryById, accessorySrc } from '@/lib/accessories';
+import { bodyLocalSrc, bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
+import { accessoryById, accessoryLocalSrc, accessorySrc } from '@/lib/accessories';
+import { fallbackToLocal } from '@/lib/assetUrl';
 import type { AccessoryId, ActivityState, BurstData, PetState } from '@/lib/types';
 
 export interface ResolvedSkin {
@@ -66,6 +67,7 @@ function AccessoryLayer({
         src={accessorySrc(def.id)}
         alt=""
         draggable={false}
+        onError={(e) => fallbackToLocal(e, accessoryLocalSrc(def.id))}
         className="pointer-events-none absolute object-contain"
         style={{
           left: `${50 - 19}%`,
@@ -82,6 +84,7 @@ function AccessoryLayer({
       src={accessorySrc(def.id)}
       alt=""
       draggable={false}
+      onError={(e) => fallbackToLocal(e, accessoryLocalSrc(def.id))}
       className="pointer-events-none absolute object-contain"
       style={{ left: `${l.x - l.w / 2}%`, top: `${l.y}%`, width: `${l.w}%` }}
     />
@@ -139,6 +142,9 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
           alt={pet.name}
           className="h-full w-full object-contain"
           draggable={false}
+          onError={(e) => {
+            if (!customSkin) fallbackToLocal(e, bodyLocalSrc(pet.variant, pet.stage));
+          }}
         />
         {/* 蛋裂纹（随啄壳进度增多） */}
         {isEgg && <EggCracks tapsToHatch={pet.tapsToHatch} />}

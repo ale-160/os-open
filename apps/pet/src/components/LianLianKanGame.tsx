@@ -3,6 +3,7 @@
 /**
  * 连连看：8×6 棋盘 24 对图案，点选两张相同图案，
  * 能用 ≤2 个拐点的空路径连通即可消除；180 秒内清空获胜。
+ * 主题每局随机：甜点（llk 素材）或森林（llk2 素材 48 选 24），图片加载失败回退 emoji。
  * 得分 = 消除对数 ×1 + 剩余秒数 ÷10 的时间奖励，走统一的 minigameReward 结算。
  */
 
@@ -11,6 +12,7 @@ import { useEscClose } from '@/hooks/useEscClose';
 import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
 import { BASE_PATH } from '@/lib/skins';
+import { gameBgStyle } from '@/lib/gamebg';
 import { sfx } from '@/lib/sfx';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -18,19 +20,72 @@ import type { PetState } from '@/lib/types';
 const ROWS = 6;
 const COLS = 8;
 const DURATION = 180_000;
+/** 棋盘 48 格 = 24 对 */
+const PAIRS = (ROWS * COLS) / 2;
 
-/** 24 种图案素材 id（skins/gugu/game/llk-<id>.png），加载失败用同名 emoji 兜底 */
-const ICON_IDS = [
-  'taiyaki', 'dango', 'tart', 'macaron', 'pudding2', 'croissant', 'pretzel', 'waffle',
-  'candy-apple', 'mochi', 'senbei', 'melonbread', 'crepe', 'parfait', 'shortcake', 'eclair',
-  'madeleine', 'biscuit', 'jam-toast', 'cinnamon-roll', 'strawberry-pocky', 'chocolate-cornet',
-  'lemon-tart', 'cream puff',
+interface IconTheme {
+  /** 素材文件名（不含 .png），长度 = PAIRS */
+  files: readonly string[];
+  emoji: readonly string[];
+  icon: string;
+}
+
+const BAKERY_THEME: IconTheme = {
+  files: [
+    'llk-taiyaki', 'llk-dango', 'llk-tart', 'llk-macaron', 'llk-pudding2', 'llk-croissant', 'llk-pretzel', 'llk-waffle',
+    'llk-candy-apple', 'llk-mochi', 'llk-senbei', 'llk-melonbread', 'llk-crepe', 'llk-parfait', 'llk-shortcake', 'llk-eclair',
+    'llk-madeleine', 'llk-biscuit', 'llk-jam-toast', 'llk-cinnamon-roll', 'llk-strawberry-pocky', 'llk-chocolate-cornet',
+    'llk-lemon-tart', 'llk-cream puff',
+  ],
+  emoji: [
+    '🐟', '🍡', '🥧', '🍬', '🍮', '🥐', '🥨', '🧇',
+    '🍎', '🍚', '🍘', '🍞', '🌯', '🍨', '🍰', '🍫',
+    '🍪', '🍪', '🍞', '🌀', '🍫', '🥐', '🍋', '🥯',
+  ],
+  icon: '🍡',
+};
+
+/** 48 种森林图案（game/llk2-<id>.png）：蘑菇/松果/坚果/叶子/浆果/野花/林地 */
+const FOREST_ITEMS: readonly string[] = [
+  'mushroom-fly', 'mushroom-puffball', 'mushroom-coral', 'mushroom-porcini',
+  'mushroom-blue', 'mushroom-amber', 'mushroom-chanterelle', 'mushroom-purple',
+  'cone-spruce', 'cone-larch', 'cone-pine', 'cone-sweetgum',
+  'nut-acorn', 'nut-walnut', 'nut-hazelnut', 'nut-chestnut',
+  'leaf-ginkgo', 'leaf-ivy', 'leaf-maple', 'leaf-birch',
+  'leaf-fern', 'leaf-oak', 'leaf-aspen', 'leaf-willow',
+  'berry-strawberry', 'berry-blueberry', 'berry-lingonberry', 'berry-blackberry',
+  'berry-rosehip', 'berry-elderberry', 'berry-currant', 'berry-rowan',
+  'flower-violet', 'flower-thistle', 'flower-snowdrop', 'flower-lily-valley',
+  'flower-clover', 'flower-daisy', 'flower-dandelion', 'flower-poppy',
+  'forest-log', 'forest-amber', 'forest-moss-rock', 'forest-nest',
+  'forest-snail-shell', 'forest-stump', 'forest-feather', 'forest-wood-slice',
 ];
-const ICON_EMOJI = [
-  '🐟', '🍡', '🥧', '🍬', '🍮', '🥐', '🥨', '🧇',
-  '🍎', '🍚', '🍘', '🍞', '🌯', '🍨', '🍰', '🍫',
-  '🍪', '🍪', '🍞', '🌀', '🍫', '🥐', '🍋', '🥯',
-];
+
+/** 按前缀给森林图案配 emoji 兜底 */
+function forestEmoji(id: string): string {
+  if (id.startsWith('mushroom')) return '🍄';
+  if (id.startsWith('cone')) return '🌲';
+  if (id.startsWith('nut')) return '🌰';
+  if (id.startsWith('leaf')) return '🍃';
+  if (id.startsWith('berry')) return '🍓';
+  if (id.startsWith('flower')) return '🌸';
+  return '🪵';
+}
+
+function pickTheme(): IconTheme {
+  if (Math.random() < 0.5) return BAKERY_THEME;
+  const pool = FOREST_ITEMS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picked = pool.slice(0, PAIRS);
+  return {
+    files: picked.map((id) => `llk2-${id}`),
+    emoji: picked.map(forestEmoji),
+    icon: '🌲',
+  };
+}
 
 /** 棋盘：长度 48 的数组，值 = 图案下标，null = 已消除空格 */
 type Board = (number | null)[];
@@ -116,9 +171,9 @@ function hasLink(board: readonly (number | null)[]): boolean {
 }
 
 /** 开局棋盘：24 对图案随机洗牌，并保证至少有一对可连（兜底时强制一对相邻） */
-function freshBoard(): Board {
+function freshBoard(kindCount: number): Board {
   const kinds: number[] = [];
-  for (let k = 0; k < ICON_IDS.length; k++) kinds.push(k, k);
+  for (let k = 0; k < kindCount; k++) kinds.push(k, k);
   for (let attempt = 0; attempt < 300; attempt++) {
     const arr = shuffled(kinds);
     if (hasLink(arr)) return arr;
@@ -139,8 +194,9 @@ export function LianLianKanGame({ onClose }: { pet: PetState; onClose: () => voi
   useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
+  const [theme, setTheme] = useState<IconTheme>(pickTheme);
   const [board, setBoard] = useState<Board>(() =>
-    Array.from({ length: ROWS * COLS }, (_, i) => Math.floor(i / 2) % ICON_IDS.length)
+    Array.from({ length: ROWS * COLS }, (_, i) => Math.floor(i / 2) % PAIRS)
   );
   const [timeLeft, setTimeLeft] = useState(DURATION);
   const [score, setScore] = useState(0);
@@ -170,12 +226,15 @@ export function LianLianKanGame({ onClose }: { pet: PetState; onClose: () => voi
     finishedRef.current = false;
     scoreRef.current = 0;
     deadlineRef.current = performance.now() + DURATION;
-    setBoard(freshBoard());
+    const nextTheme = pickTheme();
+    setTheme(nextTheme);
+    setBoard(freshBoard(nextTheme.files.length));
     setScore(0);
     setTimeLeft(DURATION);
     setReward(null);
     setSel(null);
     setShuffleUsed(false);
+    setFailed(new Set());
     setPhase('playing');
   }, []);
 
@@ -272,14 +331,14 @@ export function LianLianKanGame({ onClose }: { pet: PetState; onClose: () => voi
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3" role="dialog" aria-label={t.gameLlk}>
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="text-lg font-bold">🔗 {t.gameLlk}</h2>
+          <h2 className="text-lg font-bold">{theme.icon} {t.gameLlk}</h2>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-amber-100/80 px-3 py-1 text-sm font-extrabold">{t.gameScore} {score}</span>
             <button type="button" onClick={onClose} className="press rounded-full bg-amber-900/5 px-3 py-1 text-sm font-semibold">✕</button>
           </div>
         </div>
 
-        <div className="relative bg-gradient-to-b from-[#fff3dd] to-[#ffe3b8] p-3">
+        <div className="relative p-3" style={gameBgStyle('rgba(255,243,221,0.82)')}>
           {phase === 'playing' && (
             <div className="absolute left-0 top-0 h-1.5 w-full bg-amber-900/15">
               <div className="h-full bg-gugu-accent" style={{ width: `${Math.max(0, Math.min(100, (timeLeft / DURATION) * 100))}%` }} />
@@ -316,11 +375,11 @@ export function LianLianKanGame({ onClose }: { pet: PetState; onClose: () => voi
                   }`}
                 >
                   {failed.has(kind) ? (
-                    <span className="text-3xl leading-none">{ICON_EMOJI[kind]}</span>
+                    <span className="text-3xl leading-none">{theme.emoji[kind]}</span>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`${BASE_PATH}/skins/gugu/game/llk-${ICON_IDS[kind]}.png`}
+                      src={`${BASE_PATH}/skins/gugu/game/${theme.files[kind]}.png`}
                       alt=""
                       draggable={false}
                       onError={() => markFailed(kind)}
@@ -334,7 +393,7 @@ export function LianLianKanGame({ onClose }: { pet: PetState; onClose: () => voi
 
           {phase !== 'playing' && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/88 px-6 text-center">
-              <span className="text-4xl">{phase === 'ready' ? '🔗' : '🎉'}</span>
+              <span className="text-4xl">{phase === 'ready' ? theme.icon : '🎉'}</span>
               <p className="max-w-[280px] text-sm text-gugu-ink-soft">{phase === 'ready' ? t.llkHint : ''}</p>
               {phase === 'done' && reward && (
                 <>

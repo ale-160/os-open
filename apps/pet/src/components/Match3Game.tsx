@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * 消消乐（三消）：8×8 棋盘 6 种水果，20 步内交换相邻水果凑横竖三连消除。
+ * 消消乐（三消）：8×8 棋盘 6 种图案，20 步内交换相邻图案凑横竖三连消除。
+ * 主题每局随机：水果（m3 素材）或宝石（m3b 素材 28 选 6），图片加载失败回退 emoji。
  * 连锁逐波结算：每块 30 分 × 波次倍数（第 n 波 ×n），4 连波额外 +60、5 连波 +150；
  * 无有效交换时自动洗牌（保底有解），步数用尽结算，走统一的 finishMinigame 奖励。
  */
@@ -11,6 +12,7 @@ import { useEscClose } from '@/hooks/useEscClose';
 import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
 import { BASE_PATH } from '@/lib/skins';
+import { gameBgStyle } from '@/lib/gamebg';
 import { sfx } from '@/lib/sfx';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -21,11 +23,49 @@ const MOVES = 20;
 const TILE_SCORE = 30;
 const REMOVED = -1;
 
-/** 6 种水果素材 id（skins/gugu/game/m3-<id>.png），加载失败用同名 emoji 兜底 */
-const ICON_IDS = ['strawberry', 'banana', 'grape2', 'orange2', 'blueberry', 'watermelon2'];
-const ICON_EMOJI = ['🍓', '🍌', '🍇', '🍊', '🫐', '🍉'];
+interface IconTheme {
+  /** 素材文件名（不含 .png），长度 = KINDS */
+  files: readonly string[];
+  /** 图片加载失败时的 emoji 兜底 */
+  emoji: readonly string[];
+  /** 结算面板/标题用的主题 emoji */
+  icon: string;
+}
 
-/** 棋盘：长度 64 的数组，值 = 水果下标，-1 = 消除后的空格 */
+const FRUIT_THEME: IconTheme = {
+  files: ['m3-strawberry', 'm3-banana', 'm3-grape2', 'm3-orange2', 'm3-blueberry', 'm3-watermelon2'],
+  emoji: ['🍓', '🍌', '🍇', '🍊', '🫐', '🍉'],
+  icon: '🍊',
+};
+
+/** 28 种宝石（game/m3b-<id>.png），每局随机抽 6 种 */
+const GEMS: readonly (readonly [string, string])[] = [
+  ['ruby', '💎'], ['emerald', '💚'], ['sapphire', '🔷'], ['amethyst', '🟣'],
+  ['topaz', '🟡'], ['opal', '⚪'], ['garnet', '🟥'], ['peridot', '🟩'],
+  ['aquamarine', '🩵'], ['citrine', '🍋'], ['tourmaline', '🌈'], ['moonstone', '🌙'],
+  ['onyx', '⚫'], ['jade', '🟢'], ['lapis', '🔵'], ['turquoise', '🩵'],
+  ['spinel', '🌺'], ['zircon', '✨'], ['tanzanite', '🟪'], ['morganite', '🌸'],
+  ['alexandrite', '🦋'], ['labradorite', '🪩'], ['rose-quartz', '🌷'], ['obsidian', '⬛'],
+  ['amber', '🟠'], ['smoky-quartz', '🟤'], ['sunstone', '🔆'], ['fluorite', '🔮'],
+];
+
+function pickTheme(): IconTheme {
+  // 一半概率水果、一半概率宝石，让老素材与新素材都有出场
+  if (Math.random() < 0.5) return FRUIT_THEME;
+  const pool = GEMS.slice();
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  const picked = pool.slice(0, KINDS);
+  return {
+    files: picked.map(([id]) => `m3b-${id}`),
+    emoji: picked.map(([, e]) => e),
+    icon: '💎',
+  };
+}
+
+/** 棋盘：长度 64 的数组，值 = 图案下标，-1 = 消除后的空格 */
 type Board = number[];
 
 const at = (r: number, c: number) => r * SIZE + c;
@@ -173,6 +213,7 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
   useEscClose(onClose);
 
   const [phase, setPhase] = useState<'ready' | 'playing' | 'done'>('ready');
+  const [theme, setTheme] = useState<IconTheme>(pickTheme);
   const [board, setBoard] = useState<Board>(ensureSolvableBoard);
   const [clearing, setClearing] = useState<Set<number>>(() => new Set());
   const [sel, setSel] = useState<number | null>(null);
@@ -206,6 +247,7 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
     busyRef.current = false;
     scoreRef.current = 0;
     movesRef.current = MOVES;
+    setTheme(pickTheme());
     setBoard(ensureSolvableBoard());
     setClearing(new Set());
     setSel(null);
@@ -214,6 +256,7 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
     setCombo(0);
     setReshuffled(false);
     setReward(null);
+    setFailed(new Set());
     setPhase('playing');
   }, []);
 
@@ -313,14 +356,14 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3" role="dialog" aria-label={t.gameM3}>
       <div className="w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl">
         <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="text-lg font-bold">🍊 {t.gameM3}</h2>
+          <h2 className="text-lg font-bold">{theme.icon} {t.gameM3}</h2>
           <div className="flex items-center gap-2">
             <span className="rounded-full bg-amber-100/80 px-3 py-1 text-sm font-extrabold">{t.gameScore} {score}</span>
             <button type="button" onClick={onClose} className="press rounded-full bg-amber-900/5 px-3 py-1 text-sm font-semibold">✕</button>
           </div>
         </div>
 
-        <div className="relative bg-gradient-to-b from-[#fff3dd] to-[#ffe3b8] p-3">
+        <div className="relative p-3" style={gameBgStyle('rgba(255,243,221,0.82)')}>
           <div className="mb-2 flex items-center justify-between">
             <span className="rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-extrabold text-gugu-ink-soft">
               {locale === 'zh' ? '步数' : 'Moves'} {movesLeft}
@@ -347,11 +390,11 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
                 }`}
               >
                 {failed.has(kind) ? (
-                  <span className="text-2xl leading-none">{ICON_EMOJI[kind]}</span>
+                  <span className="text-2xl leading-none">{theme.emoji[kind]}</span>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`${BASE_PATH}/skins/gugu/game/m3-${ICON_IDS[kind]}.png`}
+                    src={`${BASE_PATH}/skins/gugu/game/${theme.files[kind]}.png`}
                     alt=""
                     draggable={false}
                     onError={() => markFailed(kind)}
@@ -370,7 +413,7 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
 
           {phase !== 'playing' && (
             <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-white/88 px-6 text-center backdrop-blur">
-              <span className="text-4xl">{phase === 'ready' ? '🍊' : '🎉'}</span>
+              <span className="text-4xl">{phase === 'ready' ? theme.icon : '🎉'}</span>
               <p className="max-w-[280px] text-sm text-gugu-ink-soft">{phase === 'ready' ? t.m3Hint : ''}</p>
               {phase === 'done' && reward && (
                 <>

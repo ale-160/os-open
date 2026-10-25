@@ -40,10 +40,31 @@ export const VISITORS: VisitorDef[] = [
   { id: 'hamster', mode: 'ground' },
   { id: 'mouse', mode: 'ground' },
   { id: 'penguin', mode: 'ground' },
+  // 传说生物（第 5 批）：飞行 / 地面
+  { id: 'v3-fenghuang', mode: 'fly' },
+  { id: 'v3-griffin', mode: 'fly' },
+  { id: 'v3-dragonet', mode: 'fly' },
+  { id: 'v3-wyvern', mode: 'fly' },
+  { id: 'v3-pixie', mode: 'fly' },
+  { id: 'v3-pegasus', mode: 'fly' },
+  { id: 'v3-thunderbird', mode: 'fly' },
+  { id: 'v3-wisp', mode: 'fly' },
+  { id: 'v3-hippocampus', mode: 'fly' },
+  { id: 'v3-sea-serpent', mode: 'fly' },
+  { id: 'v3-qilin', mode: 'ground' },
+  { id: 'v3-jade-rabbit', mode: 'ground' },
+  { id: 'v3-merfolk', mode: 'ground' },
+  { id: 'v3-yeti', mode: 'ground' },
+  { id: 'v3-unicorn', mode: 'ground' },
+  { id: 'v3-kitsune', mode: 'ground' },
+  { id: 'v3-tanuki', mode: 'ground' },
+  { id: 'v3-sphinx', mode: 'ground' },
+  { id: 'v3-ember-salamander', mode: 'ground' },
+  { id: 'v3-golem', mode: 'ground' },
 ];
 
 /** 夜行访客（仅夜晚时段出现） */
-export const NIGHT_VISITORS = new Set(['owl', 'moth', 'bat', 'firefly', 'jellyfish']);
+export const NIGHT_VISITORS = new Set(['owl', 'moth', 'bat', 'firefly', 'jellyfish', 'v3-wisp', 'v3-jade-rabbit', 'v3-thunderbird']);
 
 /** 昼行访客（夜晚不出） */
 export const DAY_ONLY_VISITORS = new Set(['bee', 'hummingbird', 'duckling', 'squirrel']);

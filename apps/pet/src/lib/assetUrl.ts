@@ -41,3 +41,17 @@ export function thumbUrl(localUrl: string): string {
   const rel = localUrl.slice(i + marker.length);
   return `${R2_CDN}/gugu/thumb/${rel}`;
 }
+
+/**
+ * <img onError> 兜底：R2 上缺对象时先切本地文件，本地也失败才隐藏。
+ * 用于装扮/装饰/场景/身体等 assetUrl 产出的地址。
+ */
+export function fallbackToLocal(e: { currentTarget: HTMLImageElement }, localSrc: string): void {
+  const img = e.currentTarget;
+  if (img.dataset.localFallback === '1') {
+    img.style.display = 'none';
+    return;
+  }
+  img.dataset.localFallback = '1';
+  img.src = localSrc;
+}
