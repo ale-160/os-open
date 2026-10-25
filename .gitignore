@@ -19,3 +19,7 @@ apps/pet/tools/
 
 # burger 游戏原图（已上传 R2，本地仅保留用于重传）
 apps/burger/assets-local/
+
+# Playwright 测试产物
+test-results/
+playwright-report/
