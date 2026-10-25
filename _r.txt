@@ -1,7 +1,0 @@
-GameKind ok
-GameBests MISS
-ZERO_BESTS ok
-bests fallback MISS
-TIER_CFG MISS
-zh games ok
-en games ok
