@@ -4,6 +4,7 @@
  */
 
 import { BASE_PATH } from './skins';
+import { assetUrl } from './assetUrl';
 
 export type SceneId =
   | 'garden' | 'lake' | 'bamboo' | 'roof' | 'meadow' | 'courtyard'
@@ -46,7 +47,7 @@ export const SCENES: SceneDef[] = [
 ];
 
 export function sceneSrc(id: SceneId): string {
-  return `${BASE_PATH}/skins/gugu/${SCENES.find((s) => s.id === id)?.file ?? ''}`;
+  return assetUrl(`${BASE_PATH}/skins/gugu/${SCENES.find((s) => s.id === id)?.file ?? ''}`);
 }
 
 /** 每日轮换（'auto' 模式）：按日期种子选场景 */

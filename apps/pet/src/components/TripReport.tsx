@@ -5,7 +5,7 @@
 import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
-import { destById, photoCaption } from '@/lib/travel';
+import { destById } from '@/lib/travel';
 import { BASE_PATH } from '@/lib/skins';
 import { PDS_DESTS, yypPhotoUrl } from '@/lib/pingdingshan';
 import { useEscClose } from '@/hooks/useEscClose';

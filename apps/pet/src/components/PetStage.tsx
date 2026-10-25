@@ -9,12 +9,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
+import { sfx } from '@/lib/sfx';
 import { weatherFor, type Weather } from '@/lib/weather';
 import { DECO_SLOTS, decoById, decoSrc } from '@/lib/accessories';
 import { SCENES, dailyScene, sceneSrc, type SceneId } from '@/lib/scenes';
 import { isBadWeather } from '@/lib/weather';
 import { pickVisitor, visitorSrc } from '@/lib/visitors';
-import { pickSticker } from '@/lib/stickers';
 import { destById } from '@/lib/travel';
 import { PDS_DESTS } from '@/lib/pingdingshan';
 import { fmt, ui } from '@/lib/locale';
@@ -47,12 +47,13 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   const [hour] = useState(() => new Date().getHours());
   const sky = skyTheme(hour);
   const [weather] = useState<Weather>(() => weatherFor(new Date()));
-  const [activeScene] = useState<SceneId | null>(() => {
+  // 场景即时生效：pet.sceneId 变化（工坊选择）直接派生，无需刷新
+  const activeScene: SceneId | null = (() => {
     const pick = pet.sceneId as SceneId | null | undefined;
     if (pick && SCENES.some((x) => x.id === pick)) return pick;
     if (pick === null || pick === undefined) return dailyScene(new Date());
-    return dailyScene(new Date());
-  });
+    return null;
+  })();
   const useScene = !!activeScene;
 
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -60,7 +61,8 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   const [facing, setFacing] = useState<1 | -1>(1);
   const [trick, setTrick] = useState<TrickId | null>(null);
   const [butterfly, setButterfly] = useState(0); // 触发序号（0 = 无）；奇偶控制方向
-  const [visitor, setVisitor] = useState<{ n: number; id: string; mode: 'fly' | 'ground'; dur: number } | null>(null);
+  const [visitor, setVisitor] = useState<{ key: number; id: string; mode: 'fly' | 'ground'; dur: number; x: number; dir: 1 | -1 } | null>(null);
+  const visitorSeq = useRef(0);
   const timersRef = useRef<number[]>([]);
 
   const isEgg = pet.stage === 'egg';
@@ -153,11 +155,12 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       localTimers.push(id);
     };
     const visitorLoop = () => {
-      schedule(18_000 + Math.random() * 30_000, () => {
+      schedule(24_000 + Math.random() * 36_000, () => {
         const v = pickVisitor(new Date().getHours(), isBadWeather(weather));
         const dur = v.mode === 'fly' ? 5 + Math.random() * 3 : 8 + Math.random() * 5;
-        setVisitor((n) => ({ n: (n?.n ?? 0) + 1, id: v.id, mode: v.mode, dur }));
-        schedule(dur * 1000 + 500, visitorLoop);
+        const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
+        setVisitor({ key: ++visitorSeq.current, id: v.id, mode: v.mode, dur, x: dir === 1 ? -10 : 108, dir });
+        schedule(dur * 1000 + 800, visitorLoop);
       });
     };
     visitorLoop();
@@ -294,13 +297,23 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {visitor && (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          key={visitor.n}
+          key={visitor.key}
           src={visitorSrc(visitor.id)}
-          alt=""
+          alt={visitor.id}
           draggable={false}
           onAnimationEnd={() => setVisitor(null)}
-          className={visitor.mode === 'fly' ? 'anim-fly-across pointer-events-none absolute text-3xl' : 'anim-walk-across pointer-events-none absolute bottom-[7%] w-[11%] object-contain'}
-          style={{ top: visitor.mode === 'fly' ? '30%' : undefined, animationDuration: `${visitor.dur}s` }}
+          onClick={() => {
+            sfx.pop();
+            setVisitor(null);
+          }}
+          className={visitor.mode === 'fly' ? 'anim-fly-across absolute cursor-pointer' : 'anim-walk-x absolute bottom-[7%] w-[13%] cursor-pointer object-contain'}
+          style={{
+            top: visitor.mode === 'fly' ? '30%' : undefined,
+            left: visitor.dir === -1 ? '104%' : '-10%',
+            transform: visitor.dir === -1 ? 'scaleX(-1)' : undefined,
+            animationDuration: `${visitor.dur}s`,
+            animationDirection: visitor.dir === -1 ? 'reverse' : 'normal',
+          }}
         />
       )}
 

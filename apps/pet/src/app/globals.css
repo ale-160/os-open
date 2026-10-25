@@ -264,14 +264,24 @@ body {
 
 /* 访客地面巡游（左→右，带轻微上下颠） */
 @keyframes gugu-walk-across {
-  0% { left: -12%; transform: translateY(0) scaleX(1); }
-  25% { transform: translateY(-1.5%) scaleX(1); }
-  50% { transform: translateY(0) scaleX(1); }
-  75% { transform: translateY(-1.5%) scaleX(1); }
-  99% { left: 104%; transform: translateY(0) scaleX(1); }
+  0% { left: -12%; transform: translateY(0) ; }
+  25% { transform: translateY(-1.5%) ; }
+  50% { transform: translateY(0) ; }
+  75% { transform: translateY(-1.5%) ; }
+  99% { left: 104%; transform: translateY(0) ; }
   100% { left: 104%; }
 }
 .anim-walk-across { animation: gugu-walk-across var(--dur, 9s) linear 1; }
 
 /* 访客飞行巡游（复用 fly 轨迹，速度可变） */
 .anim-fly-across { animation: gugu-fly var(--dur, 6s) linear 1; }
+
+/* 访客地面巡游 v2：translateX 全程（避免 left 动画抖动） */
+@keyframes gugu-walk-x {
+  0% { transform: translateX(0) translateY(0); }
+  25% { transform: translateX(12vw) translateY(-1.5%); }
+  50% { transform: translateX(50vw) translateY(0); }
+  75% { transform: translateX(88vw) translateY(-1.5%); }
+  100% { transform: translateX(116vw) translateY(0); }
+}
+.anim-walk-x { animation: gugu-walk-x var(--dur, 9s) linear 1 forwards; }

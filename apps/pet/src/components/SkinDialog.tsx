@@ -188,20 +188,18 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
           ))}
         </div>
 
-        {/* 装扮配件（拥有才可穿） */}
+        {/* 装扮配件（只显示已拥有；购买去商店） */}
         <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🎩 装扮</p>
         <div className="mb-4 grid grid-cols-4 gap-2">
-          {ACCESSORIES.map((a) => {
-            const owned = pet.accessories?.includes(a.id);
+          {ACCESSORIES.filter((a) => pet.accessories?.includes(a.id)).map((a) => {
             const active = pet.equippedAccessory === a.id;
             return (
               <button
                 key={a.id}
                 type="button"
-                disabled={!owned}
                 onClick={() => equipAccessory(active ? null : a.id)}
-                title={owned ? (locale === 'zh' ? a.zh : a.en) : locale === 'zh' ? '商店购买解锁' : 'Buy in shop'}
-                className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${active ? 'border-gugu-accent bg-amber-50' : owned ? 'border-transparent bg-amber-50/50' : 'border-transparent bg-amber-50/30 opacity-45'}`}
+                title={locale === 'zh' ? a.zh : a.en}
+                className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${active ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={accessorySrc(a.id)} alt="" className="h-9 w-9 object-contain" draggable={false} />
@@ -211,20 +209,18 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
           })}
         </div>
 
-        {/* 房间装饰（拥有可摆/收） */}
+        {/* 房间装饰（只显示已拥有；购买去商店） */}
         <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🪴 房间装饰</p>
         <div className="mb-4 grid grid-cols-4 gap-2">
-          {DECORATIONS.map((d) => {
-            const owned = pet.decoOwned?.includes(d.id);
+          {DECORATIONS.filter((d) => pet.decoOwned?.includes(d.id)).map((d) => {
             const placed = pet.decorations?.includes(d.id);
             return (
               <button
                 key={d.id}
                 type="button"
-                disabled={!owned}
                 onClick={() => toggleDecoration(d.id)}
-                title={owned ? (locale === 'zh' ? d.zh : d.en) : locale === 'zh' ? '商店购买解锁' : 'Buy in shop'}
-                className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${placed ? 'border-gugu-accent bg-amber-50' : owned ? 'border-transparent bg-amber-50/50' : 'border-transparent bg-amber-50/30 opacity-45'}`}
+                title={locale === 'zh' ? d.zh : d.en}
+                className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${placed ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={decoSrc(d.id)} alt="" className="h-9 w-9 object-contain" draggable={false} />
