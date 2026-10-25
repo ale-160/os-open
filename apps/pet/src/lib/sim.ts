@@ -59,6 +59,8 @@ export function createPet(variant: VariantId, name: string, now: number): PetSta
     equippedAccessory: null,
     decoOwned: [],
     decorations: [],
+    variantOwned: [variant],
+    sceneOwned: [],
     achievements: [],
     sleeping: false,
     sick: false,

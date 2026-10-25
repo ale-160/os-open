@@ -8,27 +8,47 @@ import { useEscClose } from '@/hooks/useEscClose';
 import { useLocale } from '@/hooks/useLocale';
 import { SHOP_ITEMS } from '@/lib/balance';
 import { wardrobeShopItems } from '@/lib/accessories';
+import { sceneShopItems, variantShopItems } from '@/lib/shop-extra';
 import { BASE_PATH } from '@/lib/skins';
+import { assetThumbUrl, assetUrl, thumbLocalSrc } from '@/lib/assetUrl';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { PetState, ShopItem } from '@/lib/types';
 
-/** 商品图标：素材缺失时自动退回 emoji，避免出现破图 */
-function ShopIcon({ item, kind }: { item: ShopItem; kind: 'use' | 'accessory' | 'decoration' }) {
+/** 商品图标：R2 缩略图 → R2 原图 → 本地缩略图 → 本地原图 → emoji */
+function ShopIcon({ item, kind }: { item: ShopItem; kind: NonNullable<ShopItem['kind']> }) {
+  const [idx, setIdx] = useState(0);
   const [failed, setFailed] = useState(false);
-  const src = item.iconSrc ?? (kind === 'use' ? `${BASE_PATH}/skins/gugu/item/${item.id}.png` : undefined);
-  if (src && !failed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img src={src} alt="" onError={() => setFailed(true)} className="h-10 w-10 shrink-0 object-contain" draggable={false} />
-    );
+  const localFull =
+    item.iconSrc ?? (kind === 'use' ? `${BASE_PATH}/skins/gugu/item/${item.id}.png` : '');
+  const candidates = localFull
+    ? [assetThumbUrl(localFull), assetUrl(localFull), thumbLocalSrc(localFull), localFull].filter(
+        (v, i, a) => v && a.indexOf(v) === i,
+      )
+    : [];
+  if (failed || candidates.length === 0) {
+    return <span className="text-3xl leading-none">{item.icon}</span>;
   }
-  return <span className="text-3xl leading-none">{item.icon}</span>;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={candidates[Math.min(idx, candidates.length - 1)]}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      onError={() => {
+        if (idx < candidates.length - 1) setIdx(idx + 1);
+        else setFailed(true);
+      }}
+      className="h-10 w-10 shrink-0 object-contain"
+      draggable={false}
+    />
+  );
 }
 
 export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => void }) {
   const buyItem = usePetStore((s) => s.buyItem);
-  const ALL_ITEMS = [...SHOP_ITEMS, ...wardrobeShopItems()];
+  const ALL_ITEMS = [...SHOP_ITEMS, ...wardrobeShopItems(), ...variantShopItems(), ...sceneShopItems()];
   const { locale } = useLocale();
   const t = ui(locale);
   useEscClose(onClose);
@@ -40,7 +60,7 @@ export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
       role="presentation"
     >
       <div
-        className="w-full max-w-md rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl"
+        className="max-h-[86dvh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-5 shadow-2xl sm:rounded-3xl"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-label={t.shopTitle}
@@ -62,6 +82,8 @@ export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
 
                 {([
           ['use', locale === 'zh' ? '🍪 道具（买即用）' : 'Snacks & items'],
+          ['variant', locale === 'zh' ? '🎨 官方配色（买后拥有）' : 'Color variants'],
+          ['scene', locale === 'zh' ? '🏞️ 场景（买后拥有）' : 'Scenes'],
           ['accessory', locale === 'zh' ? '🎩 装扮（买后拥有）' : 'Accessories'],
           ['decoration', locale === 'zh' ? '🪴 房间装饰' : 'Decorations'],
         ] as const).map(([kind, title]) => (
@@ -72,7 +94,9 @@ export function ShopDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                 const affordable = pet.coins >= item.price;
                 const owned =
                   (item.accessory && pet.accessories?.includes(item.accessory)) ||
-                  (item.deco && pet.decoOwned?.includes(item.deco));
+                  (item.deco && pet.decoOwned?.includes(item.deco)) ||
+                  (item.variant && pet.variantOwned?.includes(item.variant)) ||
+                  (item.scene && pet.sceneOwned?.includes(item.scene));
                 const usable =
                   kind !== 'use' ||
                   (item.cure ? pet.sick : true);

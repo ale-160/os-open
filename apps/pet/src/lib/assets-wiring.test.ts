@@ -11,6 +11,8 @@ import { CLASSIC_TILES, VENUES, buildSeasonBoard } from './monopoly';
 import { ACCESSORIES, DECORATIONS } from './accessories';
 import { VISITORS } from './visitors';
 import { EXTRA_FACES } from './stickers';
+import { sceneShopItems, variantShopItems } from './shop-extra';
+import { VARIANTS } from './skins';
 
 const ROOT = path.join(process.cwd(), 'public', 'skins', 'gugu');
 const GAME_DIR = path.join(ROOT, 'game');
@@ -150,5 +152,26 @@ assetDescribe('第 5 批装扮 / 装饰 / 表情 / 访客', () => {
     const legend = VISITORS.filter((v) => v.id.startsWith('v3-'));
     expect(legend.length).toBe(20);
     expect(legend.filter((v) => !existsSync(asset(`vis/${v.id}.png`)))).toEqual([]);
+  });
+
+  it('全部访客素材齐全且 id 不重复', () => {
+    expect(new Set(VISITORS.map((v) => v.id)).size).toBe(VISITORS.length);
+    expect(VISITORS.filter((v) => !existsSync(asset(`vis/${v.id}.png`))).map((v) => v.id)).toEqual([]);
+  });
+});
+describe('商店配色 / 场景', () => {
+  it('每个配色与场景都有购买项（价格 > 0、id 唯一）', () => {
+    const variants = variantShopItems();
+    const scenes = sceneShopItems();
+    expect(variants.length).toBe(VARIANTS.length);
+    expect(scenes.length).toBe(SCENES.length);
+    expect(variants.every((i) => i.kind === 'variant' && !!i.variant && i.price > 0)).toBe(true);
+    expect(scenes.every((i) => i.kind === 'scene' && !!i.scene && i.price > 0)).toBe(true);
+    expect(new Set([...variants, ...scenes].map((i) => i.id)).size).toBe(VARIANTS.length + SCENES.length);
+  });
+
+  assetIt('配色蛋图与场景图齐全', () => {
+    expect(VARIANTS.filter((v) => !existsSync(asset(`${v.id}-egg.png`)))).toEqual([]);
+    expect(SCENES.filter((s) => !existsSync(asset(s.file)))).toEqual([]);
   });
 });

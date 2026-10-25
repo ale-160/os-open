@@ -12,8 +12,8 @@ import { useLocale } from '@/hooks/useLocale';
 import { useEscClose } from '@/hooks/useEscClose';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
-import { BASE_PATH } from '@/lib/skins';
 import { gameBgStyle } from '@/lib/gamebg';
+import { gameImgError, gameThumbSrc } from '@/lib/game-assets';
 import { sfx } from '@/lib/sfx';
 import type { PetState } from '@/lib/types';
 
@@ -264,10 +264,10 @@ export function MergeGame({ onClose }: { pet: PetState; onClose: () => void }) {
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={`${BASE_PATH}/skins/gugu/game/merge2-${cell.family}-${ART_LEVEL[cell.tier - 1]}.png`}
+                      src={gameThumbSrc(`merge2-${cell.family}-${ART_LEVEL[cell.tier - 1]}.png`)}
                       alt=""
                       draggable={false}
-                      onError={() => markFailed(`${cell.family}-${cell.tier}`)}
+                      onError={(e) => gameImgError(e, `merge2-${cell.family}-${ART_LEVEL[cell.tier - 1]}.png`, () => markFailed(`${cell.family}-${cell.tier}`))}
                       className="h-[82%] w-[82%] object-contain"
                     />
                   )}

@@ -7,13 +7,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
+import { stickerFullSrc } from '@/lib/stickers';
 import { HATCH_TAPS } from '@/lib/balance';
 import { skyTheme } from '@/lib/sky';
 import { sfx } from '@/lib/sfx';
 import { weatherFor, type Weather } from '@/lib/weather';
-import { DECO_SLOTS, decoById, decoLocalSrc, decoSrc } from '@/lib/accessories';
+import { DECO_SLOTS, decoById, decoLocalSrc } from '@/lib/accessories';
 import { SCENES, dailyScene, sceneLocalSrc, sceneSrc, sceneVariantFor, type SceneId } from '@/lib/scenes';
-import { fallbackToLocal } from '@/lib/assetUrl';
+import { assetThumbUrl, fallbackAsset, fallbackToLocal } from '@/lib/assetUrl';
 import { isBadWeather } from '@/lib/weather';
 import { pickVisitor, visitorSrc } from '@/lib/visitors';
 import { destById } from '@/lib/travel';
@@ -28,6 +29,8 @@ const BOUND_R = 78;
 const TRICKS: TrickId[] = ['tilt', 'peck', 'turn', 'flap', 'sing', 'dance', 'sit'];
 const LONG_PRESS_MS = 550;
 const LONG_PRESS_MOVE = 12;
+/** 1×1 透明占位图（访客隐藏时不产生网络请求） */
+const EMPTY_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
 interface PetStageProps {
   onPetMenu?: (x: number, y: number) => void;
@@ -66,6 +69,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   const [butterfly, setButterfly] = useState(0); // 触发序号（0 = 无）；奇偶控制方向
   const [visitor, setVisitor] = useState<{ key: number; id: string; mode: 'fly' | 'ground'; dur: number; x: number; dir: 1 | -1 } | null>(null);
   const visitorSeq = useRef(0);
+  const visitorRef = useRef<HTMLImageElement>(null);
   const timersRef = useRef<number[]>([]);
 
   const isEgg = pet.stage === 'egg';
@@ -145,7 +149,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
   }, [canPerform]);
 
   // 蝴蝶动画结束即卸载（keyframes 无 forwards，动画一停就移除，避免冻在半空）
-  const onButterflyEnd = useCallback(() => setButterfly(0), []);
+  const onButterflyEnd = () => setButterfly(0);
 
 
   // 访客小剧场：低频随机小动物巡游（飞行/地面），独立本地定时器
@@ -162,7 +166,10 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         const v = pickVisitor(new Date().getHours(), isBadWeather(weather));
         const dur = v.mode === 'fly' ? 5 + Math.random() * 3 : 8 + Math.random() * 5;
         const dir: 1 | -1 = Math.random() < 0.5 ? 1 : -1;
-        setVisitor({ key: ++visitorSeq.current, id: v.id, mode: v.mode, dur, x: dir === 1 ? -10 : 108, dir });
+        const next = { key: ++visitorSeq.current, id: v.id, mode: v.mode, dur, x: dir === 1 ? -10 : 108, dir };
+        setVisitor(next);
+        // 兜底清除：即使 animationend 因浏览器省电/动画禁用而不触发，也不会留下残影
+        schedule(dur * 1000 + 500, () => setVisitor((cur) => (cur && cur.key === next.key ? null : cur)));
         schedule(dur * 1000 + 800, visitorLoop);
       });
     };
@@ -170,6 +177,15 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     return () => { cancelled = true; localTimers.forEach(clearTimeout); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canPerform]);
+
+  // 访客节点保持单实例：每次换访客时重启动画（避免 key 变化在部分 React 版本里追加 DOM）
+  useEffect(() => {
+    const el = visitorRef.current;
+    if (!visitor || !el) return;
+    el.style.animationName = 'none';
+    void el.offsetWidth;
+    el.style.animationName = '';
+  }, [visitor]);
 
   // 踱步 / 奔跑
   useEffect(() => {
@@ -263,7 +279,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           { l: '74%', t: '42%', d: '0.4s' },
           { l: '88%', t: '34%', d: '1.2s' },
         ].map((s, i) => (
-          <span key={i} className="absolute animate-pulse text-[10px] text-white/80" style={{ left: s.l, top: s.t, animationDelay: s.d }}>
+          <span key={`star-${i}`} className="absolute animate-pulse text-[10px] text-white/80" style={{ left: s.l, top: s.t, animationDelay: s.d }}>
             ✦
           </span>
         ))}
@@ -279,14 +295,14 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           {weather === 'rain'
             ? [8, 18, 30, 41, 55, 63, 74, 86, 94].map((l, i) => (
                 <span
-                  key={i}
+                  key={`rain-${i}`}
                   className="anim-rain pointer-events-none absolute top-0 h-5 w-[2px] rounded-full bg-white/70"
                   style={{ left: `${l}%`, animationDelay: `${(i % 4) * 0.22}s`, animationDuration: `${0.7 + (i % 3) * 0.15}s` }}
                 />
               ))
             : [6, 16, 26, 38, 48, 60, 70, 82, 90, 96].map((l, i) => (
                 <span
-                  key={i}
+                  key={`snow-${i}`}
                   className="anim-snow pointer-events-none absolute top-0 text-sm text-white"
                   style={{ left: `${l}%`, animationDelay: `${(i % 5) * 0.9}s`, animationDuration: `${5.5 + (i % 4) * 1.2}s` }}
                 >
@@ -296,30 +312,35 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
         </>
       )}
 
-      {/* 访客巡游 */}
-      {visitor && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={visitor.key}
-          src={visitorSrc(visitor.id)}
-          alt={visitor.id}
-          draggable={false}
-          onError={() => setVisitor(null)}
-          onAnimationEnd={() => setVisitor(null)}
-          onClick={() => {
-            sfx.pop();
-            setVisitor(null);
-          }}
-          className={visitor.mode === 'fly' ? 'anim-fly-across absolute cursor-pointer' : 'anim-walk-x absolute bottom-[7%] w-[13%] cursor-pointer object-contain'}
-          style={{
-            top: visitor.mode === 'fly' ? '30%' : undefined,
-            left: visitor.dir === -1 ? '104%' : '-10%',
-            transform: visitor.dir === -1 ? 'scaleX(-1)' : undefined,
-            animationDuration: `${visitor.dur}s`,
-            animationDirection: visitor.dir === -1 ? 'reverse' : 'normal',
-          }}
-        />
-      )}
+      {/* 访客巡游：单实例常驻节点（避免 key 变化导致 DOM 追加），隐藏时用透明占位图 */}
+      <img
+        ref={visitorRef}
+        src={visitor ? assetThumbUrl(visitorSrc(visitor.id)) : EMPTY_IMG}
+        alt={visitor?.id ?? ''}
+        draggable={false}
+        onError={(e) => {
+          if (visitor) fallbackAsset(e, visitorSrc(visitor.id), () => setVisitor(null));
+          else setVisitor(null);
+        }}
+        onAnimationEnd={() => setVisitor(null)}
+        onClick={() => {
+          if (!visitor) return;
+          sfx.pop();
+          setVisitor(null);
+        }}
+        className={visitor ? (visitor.mode === 'fly' ? 'anim-fly-across absolute cursor-pointer' : 'anim-walk-x absolute bottom-[7%] w-[13%] cursor-pointer object-contain') : 'hidden'}
+        style={
+          visitor
+            ? {
+                top: visitor.mode === 'fly' ? '30%' : undefined,
+                left: visitor.dir === -1 ? '104%' : '-10%',
+                transform: visitor.dir === -1 ? 'scaleX(-1)' : undefined,
+                animationDuration: `${visitor.dur}s`,
+                animationDirection: visitor.dir === -1 ? 'reverse' : 'normal',
+              }
+            : undefined
+        }
+      />
 
       {/* 天气图标（右上角浮动） */}
       <span className="absolute right-3 top-[120px] z-[6] rounded-full bg-white/45 px-2 py-0.5 text-xs backdrop-blur-sm">
@@ -329,9 +350,13 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {/* 小剧场：蝴蝶（动画结束即卸载） */}
       {butterfly > 0 && (
         <span
-          key={butterfly}
+          key={`butterfly-${butterfly}`}
           onAnimationEnd={onButterflyEnd}
-          className="pointer-events-none absolute top-[26%] text-2xl"
+          onClick={() => {
+            sfx.pop();
+            setButterfly(0);
+          }}
+          className="absolute top-[26%] cursor-pointer text-2xl"
           style={{ animation: 'gugu-fly 4.2s linear 1', animationDirection: butterfly % 2 === 0 ? 'reverse' : 'normal' }}
         >
           🦋
@@ -363,7 +388,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       {/* 房间装饰：地毯垫底 + 槽位件（最多 6 件） */}
       {pet.decorations?.filter((d) => decoById(d)?.underlay).map((d) => (
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={`rug-${d}`} src={decoSrc(d)} alt="" draggable={false} onError={(e) => fallbackToLocal(e, decoLocalSrc(d))} className="pointer-events-none absolute bottom-[3%] left-1/2 w-[36%] -translate-x-1/2 opacity-95" />
+        <img key={`rug-${d}`} src={assetThumbUrl(decoLocalSrc(d))} alt="" draggable={false} onError={(e) => fallbackAsset(e, decoLocalSrc(d))} className="pointer-events-none absolute bottom-[3%] left-1/2 w-[36%] -translate-x-1/2 opacity-95" />
       ))}
       {(() => {
         const placed = pet.decorations?.filter((d) => !decoById(d)?.underlay).slice(0, DECO_SLOTS.length) ?? [];
@@ -371,7 +396,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
           const slot = DECO_SLOTS[i];
           return (
             // eslint-disable-next-line @next/next/no-img-element
-            <img key={`deco-${d}`} src={decoSrc(d)} alt="" draggable={false} onError={(e) => fallbackToLocal(e, decoLocalSrc(d))} className="pointer-events-none absolute" style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%` }} />
+            <img key={`deco-${d}`} src={assetThumbUrl(decoLocalSrc(d))} alt="" draggable={false} onError={(e) => fallbackAsset(e, decoLocalSrc(d))} className="pointer-events-none absolute" style={{ left: `${slot.x}%`, top: `${slot.y}%`, width: `${slot.w}%` }} />
           );
         });
       })()}
@@ -411,7 +436,15 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
             <div className="flex items-center gap-1.5">
               {bubble.sticker && (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={bubble.sticker} alt="" className="h-6 w-6 shrink-0" draggable={false} />
+                <img
+                  src={bubble.sticker}
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => fallbackAsset(e, stickerFullSrc(bubble.sticker ?? ''))}
+                  className="h-6 w-6 shrink-0"
+                  draggable={false}
+                />
               )}
               <span>{bubble.text}</span>
             </div>

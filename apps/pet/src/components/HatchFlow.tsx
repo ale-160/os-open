@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * 领养流程：选蛋（三配色变体）→ 起名 →（可选）一句话 AI 定制 → 开始孵化。
- * 页面为全幅暖色渐变（无白边框容器），底部有一条与游戏内 ActionPanel 一致的
- * 无级滚动动作条（触屏滑动 + 桌面滚轮/拖拽横滑）。
+ * 领养流程：选蛋（单行毛玻璃无级滚动，与首页底栏同款）→ 起名 →（可选）一句话 AI 定制 → 开始孵化。
+ * 页面为全幅暖色渐变（无白边框容器），底部有一条与游戏内 ActionPanel 一致的无级滚动动作条。
  */
 
 import { useRef, useState } from 'react';
@@ -12,7 +11,8 @@ import { aiImageReady, aiReady, generatePetImage, loadAiSettings } from '@/lib/a
 import { ui } from '@/lib/locale';
 import { YYP_BASE } from '@/lib/pingdingshan';
 import { usePetStore } from '@/lib/store';
-import { bodySrc, VARIANTS } from '@/lib/skins';
+import { bodyLocalSrc, VARIANTS } from '@/lib/skins';
+import { assetThumbUrl, fallbackAsset } from '@/lib/assetUrl';
 import type { CustomSkinRecord } from '@/lib/db';
 import type { VariantId } from '@/lib/types';
 
@@ -58,8 +58,10 @@ export function HatchFlow() {
   const [aiError, setAiError] = useState(false);
 
   const stripRef = useRef<HTMLDivElement>(null);
+  const eggStripRef = useRef<HTMLDivElement>(null);
   /** 拖拽滚动（桌面鼠标按住拖动，触屏原生滚动） */
   const dragRef = useRef<{ startX: number; startScroll: number } | null>(null);
+
 
   const aiSettings = typeof window === 'undefined' ? null : loadAiSettings();
   const aiUsable = !!aiSettings && aiImageReady(aiSettings);
@@ -149,21 +151,51 @@ export function HatchFlow() {
           <p className="mt-1 text-sm text-gugu-ink-soft">{t.adoptSubtitle}</p>
         </header>
 
-        <div className="grid w-full grid-cols-3 gap-2 sm:gap-3">
+        {/* 选蛋：单行毛玻璃无级滚动（与底栏同款，无白边框卡片） */}
+        <div
+          ref={eggStripRef}
+          className={`no-scrollbar ${CAPSULE} flex w-full items-stretch gap-1 overflow-x-auto`}
+          onWheel={(e) => {
+            if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+              e.currentTarget.scrollLeft += e.deltaY;
+              e.preventDefault();
+            }
+          }}
+          onPointerDown={(e) => {
+            if (e.pointerType !== 'mouse') return;
+            dragRef.current = { startX: e.clientX, startScroll: eggStripRef.current?.scrollLeft ?? 0 };
+          }}
+          onPointerMove={(e) => {
+            if (!dragRef.current || !eggStripRef.current) return;
+            eggStripRef.current.scrollLeft = dragRef.current.startScroll - (e.clientX - dragRef.current.startX);
+          }}
+          onPointerUp={() => {
+            dragRef.current = null;
+          }}
+          onPointerLeave={() => {
+            dragRef.current = null;
+          }}
+        >
           {VARIANTS.map((v) => (
             <button
               key={v.id}
               type="button"
               onClick={() => setVariant(v.id)}
-              className={`press flex flex-col items-center gap-1 rounded-3xl p-3 shadow-sm backdrop-blur-sm transition-colors ${
-                variant === v.id
-                  ? 'bg-white/85 shadow-md ring-2 ring-gugu-accent'
-                  : 'bg-white/40 hover:bg-white/70'
+              className={`press flex w-[72px] shrink-0 flex-col items-center gap-0.5 rounded-2xl py-1.5 transition-colors ${
+                variant === v.id ? 'bg-white/85 shadow-sm ring-2 ring-gugu-accent' : 'hover:bg-white/60 active:bg-white/85'
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={bodySrc(v.id, 'egg')} alt={locale === 'zh' ? v.zh : v.en} className="h-16 w-13 object-contain" draggable={false} />
-              <span className="text-sm font-bold">{locale === 'zh' ? v.zh : v.en}</span>
+              <img
+                src={assetThumbUrl(bodyLocalSrc(v.id, 'egg'))}
+                alt={locale === 'zh' ? v.zh : v.en}
+                loading="lazy"
+                decoding="async"
+                onError={(e) => fallbackAsset(e, bodyLocalSrc(v.id, 'egg'))}
+                className="h-14 w-12 object-contain"
+                draggable={false}
+              />
+              <span className="whitespace-nowrap text-[11px] font-bold tracking-wide">{locale === 'zh' ? v.zh : v.en}</span>
             </button>
           ))}
         </div>

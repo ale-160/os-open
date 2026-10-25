@@ -267,6 +267,15 @@ function withDefaults(pet: PetState): PetState {
     equippedAccessory: pet.equippedAccessory ?? null,
     decoOwned: Array.isArray(pet.decoOwned) ? pet.decoOwned : [],
     decorations: Array.isArray(pet.decorations) ? pet.decorations : [],
+    // 老档：当前配色/场景视为已解锁，保证已有选择不被收回
+    variantOwned: Array.isArray(pet.variantOwned) && pet.variantOwned.length
+      ? pet.variantOwned
+      : [pet.variant],
+    sceneOwned: Array.isArray(pet.sceneOwned)
+      ? pet.sceneOwned
+      : pet.sceneId
+        ? [pet.sceneId]
+        : [],
     trip: pet.trip ?? null,
     album: pet.album ?? { photos: [], souvenirs: [] },
     diary: pet.diary ?? {},
@@ -693,12 +702,39 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   buyItem: (item) => {
     const pet = get().pet;
     if (!pet) return;
+    // 已拥有则不重复扣钱
+    if (item.accessory && pet.accessories.includes(item.accessory)) return;
+    if (item.deco && pet.decoOwned.includes(item.deco)) return;
+    if (item.variant && pet.variantOwned.includes(item.variant)) return;
+    if (item.scene && pet.sceneOwned.includes(item.scene)) return;
     const { ok, next } = buyItem(pet, item, Date.now());
     if (!ok) return;
-    saveRaw(next);
+    let bought: PetState = next;
+    if (item.accessory) {
+      bought = { ...bought, accessories: [...bought.accessories, item.accessory], equippedAccessory: item.accessory };
+    }
+    if (item.deco) {
+      bought = {
+        ...bought,
+        decoOwned: [...bought.decoOwned, item.deco],
+        decorations: [...bought.decorations, item.deco].slice(0, 7),
+      };
+    }
+    if (item.variant) {
+      bought = {
+        ...bought,
+        variantOwned: [...bought.variantOwned, item.variant],
+        variant: item.variant,
+        customSkinId: undefined,
+      };
+    }
+    if (item.scene) {
+      bought = { ...bought, sceneOwned: [...bought.sceneOwned, item.scene], sceneId: item.scene };
+    }
+    saveRaw(bought);
     set({
-      pet: next,
-      burst: { id: ++burstSeq, kind: item.cure ? 'sparkle' : 'heart' },
+      pet: bought,
+      burst: { id: ++burstSeq, kind: item.cure || item.variant || item.scene ? 'sparkle' : 'heart' },
     });
     get().say('buy');
   },
@@ -913,6 +949,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   setVariant: (variant) => {
     const pet = get().pet;
     if (!pet) return;
+    if (!pet.variantOwned.includes(variant)) return; // 未购买配色不可切换
     const next = { ...pet, variant, customSkinId: undefined };
     saveRaw(next);
     set({ pet: next });
@@ -1074,6 +1111,7 @@ export const usePetStore = create<PetStore>()((set, get) => ({
   setScene: (id) => {
     const pet = get().pet;
     if (!pet) return;
+    if (id && !pet.sceneOwned.includes(id)) return; // 未购买场景不可选择
     const next = { ...pet, sceneId: id };
     saveRaw(next);
     set({ pet: next });

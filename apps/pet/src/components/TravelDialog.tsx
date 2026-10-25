@@ -8,6 +8,7 @@ import { usePetStore } from '@/lib/store';
 import { PROVISIONS, destById, photoCaption } from '@/lib/travel';
 import { PDS_DESTS, yypPhotoUrl } from '@/lib/pingdingshan';
 import { BASE_PATH } from '@/lib/skins';
+import { assetUrl, fallbackAsset } from '@/lib/assetUrl';
 import { useEscClose } from '@/hooks/useEscClose';
 import type { PetState, Provision } from '@/lib/types';
 
@@ -48,7 +49,7 @@ export function TravelDialog({ pet, onClose }: { pet: PetState; onClose: () => v
       souvenirIcon: d.souvenirIcon,
       capsZh: d.capsZh,
       capsEn: d.capsEn,
-      photoBg: `${BASE_PATH}/skins/gugu/pc/${dest}.png`,
+      photoBg: assetUrl(`${BASE_PATH}/skins/gugu/pc/${dest}.png`),
       souvenirZh: d.souvenirZh,
       souvenirEn: d.souvenirEn,
     };
@@ -106,7 +107,7 @@ export function TravelDialog({ pet, onClose }: { pet: PetState; onClose: () => v
               const d = destInfo(ph.dest);
               const pds = PDS_DESTS.find((x) => x.id === ph.dest);
               return (
-                <div key={`${ph.at}-${i}`} className="relative overflow-hidden rounded-2xl border border-amber-100" style={{ backgroundImage: pds ? `url(${yypPhotoUrl(pds)})` : `url(${BASE_PATH}/skins/gugu/pc/${ph.dest}.png)`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                <div key={`${ph.at}-${i}`} className="relative overflow-hidden rounded-2xl border border-amber-100" style={{ backgroundImage: pds ? `url(${yypPhotoUrl(pds)})` : `url(${assetUrl(`${BASE_PATH}/skins/gugu/pc/${ph.dest}.png`)})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
                   <div className="flex h-16 items-end justify-end gap-0.5 p-1 text-xl drop-shadow">
                     {(d.scenery ?? []).map((e, j) => (
                       <span key={j} style={{ opacity: 1 - j * 0.25 }}>
@@ -143,7 +144,7 @@ export function TravelDialog({ pet, onClose }: { pet: PetState; onClose: () => v
                     <img src={d.img} alt="" className="h-7 w-7 object-cover rounded-lg" draggable={false} />
                   ) : (
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={`${BASE_PATH}/skins/gugu/souvenir/${sv.dest}.png`} alt="" className="h-7 w-7 object-contain" draggable={false} />
+                    <img src={assetUrl(`${BASE_PATH}/skins/gugu/souvenir/${sv.dest}.png`)} alt="" onError={(e) => fallbackAsset(e, `${BASE_PATH}/skins/gugu/souvenir/${sv.dest}.png`)} className="h-7 w-7 object-contain" draggable={false} />
                   )}
                   <span className="w-full truncate text-center text-[10px] font-bold">
                     {locale === 'zh' ? d.souvenirZh : d.souvenirEn}

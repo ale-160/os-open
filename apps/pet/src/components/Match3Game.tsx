@@ -11,8 +11,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useEscClose } from '@/hooks/useEscClose';
 import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
-import { BASE_PATH } from '@/lib/skins';
 import { gameBgStyle } from '@/lib/gamebg';
+import { gameImgError, gameThumbSrc } from '@/lib/game-assets';
 import { sfx } from '@/lib/sfx';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -394,10 +394,10 @@ export function Match3Game({ onClose }: { pet: PetState; onClose: () => void }) 
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`${BASE_PATH}/skins/gugu/game/${theme.files[kind]}.png`}
+                    src={gameThumbSrc(`${theme.files[kind]}.png`)}
                     alt=""
                     draggable={false}
-                    onError={() => markFailed(kind)}
+                    onError={(e) => gameImgError(e, `${theme.files[kind]}.png`, () => markFailed(kind))}
                     className="h-[82%] w-[82%] object-contain"
                   />
                 )}

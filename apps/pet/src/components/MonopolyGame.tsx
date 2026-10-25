@@ -14,9 +14,9 @@ import { sfx } from '@/lib/sfx';
 import { useLocale } from '@/hooks/useLocale';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
-import { BASE_PATH } from '@/lib/skins';
 import { buildBoard, type BoardDef, type TileDef } from '@/lib/monopoly';
 import { gameBgStyle } from '@/lib/gamebg';
+import { gameImgError, gameThumbSrc } from '@/lib/game-assets';
 import type { PetState } from '@/lib/types';
 
 const START_CASH = 300;
@@ -435,7 +435,7 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
                 {g.dice !== null ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
                   <img
-                    src={`${BASE_PATH}/skins/gugu/game/mono2-prop-${g.turn === 'a' ? 6 + g.dice : g.dice}.png`}
+                    src={gameThumbSrc(`dice-${g.turn === 'a' ? 'gold' : 'white'}-${g.dice}.png`)}
                     alt="🎲"
                     draggable={false}
                     className="h-8 w-8 object-contain"
@@ -471,11 +471,11 @@ export function MonopolyGame({ pet, onClose }: { pet: PetState; onClose: () => v
                   ) : (
                     /* eslint-disable-next-line @next/next/no-img-element */
                     <img
-                      src={`${BASE_PATH}/skins/gugu/game/${art}.png`}
+                      src={gameThumbSrc(`${art}.png`)}
                       alt=""
                       draggable={false}
                       className="h-4/5 w-4/5 object-contain"
-                      onError={() => setFailed((prev) => new Set(prev).add(art))}
+                      onError={(e) => gameImgError(e, `${art}.png`, () => setFailed((prev) => new Set(prev).add(art)))}
                     />
                   )}
                   {/* 双方棋子标记 🐥/🐌 */}

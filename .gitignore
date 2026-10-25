@@ -14,3 +14,5 @@ dist/
 # 或对该文件 `git add -f`。
 .*/
 !.github/
+# 开发期素材生成/上传脚本与清单（仅本地使用，不入库）
+apps/pet/tools/

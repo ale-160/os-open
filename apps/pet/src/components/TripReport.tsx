@@ -7,6 +7,7 @@ import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import { destById } from '@/lib/travel';
 import { BASE_PATH } from '@/lib/skins';
+import { assetUrl } from '@/lib/assetUrl';
 import { PDS_DESTS, yypPhotoUrl } from '@/lib/pingdingshan';
 import { useEscClose } from '@/hooks/useEscClose';
 import type { PetState } from '@/lib/types';
@@ -38,7 +39,7 @@ export function TripReport({ pet, onClose }: { pet: PetState; onClose: () => voi
           name: locale === 'zh' ? dd.zh : dd.en,
           scenery: dd.scenery as string[],
           img: null as string | null,
-          photoBg: `${BASE_PATH}/skins/gugu/pc/${trip.dest}.png`,
+          photoBg: assetUrl(`${BASE_PATH}/skins/gugu/pc/${trip.dest}.png`),
           caps: locale === 'zh' ? dd.capsZh : dd.capsEn,
           souvenirIcon: dd.souvenirIcon,
           souvenirZh: dd.souvenirZh,

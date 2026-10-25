@@ -244,6 +244,10 @@ export interface PetState {
   decoOwned: DecoId[];
   /** 正在摆放的装饰（decoOwned 的子集，最多 6 件按槽位摆） */
   decorations: DecoId[];
+  /** 已解锁的官方配色（领养时选中的配色默认解锁，其余需商店购买） */
+  variantOwned: VariantId[];
+  /** 已解锁的场景（空数组 = 只有每日自动轮换；其余需商店购买） */
+  sceneOwned: string[];
   /** 手动选择的场景（null = 每日自动轮换） */
   sceneId?: string | null;
 }
@@ -263,10 +267,12 @@ export interface ShopItem {
   cure?: boolean;
   /** AI 图标（可选，替代 emoji） */
   iconSrc?: string;
-  /** 商品类型：use=即时道具（默认） accessory=装扮 decoration=装饰 */
-  kind?: 'use' | 'accessory' | 'decoration';
+  /** 商品类型：use=即时道具 accessory=装扮 decoration=装饰 variant=官方配色 scene=场景 */
+  kind?: 'use' | 'accessory' | 'decoration' | 'variant' | 'scene';
   accessory?: AccessoryId;
   deco?: DecoId;
+  variant?: VariantId;
+  scene?: string;
 }
 
 /** 粒子/演出触发（内存态） */

@@ -4,6 +4,7 @@
  */
 
 import { BASE_PATH } from './skins';
+import { assetThumbUrl } from './assetUrl';
 import type { LineKind } from './lines';
 
 export const STICKER_BY_LINE: Partial<Record<LineKind, string>> = {
@@ -98,6 +99,12 @@ export function pickSticker(kind: LineKind): string | null {
   return stickerSrc(id);
 }
 
+export function stickerFullSrc(stickerUrl: string): string {
+  const file = stickerUrl.split('/').pop() || '';
+  return `${BASE_PATH}/skins/gugu/face/${file}`;
+}
+
 export function stickerSrc(id: string): string {
-  return `${BASE_PATH}/skins/gugu/face/${id}.png`;
+  // 气泡内只有 24px：R2 缩略图优先，失败时 PetStage 按 R2 原图 → 本地原图兜底
+  return assetThumbUrl(`${BASE_PATH}/skins/gugu/face/${id}.png`);
 }

@@ -9,13 +9,12 @@ import { useEscClose } from '@/hooks/useEscClose';
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
-import { ACCESSORIES, DECORATIONS, accessoryLocalSrc, accessorySrc, decoLocalSrc, decoSrc } from '@/lib/accessories';
-import { SCENES, sceneLocalSrc, sceneSrc } from '@/lib/scenes';
-import { fallbackToLocal } from '@/lib/assetUrl';
+import { ACCESSORIES, DECORATIONS, accessoryLocalSrc, decoLocalSrc } from '@/lib/accessories';
+import { SCENES, sceneLocalSrc } from '@/lib/scenes';
+import { assetThumbUrl, fallbackAsset, templateUrl } from '@/lib/assetUrl';
 import {
   BASE_PATH,
   bodyLocalSrc,
-  bodySrc,
   decodeSkinCode,
   encodeSkinCode,
   VARIANTS,
@@ -60,11 +59,14 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
   const [community, setCommunity] = useState<CommunitySkin[] | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // 拉取仓库社区模板清单（静态文件，失败则整区隐藏）
+  // 拉取社区模板清单：R2 templates/ 优先，本地兜底，失败则整区隐藏
   useEffect(() => {
     let alive = true;
-    fetch(`${BASE_PATH}/templates/skins.json`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+    const localManifest = `${BASE_PATH}/templates/skins.json`;
+    const loadManifest = (u: string) =>
+      fetch(u).then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))));
+    loadManifest(templateUrl(localManifest))
+      .catch(() => loadManifest(localManifest))
       .then((j: { skins?: CommunitySkin[] }) => {
         if (alive) setCommunity(j.skins ?? []);
       })
@@ -171,10 +173,10 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
           </button>
         </div>
 
-        {/* 官方配色 */}
+        {/* 官方配色（只显示已购买；购买去商店） */}
         <p className="mb-2 text-xs font-bold text-gugu-ink-soft">{t.skinOfficial}</p>
-        <div className="mb-5 grid grid-cols-3 gap-2">
-          {VARIANTS.map((v) => (
+        <div className="mb-2 grid grid-cols-3 gap-2">
+          {VARIANTS.filter((v) => pet.variantOwned?.includes(v.id) || v.id === pet.variant).map((v) => (
             <button
               key={v.id}
               type="button"
@@ -184,11 +186,24 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               }`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={bodySrc(v.id, pet.stage)} alt={locale === 'zh' ? v.zh : v.en} onError={(e) => fallbackToLocal(e, bodyLocalSrc(v.id, pet.stage))} className="h-14 w-12 object-contain" draggable={false} />
+              <img
+                src={assetThumbUrl(bodyLocalSrc(v.id, pet.stage))}
+                alt={locale === 'zh' ? v.zh : v.en}
+                loading="lazy"
+                decoding="async"
+                onError={(e) => fallbackAsset(e, bodyLocalSrc(v.id, pet.stage))}
+                className="h-14 w-12 object-contain"
+                draggable={false}
+              />
               <span className="text-[11px] font-bold">{locale === 'zh' ? v.zh : v.en}</span>
             </button>
           ))}
         </div>
+        {(pet.variantOwned?.length ?? 0) < VARIANTS.length && (
+          <p className="mb-5 text-[10px] font-semibold text-gugu-ink-soft/75">
+            {locale === 'zh' ? '更多配色请在商店购买' : 'More colors in the shop'}
+          </p>
+        )}
 
         {/* 装扮配件（只显示已拥有；购买去商店） */}
         <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🎩 装扮</p>
@@ -205,11 +220,13 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={accessorySrc(a.id)}
+                  src={assetThumbUrl(accessoryLocalSrc(a.id))}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="h-9 w-9 object-contain"
                   draggable={false}
-                  onError={(e) => fallbackToLocal(e, accessoryLocalSrc(a.id))}
+                  onError={(e) => fallbackAsset(e, accessoryLocalSrc(a.id))}
                 />
                 <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? a.zh : a.en}</span>
               </button>
@@ -232,11 +249,13 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={decoSrc(d.id)}
+                  src={assetThumbUrl(decoLocalSrc(d.id))}
                   alt=""
+                  loading="lazy"
+                  decoding="async"
                   className="h-9 w-9 object-contain"
                   draggable={false}
-                  onError={(e) => fallbackToLocal(e, decoLocalSrc(d.id))}
+                  onError={(e) => fallbackAsset(e, decoLocalSrc(d.id))}
                 />
                 <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? d.zh : d.en}</span>
               </button>
@@ -244,9 +263,9 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
           })}
         </div>
 
-        {/* 场景（每日自动 / 手动选择） */}
+        {/* 场景（每日自动 / 已购买场景） */}
         <p className="mb-2 text-xs font-bold text-gugu-ink-soft">🏞️ 场景</p>
-        <div className="mb-4 grid grid-cols-4 gap-2">
+        <div className="mb-2 grid grid-cols-4 gap-2">
           <button
             type="button"
             onClick={() => setScene(null)}
@@ -255,7 +274,7 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
             <span className="text-xl leading-none">🎲</span>
             <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? '每日轮换' : 'Daily'}</span>
           </button>
-          {SCENES.map((sc) => (
+          {SCENES.filter((sc) => pet.sceneOwned?.includes(sc.id) || pet.sceneId === sc.id).map((sc) => (
             <button
               key={sc.id}
               type="button"
@@ -263,11 +282,24 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
               className={`press flex flex-col items-center gap-0.5 rounded-2xl border-2 p-1.5 ${pet.sceneId === sc.id ? 'border-gugu-accent bg-amber-50' : 'border-transparent bg-amber-50/50'}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={sceneSrc(sc.id)} alt="" onError={(e) => fallbackToLocal(e, sceneLocalSrc(sc.id))} className="h-9 w-9 rounded-lg object-cover" draggable={false} />
+              <img
+                src={assetThumbUrl(sceneLocalSrc(sc.id))}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                onError={(e) => fallbackAsset(e, sceneLocalSrc(sc.id))}
+                className="h-9 w-9 rounded-lg object-cover"
+                draggable={false}
+              />
               <span className="w-full truncate text-center text-[9px] font-bold">{locale === 'zh' ? sc.zh : sc.en}</span>
             </button>
           ))}
         </div>
+        {(pet.sceneOwned?.length ?? 0) < SCENES.length && (
+          <p className="mb-4 text-[10px] font-semibold text-gugu-ink-soft/75">
+            {locale === 'zh' ? '更多场景请在商店购买' : 'More scenes in the shop'}
+          </p>
+        )}
 
         {/* 社区模板（仓库 PR 渠道） */}
         {community && community.length > 0 && (
@@ -278,8 +310,9 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
             </p>
             <div className="mb-4 grid grid-cols-3 gap-2">
               {community.map((s) => {
-                const url = `${BASE_PATH}/templates/skins/${s.file}`;
-                const active = customSkins.some((c) => c.url === url);
+                const localUrl = `${BASE_PATH}/templates/skins/${s.file}`;
+                const url = templateUrl(localUrl);
+                const active = customSkins.some((c) => c.url === url || c.url === localUrl);
                 return (
                   <button
                     key={s.id}
@@ -298,7 +331,7 @@ export function SkinDialog({ pet, onClose }: { pet: PetState; onClose: () => voi
                     }`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={locale === 'zh' ? s.name : s.nameEn} className="h-14 w-12 object-contain" draggable={false} />
+                    <img src={url} alt={locale === 'zh' ? s.name : s.nameEn} onError={(e) => { if (e.currentTarget.dataset.local) { e.currentTarget.style.display = 'none'; return; } e.currentTarget.dataset.local = '1'; e.currentTarget.src = localUrl; }} className="h-14 w-12 object-contain" draggable={false} />
                     <span className="w-full truncate text-center text-[11px] font-bold">{locale === 'zh' ? s.name : s.nameEn}</span>
                     <span className="w-full truncate text-center text-[9px] text-gugu-ink-soft/70">
                       {t.communityBy} {s.author}

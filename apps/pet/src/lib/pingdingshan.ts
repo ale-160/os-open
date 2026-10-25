@@ -5,6 +5,7 @@
  */
 
 import { BASE_PATH } from './skins';
+import { assetUrl } from './assetUrl';
 
 export type PingdingshanDestId =
   | 'yaoshan'
@@ -183,7 +184,7 @@ export function yypPhotoUrl(d: PdsDestination): string {
 
 /** 联动插画完整 URL（本地素材） */
 export function pdsSceneSrc(d: PdsDestination): string {
-  return `${BASE_PATH}/skins/gugu/${d.scene}`;
+  return assetUrl(`${BASE_PATH}/skins/gugu/${d.scene}`);
 }
 
 /** 鹰悦拍场景详情搜索链接（分享/引导） */
