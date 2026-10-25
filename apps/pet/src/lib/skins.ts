@@ -5,6 +5,8 @@ import type { GrowthStage, VariantId } from './types';
 /** 构建时注入的子路径（见 next.config.ts env） */
 export const BASE_PATH = process.env.NEXT_PUBLIC_APP_BASE_PATH ?? '';
 
+import { assetUrl } from './assetUrl';
+
 const SKIN_BASE = `${BASE_PATH}/skins/gugu`;
 
 /** 官方各阶段身体图文件段（素材齐全，直接映射） */
@@ -16,7 +18,7 @@ const STAGE_SEGMENT: Record<GrowthStage, string> = {
 };
 
 export function bodySrc(variant: VariantId, stage: GrowthStage): string {
-  return `${SKIN_BASE}/${variant}-${STAGE_SEGMENT[stage]}.png`;
+  return assetUrl(`${SKIN_BASE}/${variant}-${STAGE_SEGMENT[stage]}.png`);
 }
 
 export interface VariantInfo {

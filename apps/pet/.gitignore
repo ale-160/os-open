@@ -35,3 +35,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+
+# 素材不入库（本地 + R2 桶 public/gugu，公共域 public.ale160.com）
+/public/

@@ -4,6 +4,7 @@
  */
 
 import { BASE_PATH } from './skins';
+import { assetUrl } from './assetUrl';
 import type { AccessoryId, DecoId, ShopItem } from './types';
 import { ACCESSORIES_BATCH2, DECORATIONS_BATCH2 } from './wardrobe-batch2';
 
@@ -74,11 +75,11 @@ export function decoById(id: DecoId): DecoDef | undefined {
 }
 
 export function accessorySrc(id: AccessoryId): string {
-  return `${BASE_PATH}/skins/gugu/${accessoryById(id)?.file ?? ''}`;
+  return assetUrl(`${BASE_PATH}/skins/gugu/${accessoryById(id)?.file ?? ''}`);
 }
 
 export function decoSrc(id: DecoId): string {
-  return `${BASE_PATH}/skins/gugu/${decoById(id)?.file ?? ''}`;
+  return assetUrl(`${BASE_PATH}/skins/gugu/${decoById(id)?.file ?? ''}`);
 }
 
 export const ACCESSORIES: AccessoryDef[] = [...ACCESSORIES_BASE, ...ACCESSORIES_BATCH2];
