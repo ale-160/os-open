@@ -54,22 +54,37 @@ export const STICKER_BY_LINE: Partial<Record<LineKind, string>> = {
 const FALLBACK = ['happy', 'nom', 'wave', 'love', 'run'];
 
 /**
- * 第 5 批场景表情（face/b3-1..40）：节日 1-10 / 旅行 11-20 / 睡姿 21-30 / 吃东西 31-40。
+ * 第 5 批场景表情（face/<id>.png）：节日 / 旅行 / 睡姿 / 吃东西，文件名语义化。
  * 作为对应台词类型的备选池，50% 概率替换默认贴纸，让场景图自然出现。
  */
+export const EXTRA_FACES = [
+  // 节日
+  'sparkler', 'red-envelope', 'mooncake', 'pumpkin-candy', 'candy-cane',
+  'party-confetti', 'flower-lei-dance', 'fox-mask', 'paper-lantern', 'birthday-horn',
+  // 旅行
+  'suitcase-ride', 'map-confused', 'aviator-flag', 'paper-boat', 'hiking-stick',
+  'selfie-peace', 'train-window', 'boarding-pass', 'sleeping-bag', 'instant-noodles',
+  // 睡姿
+  'croissant-sleep', 'pillow-hug', 'hammock-sleep', 'books-nap', 'sitting-doze',
+  'bed-blanket', 'cloud-sleep', 'leaf-blanket', 'dream-snacks', 'rubbing-eyes',
+  // 吃东西
+  'ramen-chopsticks', 'bubble-tea', 'watermelon-bite', 'taiyaki-tail', 'icecream-lick',
+  'rice-cracker', 'hot-cocoa', 'popcorn-bucket', 'soup-spoon', 'chocolate-bar',
+] as const;
+
 const EXTRA_POOLS: Partial<Record<LineKind, readonly string[]>> = {
-  checkin: ['b3-1', 'b3-2', 'b3-3', 'b3-4', 'b3-5', 'b3-6', 'b3-8', 'b3-9', 'b3-10'],
-  eventMoodUp: ['b3-6', 'b3-7', 'b3-10'],
-  stageUp: ['b3-6', 'b3-10'],
-  gameGreat: ['b3-6', 'b3-7'],
-  back: ['b3-11', 'b3-12', 'b3-13', 'b3-14', 'b3-15', 'b3-16', 'b3-17', 'b3-18', 'b3-19', 'b3-20'],
-  feed: ['b3-31', 'b3-33', 'b3-34', 'b3-36', 'b3-38', 'b3-40'],
-  careMeal: ['b3-31', 'b3-32', 'b3-35', 'b3-37', 'b3-39'],
-  sleep: ['b3-21', 'b3-22', 'b3-26', 'b3-27'],
-  sleepy: ['b3-25', 'b3-28', 'b3-29', 'b3-30'],
-  careNight: ['b3-23', 'b3-24', 'b3-26'],
-  tired: ['b3-25', 'b3-30'],
-  weatherRain: ['b3-21', 'b3-25'],
+  checkin: ['sparkler', 'red-envelope', 'mooncake', 'pumpkin-candy', 'candy-cane', 'party-confetti', 'fox-mask', 'paper-lantern', 'birthday-horn'],
+  eventMoodUp: ['party-confetti', 'flower-lei-dance', 'birthday-horn'],
+  stageUp: ['party-confetti', 'birthday-horn'],
+  gameGreat: ['party-confetti', 'flower-lei-dance'],
+  back: ['suitcase-ride', 'map-confused', 'aviator-flag', 'paper-boat', 'hiking-stick', 'selfie-peace', 'train-window', 'boarding-pass', 'sleeping-bag', 'instant-noodles'],
+  feed: ['ramen-chopsticks', 'watermelon-bite', 'taiyaki-tail', 'rice-cracker', 'popcorn-bucket', 'chocolate-bar'],
+  careMeal: ['ramen-chopsticks', 'bubble-tea', 'icecream-lick', 'hot-cocoa', 'soup-spoon'],
+  sleep: ['croissant-sleep', 'pillow-hug', 'bed-blanket', 'cloud-sleep'],
+  sleepy: ['sitting-doze', 'leaf-blanket', 'dream-snacks', 'rubbing-eyes'],
+  careNight: ['hammock-sleep', 'books-nap', 'bed-blanket'],
+  tired: ['sitting-doze', 'rubbing-eyes'],
+  weatherRain: ['croissant-sleep', 'sitting-doze'],
 };
 
 /** 挑贴纸：专属优先，60% 概率显示（保持气泡轻量）；有场景备选池时各半 */

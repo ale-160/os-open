@@ -10,6 +10,7 @@ import { SCENES, SCENE_VARIANTS, sceneVariantFor } from './scenes';
 import { CLASSIC_TILES, VENUES, buildSeasonBoard } from './monopoly';
 import { ACCESSORIES, DECORATIONS } from './accessories';
 import { VISITORS } from './visitors';
+import { EXTRA_FACES } from './stickers';
 
 const ROOT = path.join(process.cwd(), 'public', 'skins', 'gugu');
 const GAME_DIR = path.join(ROOT, 'game');
@@ -141,11 +142,8 @@ assetDescribe('第 5 批装扮 / 装饰 / 表情 / 访客', () => {
   });
 
   it('场景表情 40 张齐全', () => {
-    const missing: string[] = [];
-    for (let i = 1; i <= 40; i++) {
-      if (!existsSync(asset(`face/b3-${i}.png`))) missing.push(`b3-${i}.png`);
-    }
-    expect(missing).toEqual([]);
+    expect(EXTRA_FACES.length).toBe(40);
+    expect(EXTRA_FACES.filter((name) => !existsSync(asset(`face/${name}.png`)))).toEqual([]);
   });
 
   it('传说访客 20 只齐全', () => {
