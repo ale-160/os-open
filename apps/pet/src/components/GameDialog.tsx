@@ -28,6 +28,10 @@ export function GameDialog({
     { kind: 'race', icon: '🏃', name: t.gameRace, hint: locale === 'zh' ? '连点冲刺赢蜗牛' : 'Mash to outrun the snail' },
     { kind: 'toss', icon: '🎯', name: t.gameToss, hint: locale === 'zh' ? '时机投喂进嘴里' : 'Time your toss' },
     { kind: 'sing', icon: '🎵', name: t.gameSing, hint: locale === 'zh' ? '跟着咕咕唱' : 'Repeat the melody' },
+    { kind: 'lianliankan', icon: '🔗', name: t.gameLlk, hint: locale === 'zh' ? '图案配对连线' : 'Connect the pairs' },
+    { kind: 'match3', icon: '🍊', name: t.gameM3, hint: locale === 'zh' ? '三连消除' : 'Match three' },
+    { kind: 'monopoly', icon: '🎲', name: t.gameMono, hint: locale === 'zh' ? '掷骰买地' : 'Roll and buy' },
+    { kind: 'merge', icon: '🌀', name: t.gameMerge, hint: locale === 'zh' ? '合并进化' : 'Merge & evolve' },
   ];
 
   return (

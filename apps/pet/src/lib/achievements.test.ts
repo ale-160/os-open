@@ -89,7 +89,7 @@ describe('checkAchievements', () => {
     const pet = {
       ...hatchEgg(createPet('cream', '咕咕', 0), 0),
       counters: { feed: 0, wash: 0, play: 0, work: 0, study: 0, tap: 0, heal: 0, aiChat: 1 },
-      bests: { snack: 12, whack: 0, memory: 0, race: 0, toss: 0, sing: 0 },
+      bests: { snack: 12, whack: 0, memory: 0, race: 0, toss: 0, sing: 0, lianliankan: 0, match3: 0, monopoly: 0, merge: 0 },
     };
     const earned = checkAchievements(pet);
     expect(earned).toContain('game12');

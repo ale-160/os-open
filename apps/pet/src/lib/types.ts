@@ -70,10 +70,14 @@ export interface GameBests {
   race: number;
   toss: number;
   sing: number;
+  lianliankan: number;
+  match3: number;
+  monopoly: number;
+  merge: number;
 }
 
 /** 小游戏种类（GameDialog 与结算共用） */
-export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing';
+export type GameKind = 'snack' | 'whack' | 'memory' | 'race' | 'toss' | 'sing' | 'lianliankan' | 'match3' | 'monopoly' | 'merge';
 
 /** 旅行目的地 id（见 lib/travel.ts） */
 export type DestId =

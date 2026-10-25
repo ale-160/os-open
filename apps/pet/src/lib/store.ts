@@ -72,7 +72,7 @@ const ZERO_COUNTERS: PetCounters = {
   heal: 0,
   aiChat: 0,
 };
-const ZERO_BESTS: GameBests = { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0 };
+const ZERO_BESTS: GameBests = { snack: 0, whack: 0, memory: 0, race: 0, toss: 0, sing: 0, lianliankan: 0, match3: 0, monopoly: 0, merge: 0 };
 
 interface BubbleData {
   id: number;
@@ -252,7 +252,8 @@ function normalizeRaw(parsed: { saveVersion?: number } & Record<string, unknown>
   if (parsed.saveVersion === 5) return migrateV5(parsed);
   if (parsed.saveVersion === 6) return migrateV6(parsed);
   if (parsed.saveVersion !== 7 || typeof parsed.updatedAt !== 'number') return null;
-  return parsed as unknown as PetState;
+  const pet7 = parsed as unknown as PetState;
+  return { ...pet7, bests: { ...ZERO_BESTS, ...pet7.bests } };
 }
 
 function loadRaw(): PetState | null {
@@ -312,6 +313,10 @@ const TIER_CFG: Record<GameKind, [great: number, ok: number]> = {
   race: [14, 6],
   toss: [11, 5],
   sing: [12, 5],
+  lianliankan: [8, 3],
+  match3: [1500, 600],
+  monopoly: [18, 8],
+  merge: [600, 200],
 };
 
 /** 关怀去重记录（localStorage，保留最近 60 条 key） */

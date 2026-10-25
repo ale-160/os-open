@@ -24,6 +24,10 @@ import { TossGame } from '@/components/TossGame';
 import { TravelDialog } from '@/components/TravelDialog';
 import { TripReport } from '@/components/TripReport';
 import { WhackGame } from '@/components/WhackGame';
+import { LianLianKanGame } from '@/components/LianLianKanGame';
+import { Match3Game } from '@/components/Match3Game';
+import { MonopolyGame } from '@/components/MonopolyGame';
+import { MergeGame } from '@/components/MergeGame';
 import { useLocale } from '@/hooks/useLocale';
 import { ui } from '@/lib/locale';
 import { skyTheme } from '@/lib/sky';
@@ -210,6 +214,10 @@ export default function Page() {
       {gameKind === 'race' && <RaceGame pet={pet} onClose={() => setGameKind(null)} />}
       {gameKind === 'toss' && <TossGame pet={pet} onClose={() => setGameKind(null)} />}
       {gameKind === 'sing' && <SingGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'lianliankan' && <LianLianKanGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'match3' && <Match3Game pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'monopoly' && <MonopolyGame pet={pet} onClose={() => setGameKind(null)} />}
+      {gameKind === 'merge' && <MergeGame pet={pet} onClose={() => setGameKind(null)} />}
       {chatOpen && <ChatPanel onClose={() => setChatOpen(false)} />}
       {skinOpen && <SkinDialog pet={pet} onClose={() => setSkinOpen(false)} />}
       {achOpen && <AchievementsDialog pet={pet} onClose={() => setAchOpen(false)} />}
