@@ -35,30 +35,3 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# 大批量 AI 素材不入库（存本地 + R2 桶 gugu/public/gugu，公共访问待开启）
-public/skins/gugu/acc/
-public/skins/gugu/deco/
-public/skins/gugu/vis/
-public/skins/gugu/face/
-public/skins/gugu/scene/
-public/skins/gugu/pc/
-public/skins/gugu/souvenir/
-public/skins/gugu/misc/
-public/skins/gugu/item/
-public/skins/gugu/caramel-*
-public/skins/gugu/charcoal-*
-public/skins/gugu/choco-*
-public/skins/gugu/lavender-*
-public/skins/gugu/soda-*
-public/skins/gugu/matcha-*
-public/skins/gugu/peach-*
-public/skins/gugu/ocean-*
-public/skins/gugu/grape-*
-public/skins/gugu/lemon-*
-public/skins/gugu/sakura-deep-*
-public/skins/gugu/cotton-*
-public/skins/gugu/mint-deep-*
-public/skins/gugu/coral-*
-public/skins/gugu/sky-*
-public/skins/gugu/rose-*
-public/skins/gugu/olive-*
