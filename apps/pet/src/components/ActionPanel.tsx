@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
-import { cooldownRemaining } from '@/lib/balance';
+import { ACTIONS, cooldownRemaining, STUDY, WORK } from '@/lib/balance';
 import { fmt, ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -76,6 +76,10 @@ export function ActionPanel({
   const playCd = cooldownRemaining('play', pet, now);
   const workCd = cooldownRemaining('work', pet, now);
   const studyCd = cooldownRemaining('study', pet, now);
+  const playCost = Math.abs(ACTIONS.play.energy ?? 0);
+  const playTired = pet.energy < playCost;
+  const workTired = pet.energy < WORK.energyCost;
+  const studyTired = pet.energy < STUDY.energyCost;
 
   /** 全部动作/入口一排（顺序：高频照顾 → 经济 → 入口 → 设置） */
   const allEntries: DockEntry[] = [
@@ -99,24 +103,24 @@ export function ActionPanel({
       key: 'play',
       icon: '🎾',
       label: t.actPlay,
-      sub: cdText(playCd),
-      disabled: disabledBySleep || playCd > 0,
+      sub: playTired && !disabledBySleep ? t.actTired : cdText(playCd),
+      disabled: disabledBySleep || playCd > 0 || playTired,
       onClick: () => doAction('play'),
     },
     {
       key: 'work',
       icon: '💼',
       label: t.actWork,
-      sub: cdText(workCd),
-      disabled: disabledBySleep || workCd > 0 || pet.energy < 30,
+      sub: workTired && !disabledBySleep ? t.actTired : cdText(workCd),
+      disabled: disabledBySleep || workCd > 0 || workTired,
       onClick: () => usePetStore.getState().doWork(),
     },
     {
       key: 'study',
       icon: '📖',
       label: t.actStudy,
-      sub: cdText(studyCd),
-      disabled: disabledBySleep || studyCd > 0 || pet.energy < 20,
+      sub: studyTired && !disabledBySleep ? t.actTired : cdText(studyCd),
+      disabled: disabledBySleep || studyCd > 0 || studyTired,
       onClick: () => usePetStore.getState().doStudy(),
     },
     {

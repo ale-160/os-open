@@ -17,11 +17,10 @@ import { usePetStore } from '@/lib/store';
 import { buildBoard, type BoardDef, type TileDef } from '@/lib/monopoly';
 import { gameBgStyle } from '@/lib/gamebg';
 import { gameImgError, gameThumbSrc } from '@/lib/game-assets';
+import { MONOPOLY } from '@/lib/balance';
 import type { PetState } from '@/lib/types';
 
-const START_CASH = 300;
-const MAX_ROUNDS = 15;
-const PASS_BONUS = 20;
+const { startCash: START_CASH, maxRounds: MAX_ROUNDS, passBonus: PASS_BONUS } = MONOPOLY;
 const STEP_MS = 160;
 
 type Side = 'p' | 'a';
@@ -153,6 +152,25 @@ function createEngine(opts: EngineOpts) {
       opts.render();
       return;
     }
+    // 每轮结束按已购地产的租金收一次分红：买地越多，现金流越稳
+    const incomeOf = (owner: Side) =>
+      g.owners.reduce(
+        (sum, who, i) =>
+          who === owner ? sum + Math.floor((g.board.tiles[i].rent ?? 0) * MONOPOLY.roundIncomeRate) : sum,
+        0
+      );
+    const pIncome = incomeOf('p');
+    const aIncome = incomeOf('a');
+    if (pIncome || aIncome) {
+      g.sides.p.cash += pIncome;
+      g.sides.a.cash += aIncome;
+      log(
+        fmt(L('🏠 本轮地产分红：{p} +{a} 🪙', '🏠 Property income this round: {p} +{a} 🪙'), {
+          p: pIncome,
+          a: aIncome,
+        })
+      );
+    }
     if (g.round >= MAX_ROUNDS) {
       log(L(`⏰ ${MAX_ROUNDS} 轮结束，比拼资产！`, `⏰ ${MAX_ROUNDS} rounds over — compare assets!`));
       endGame(assetsOf(g, 'p') >= assetsOf(g, 'a') ? 'p' : 'a');
@@ -204,8 +222,8 @@ function createEngine(opts: EngineOpts) {
           finishTurn(side);
           return;
         }
-        // AI 策略：现金 > 价 + 60 即买
-        if (g.sides.a.cash > tile.price + 60) {
+        // AI 策略：留出安全线后即可买地
+        if (g.sides.a.cash > tile.price + MONOPOLY.aiReserve) {
           g.sides.a.cash -= tile.price;
           g.owners[idx] = 'a';
           log(fmt(L('🐌 买下了「{n}」', '🐌 bought {n}'), { n: nameOf(tile) }));
@@ -232,7 +250,8 @@ function createEngine(opts: EngineOpts) {
     // 事件格：即时生效
     switch (tile.id) {
       case 'luck': {
-        const v = 30 + Math.floor(Math.random() * 51);
+        const v =
+          MONOPOLY.luckMin + Math.floor(Math.random() * (MONOPOLY.luckMax - MONOPOLY.luckMin + 1));
         g.sides[side].cash += v;
         log(fmt(L(`⭐ ${marker} 摸到幸运星 +{v} 🪙`, `⭐ ${marker} got a lucky star +{v} 🪙`), { v }));
         break;
@@ -248,7 +267,7 @@ function createEngine(opts: EngineOpts) {
         return;
       }
       case 'tax': {
-        const amt = Math.ceil(g.sides[side].cash * 0.08);
+        const amt = Math.ceil(g.sides[side].cash * MONOPOLY.taxRate);
         log(fmt(L(`🏦 ${marker} 交了税 -{v} 🪙`, `🏦 ${marker} paid {v} 🪙 tax`), { v: amt }));
         if (!spend(side, amt)) return;
         break;
@@ -260,26 +279,26 @@ function createEngine(opts: EngineOpts) {
       }
       case 'chest': {
         if (Math.random() < 0.5) {
-          g.sides[side].cash += 50;
-          log(fmt(L(`🎁 ${marker} 打开宝箱 +{v} 🪙`, `🎁 ${marker} opened the chest +{v} 🪙`), { v: 50 }));
+          g.sides[side].cash += MONOPOLY.chestGood;
+          log(fmt(L(`🎁 ${marker} 打开宝箱 +{v} 🪙`, `🎁 ${marker} opened the chest +{v} 🪙`), { v: MONOPOLY.chestGood }));
         } else {
-          log(fmt(L('🎁 宝箱里是调皮的小虫 -{v} 🪙', '🎁 A naughty bug in the chest -{v} 🪙'), { v: 20 }));
-          if (!spend(side, 20)) return;
+          log(fmt(L('🎁 宝箱里是调皮的小虫 -{v} 🪙', '🎁 A naughty bug in the chest -{v} 🪙'), { v: MONOPOLY.chestBad }));
+          if (!spend(side, MONOPOLY.chestBad)) return;
         }
         break;
       }
       case 'festival': {
-        g.sides[side].cash += 40;
-        log(fmt(L(`🏮 ${marker} 逛灯会赚了零花 +{v} 🪙`, `🏮 ${marker} enjoyed the fair +{v} 🪙`), { v: 40 }));
+        g.sides[side].cash += MONOPOLY.festival;
+        log(fmt(L(`🏮 ${marker} 逛灯会赚了零花 +{v} 🪙`, `🏮 ${marker} enjoyed the fair +{v} 🪙`), { v: MONOPOLY.festival }));
         break;
       }
       case 'hospital': {
-        log(fmt(L(`🏥 ${marker} 打疫苗花掉 {v} 🪙`, `🏥 ${marker} got a shot for {v} 🪙`), { v: 30 }));
-        if (!spend(side, 30)) return;
+        log(fmt(L(`🏥 ${marker} 打疫苗花掉 {v} 🪙`, `🏥 ${marker} got a shot for {v} 🪙`), { v: MONOPOLY.hospital }));
+        if (!spend(side, MONOPOLY.hospital)) return;
         break;
       }
       default:
-        break; // start：+20 已在移动经过/落在起点时发放
+        break; // start：经过/落在起点时已发放通行奖励
     }
     finishTurn(side);
   };

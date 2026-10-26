@@ -17,6 +17,10 @@ import type { PetState } from '@/lib/types';
 const DURATION = 20_000;
 const HOLE_COUNT = 6;
 const BOMB_RATE = 0.12;
+/** 开局 2.5 秒适应期：虫虫停留更久、刷新更慢 */
+const RAMP_MS = 2_500;
+const SPAWN_CHANCE_START = 0.5;
+const SPAWN_CHANCE_END = 0.78;
 
 type Occupant = { kind: 'worm' | 'bomb' | 'golden' | 'clock'; id: number } | null;
 
@@ -83,21 +87,25 @@ export function WhackGame({ onClose }: { pet: PetState; onClose: () => void }) {
         return;
       }
       setTimeLeft(remain);
-      const wave = 1 + Math.floor(elapsed / 7000);
+      // 整局平滑升温：缓入曲线替代每 7 秒跳一档，波次只作为展示标签
+      const ramp = Math.min(1, Math.max(0, (elapsed - RAMP_MS) / (DURATION - RAMP_MS)));
+      const eased = ramp * ramp * (3 - 2 * ramp);
+      const wave = 1 + Math.floor(eased * 3);
       setWave(wave);
-      // 生成（波次越深越频繁、停留越短）
-      if (Math.random() < Math.min(0.8, 0.55 + (wave - 1) * 0.07)) {
+      // 生成频率、停留时间、炸弹率都连续变化
+      const spawnChance = SPAWN_CHANCE_START + (SPAWN_CHANCE_END - SPAWN_CHANCE_START) * eased;
+      if (Math.random() < spawnChance) {
         const empty = holesRef.current.map((h, i) => (h ? -1 : i)).filter((i) => i >= 0);
         if (empty.length) {
           const idx = empty[Math.floor(Math.random() * empty.length)];
-          const progress = Math.min(1, elapsed / DURATION);
-          const visible = (1050 - 450 * progress + Math.random() * 200) / (1 + (wave - 1) * 0.1);
+          const visible = 1050 - 420 * eased + Math.random() * 180;
+          const bombRate = 0.05 + (BOMB_RATE - 0.05) * eased;
           const roll = Math.random();
-          const occupant: Occupant = roll < BOMB_RATE
+          const occupant: Occupant = roll < bombRate
             ? { kind: 'bomb', id: ++idSeq.current }
-            : roll < BOMB_RATE + 0.1
+            : roll < bombRate + 0.1
               ? { kind: 'golden', id: ++idSeq.current }
-              : roll < BOMB_RATE + 0.16
+              : roll < bombRate + 0.16
                 ? { kind: 'clock', id: ++idSeq.current }
                 : { kind: 'worm', id: ++idSeq.current };
           holesRef.current[idx] = occupant;

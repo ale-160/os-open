@@ -9,7 +9,7 @@ import { useEscClose } from '@/hooks/useEscClose';
 
 import { useEffect, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
-import { cooldownRemaining } from '@/lib/balance';
+import { ACTIONS, cooldownRemaining, STUDY, WORK } from '@/lib/balance';
 import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
@@ -44,8 +44,9 @@ export function PetMenu({ x, y, pet, onOpenChat, onOpenAchievements, onOpenSkin,
 
   const egg = pet.stage === 'egg';
   const disabled = egg || pet.sleeping;
-  const workBlock = disabled || cooldownRemaining('work', pet, now) > 0 || pet.energy < 30;
-  const studyBlock = disabled || cooldownRemaining('study', pet, now) > 0 || pet.energy < 20;
+  const workBlock = disabled || cooldownRemaining('work', pet, now) > 0 || pet.energy < WORK.energyCost;
+  const studyBlock = disabled || cooldownRemaining('study', pet, now) > 0 || pet.energy < STUDY.energyCost;
+  const playBlock = disabled || pet.energy < Math.abs(ACTIONS.play.energy ?? 0);
 
   const run = (fn: () => void) => () => {
     fn();
@@ -56,7 +57,7 @@ export function PetMenu({ x, y, pet, onOpenChat, onOpenAchievements, onOpenSkin,
     { icon: '🫶', label: t.petMenuTap, disabled: disabled, handler: run(tapPet) },
     { icon: '🍪', label: t.actFeed, disabled, handler: run(() => doAction('feed')) },
     { icon: '🛁', label: t.actWash, disabled, handler: run(() => doAction('wash')) },
-    { icon: '🎾', label: t.actPlay, disabled, handler: run(() => doAction('play')) },
+    { icon: '🎾', label: t.actPlay, disabled: playBlock, handler: run(() => doAction('play')) },
     { icon: pet.sleeping ? '☀️' : '😴', label: pet.sleeping ? t.actWake : t.actSleep, disabled: egg, handler: run(toggleSleep) },
     { icon: '💼', label: t.actWork, disabled: workBlock, handler: run(doWork) },
     { icon: '📖', label: t.actStudy, disabled: studyBlock, handler: run(doStudy) },

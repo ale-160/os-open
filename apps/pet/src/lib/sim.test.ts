@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ACTIONS,
+  actionGrowth,
+  DECAY_PER_HOUR,
   HATCH_TAPS,
   INITIAL_COINS,
   SHOP_ITEMS,
@@ -57,9 +60,15 @@ describe('simulate', () => {
   it('睡觉恢复精力、饥饿减半（前台节奏）', () => {
     const pet = { ...hatchEgg(createPet('mint', '咕咕', 0), 0), sleeping: true, energy: 30 };
     const { pet: next } = tickFor(pet, HOUR);
-    expect(next.energy).toBeCloseTo(30 + 14, 1);
+    expect(next.energy).toBeCloseTo(30 + DECAY_PER_HOUR.energyRecover, 1);
     expect(next.satiety).toBeCloseTo(80 - 3.5, 1);
     expect(next.sleeping).toBe(true);
+  });
+
+  it('睡觉挂机 5 分钟精力有可见回升（不再原地踏步）', () => {
+    const pet = { ...hatchEgg(createPet('mint', '咕咕', 0), 0), sleeping: true, energy: 20 };
+    const { pet: next } = tickFor(pet, 5 * 60_000);
+    expect(next.energy).toBeCloseTo(20 + DECAY_PER_HOUR.energyRecover / 12, 1);
   });
 
   it('精力充满自动醒来', () => {
@@ -130,6 +139,30 @@ describe('applyAction', () => {
     expect(next.satiety).toBe(78);
     expect(next.personality.foodie).toBe(3);
     expect(next.growth).toBe(1);
+  });
+
+  it('喂食/洗澡不耗精力，精力为 0 也能照顾', () => {
+    const pet = { ...hatchEgg(createPet('cream', '咕咕', 0), 0), energy: 0, satiety: 20 };
+    expect(applyAction(pet, 'feed', 1000).ok).toBe(true);
+    expect(applyAction(pet, 'wash', 1000).ok).toBe(true);
+  });
+
+  it('玩耍需要精力，精力不足时拒绝', () => {
+    const pet = { ...hatchEgg(createPet('cream', '咕咕', 0), 0), energy: Math.abs(ACTIONS.play.energy ?? 0) - 1 };
+    const { ok, reason } = applyAction(pet, 'play', 1000);
+    expect(ok).toBe(false);
+    expect(reason).toBe('tired');
+  });
+
+  it('基础互动成长值随阶段提升', () => {
+    const baby = { ...hatchEgg(createPet('cream', '咕咕', 0), 0), growth: 0 };
+    const teen = { ...baby, stage: 'teen' as const, growth: 60 };
+    const adult = { ...baby, stage: 'adult' as const, growth: 200 };
+    expect(applyAction(baby, 'feed', 1000).next.growth).toBe(actionGrowth('feed', 'baby'));
+    expect(applyAction(teen, 'feed', 1000).next.growth).toBe(60 + actionGrowth('feed', 'teen'));
+    expect(applyAction(adult, 'feed', 1000).next.growth).toBe(200 + actionGrowth('feed', 'adult'));
+    expect(actionGrowth('feed', 'adult')).toBeGreaterThan(actionGrowth('feed', 'baby'));
+    expect(actionGrowth('play', 'adult')).toBeGreaterThan(actionGrowth('play', 'teen'));
   });
 
   it('冷却期内拒绝同一动作', () => {

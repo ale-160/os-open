@@ -46,14 +46,14 @@ body {
   50% { transform: rotate(0deg); }
   75% { transform: rotate(9deg) translateY(4%); }
 }
-.anim-eat { animation: gugu-eat 0.9s ease-in-out 2; transform-origin: 50% 30%; }
+.anim-eat { animation: gugu-eat 0.9s ease-in-out infinite; transform-origin: 50% 30%; }
 
 /* 洗澡：左右扭动 */
 @keyframes gugu-scrub {
   0%, 100% { transform: rotate(-4deg); }
   50% { transform: rotate(4deg); }
 }
-.anim-scrub { animation: gugu-scrub 0.45s ease-in-out 5; transform-origin: 50% 90%; }
+.anim-scrub { animation: gugu-scrub 0.45s ease-in-out infinite; transform-origin: 50% 90%; }
 
 /* 玩耍：开心蹦跳 */
 @keyframes gugu-bounce-happy {
@@ -61,7 +61,7 @@ body {
   30% { transform: translateY(-16%) scale(1.03, 0.97); }
   60% { transform: translateY(0) scale(0.97, 1.03); }
 }
-.anim-happy { animation: gugu-bounce-happy 0.6s ease-in-out 3; transform-origin: 50% 92%; }
+.anim-happy { animation: gugu-bounce-happy 0.6s ease-in-out infinite; transform-origin: 50% 92%; }
 
 /* 打工：埋头苦干三连 */
 @keyframes gugu-work {
@@ -69,14 +69,14 @@ body {
   30% { transform: rotate(11deg) translateY(3%); }
   60% { transform: rotate(3deg); }
 }
-.anim-work { animation: gugu-work 0.9s ease-in-out 3; transform-origin: 50% 30%; }
+.anim-work { animation: gugu-work 0.9s ease-in-out infinite; transform-origin: 50% 30%; }
 
 /* 学习：捧书摇摆 */
 @keyframes gugu-study {
   0%, 100% { transform: rotate(-2.5deg); }
   50% { transform: rotate(2.5deg); }
 }
-.anim-study { animation: gugu-study 1.6s ease-in-out 2; transform-origin: 50% 88%; }
+.anim-study { animation: gugu-study 1.6s ease-in-out infinite; transform-origin: 50% 88%; }
 
 /* ---------- 闲时小动作（tricks） ---------- */
 

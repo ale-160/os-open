@@ -5,6 +5,7 @@
 
 import {
   ACTIONS,
+  actionGrowth,
   clamp01,
   cooldownRemaining,
   DECAY_PER_HOUR,
@@ -16,6 +17,7 @@ import {
   STAGE_ORDER,
   STAGE_THRESHOLDS,
   STUDY,
+  studyGrowth,
   THRESHOLD,
   WORK,
 } from './balance';
@@ -199,13 +201,18 @@ export function applyAction(prev: PetState, id: ActionId, now: number): ActionOu
 
   const def = ACTIONS[id];
   if (cooldownRemaining(id, prev, now) > 0) return { ok: false, next: prev, reason: 'cooldown' };
+  // 喂食/洗澡是不耗精力的基础照顾；玩耍需要精力，与打工/学习保持一致
+  const energyCost = Math.abs(def.energy ?? 0);
+  if (energyCost > 0 && prev.energy < energyCost) {
+    return { ok: false, next: prev, reason: 'tired' };
+  }
 
   const next: PetState = { ...prev, personality: { ...prev.personality }, counters: { ...prev.counters } };
   if (def.satiety !== undefined) next.satiety = clamp01(next.satiety + def.satiety);
   if (def.cleanliness !== undefined) next.cleanliness = clamp01(next.cleanliness + def.cleanliness);
   if (def.mood !== undefined) next.mood = clamp01(next.mood + def.mood);
   if (def.energy !== undefined) next.energy = clamp01(next.energy + def.energy);
-  if (def.growth !== undefined) next.growth += def.growth;
+  next.growth += actionGrowth(id, prev.stage);
   if (def.personality) {
     for (const [k, v] of Object.entries(def.personality)) {
       const key = k as PersonalityKey;
@@ -268,7 +275,7 @@ export function applyStudy(prev: PetState, now: number): ActionOutcome {
     personality: { ...prev.personality, artsy: Math.min(PERSONALITY_CAP, prev.personality.artsy + STUDY.personalityArtsy) },
     counters: { ...prev.counters, study: prev.counters.study + 1 },
     energy: clamp01(prev.energy - STUDY.energyCost),
-    growth: prev.growth + STUDY.growth,
+    growth: prev.growth + studyGrowth(prev.stage),
     lastStudiedAt: now,
     updatedAt: now,
   };

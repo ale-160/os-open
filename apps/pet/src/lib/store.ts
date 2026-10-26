@@ -632,8 +632,11 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       set({ burst: { id: ++burstSeq, kind: 'wobble' } });
       return;
     }
-    const { ok, next } = applyAction(pet, id, now);
-    if (!ok) return;
+    const { ok, next, reason } = applyAction(pet, id, now);
+    if (!ok) {
+      if (reason === 'tired') get().say('tired');
+      return;
+    }
     const withD = withDiary(next, id);
     saveRaw(withD);
     const nextPet = withD;

@@ -104,13 +104,19 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
         end();
         return;
       }
-      const progress = elapsed / MINIGAME.durationMs;
+      // 前 4 秒适应期不加速；之后用 smoothstep 缓入，速度与生成频率都平滑爬升
+      const ramp = Math.min(
+        1,
+        Math.max(0, (elapsed - MINIGAME.rampDelayMs) / (MINIGAME.durationMs - MINIGAME.rampDelayMs))
+      );
+      const progress = ramp * ramp * (3 - 2 * ramp);
       setTimeLeft(MINIGAME.durationMs - elapsed);
 
-      // LV 递进：每 8 分升一级，速度/生成同步加快（复玩性核心）
-      const lv = 1 + Math.floor(scoreRef.current / 8);
-      const levelBoost = 1 + (lv - 1) * 0.22;
-      const spawnBoost = 1 + (lv - 1) * 0.18;
+      // LV 递进：每 10 分升一级，最高 5 级；单级加成温和，避免突然加速
+      const lv = Math.min(MINIGAME.maxLevel, 1 + Math.floor(scoreRef.current / MINIGAME.levelScore));
+      setLevel(lv);
+      const levelBoost = 1 + (lv - 1) * MINIGAME.levelSpeedBoost;
+      const spawnBoost = 1 + (lv - 1) * MINIGAME.levelSpawnBoost;
 
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
@@ -122,7 +128,8 @@ export function SnackGame({ pet, onClose }: { pet: PetState; onClose: () => void
             (MINIGAME.spawnIntervalEnd - MINIGAME.spawnIntervalStart) * progress) /
           spawnBoost;
         nextSpawnAt = now + interval * (0.75 + Math.random() * 0.5);
-        const bomb = Math.random() < MINIGAME.bombRate;
+        const bombRate = MINIGAME.bombRateStart + (MINIGAME.bombRate - MINIGAME.bombRateStart) * progress;
+        const bomb = Math.random() < bombRate;
         const speed =
           (MINIGAME.fallSpeedStart + (MINIGAME.fallSpeedEnd - MINIGAME.fallSpeedStart) * progress) *
           levelBoost;

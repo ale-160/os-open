@@ -3,7 +3,7 @@
  *
  * 设计基准（无限养成、真实时间流逝）：
  * - 清醒时不喂食，饱食约 14 小时耗尽；全部挂机约 2 天进入"生病"边缘
- * - 睡觉回精力，约 7 小时充满；离线结算打 5 折且最多按 12 小时计（宽容）
+ * - 睡觉回精力，约 1.7 小时充满；离线结算打 5 折且最多按 12 小时计（宽容）
  */
 
 import type { ActionId, GrowthStage, PersonalityKey, ShopItem } from './types';
@@ -22,8 +22,8 @@ export const DECAY_PER_HOUR = {
   moodDistress: 2.5,
   /** 精力（清醒） */
   energyAwake: 4,
-  /** 精力（睡觉恢复） */
-  energyRecover: 14,
+  /** 精力（睡觉恢复；挂机 5 分钟约 +5，离线结算减半） */
+  energyRecover: 60,
   /** 生病时健康消耗 */
   healthSick: 6,
   /** 状态良好时健康回复 */
@@ -77,8 +77,17 @@ export interface ActionDef {
   cleanliness?: number;
   mood?: number;
   energy?: number;
+  /** 基础成长值（低阶段兜底；优先使用 growthByStage） */
   growth?: number;
+  /** 分阶段成长值：阶段越高，单次互动反馈越大 */
+  growthByStage?: Partial<Record<GrowthStage, number>>;
   personality?: Partial<Record<PersonalityKey, number>>;
+}
+
+/** 取某阶段下动作的成长值（egg 不参与互动，按 baby 处理） */
+export function actionGrowth(id: ActionId, stage: GrowthStage): number {
+  const def = ACTIONS[id];
+  return def.growthByStage?.[stage === 'egg' ? 'baby' : stage] ?? def.growth ?? 0;
 }
 
 export const ACTIONS: Record<ActionId, ActionDef> = {
@@ -88,8 +97,8 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     animMs: 2_400,
     satiety: 28,
     mood: 2,
-    energy: -1,
     growth: 1,
+    growthByStage: { baby: 1, teen: 2, adult: 4 },
     personality: { foodie: 3 },
   },
   wash: {
@@ -98,8 +107,8 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     animMs: 2_800,
     cleanliness: 100,
     mood: 2,
-    energy: -2,
     growth: 1,
+    growthByStage: { baby: 1, teen: 2, adult: 4 },
     personality: { chill: 2 },
   },
   play: {
@@ -111,6 +120,7 @@ export const ACTIONS: Record<ActionId, ActionDef> = {
     satiety: -3,
     cleanliness: -4,
     growth: 2,
+    growthByStage: { baby: 2, teen: 4, adult: 7 },
     personality: { lively: 4 },
   },
 };
@@ -144,9 +154,15 @@ export const STUDY = {
   cooldownMs: 3 * 60_000,
   energyCost: 20,
   growth: 5,
+  growthByStage: { baby: 5, teen: 7, adult: 10 },
   personalityArtsy: 3,
   animMs: 3_200,
 } as const;
+
+/** 学习成长值（分阶段） */
+export function studyGrowth(stage: GrowthStage): number {
+  return STUDY.growthByStage[stage === 'egg' ? 'baby' : stage];
+}
 
 /** 商店（买即用，无库存） */
 export const SHOP_ITEMS: ShopItem[] = [
@@ -180,12 +196,41 @@ export const MINIGAME = {
   /** 单局奖励上限 */
   maxCoins: 25,
   maxMood: 25,
-  /** 障碍物（接到扣分）概率 */
+  /** 障碍物（接到扣分）概率（开局会从低值平滑爬升） */
   bombRate: 0.12,
+  bombRateStart: 0.04,
+  /** 开局适应期：这段时间内不加速，让玩家先熟悉手感 */
+  rampDelayMs: 4_000,
+  /** 难度按 smoothstep 从 0 → 1 缓入，避免前后半场突变 */
   fallSpeedStart: 32, // %/s
-  fallSpeedEnd: 58,
+  fallSpeedEnd: 52,
   spawnIntervalStart: 900, // ms
-  spawnIntervalEnd: 480,
+  spawnIntervalEnd: 620,
+  /** 等级：每 10 分升一级，最高 5 级；加成温和递增 */
+  levelScore: 10,
+  maxLevel: 5,
+  levelSpeedBoost: 0.1,
+  levelSpawnBoost: 0.08,
+} as const;
+
+/** 大富翁经济参数（15 轮内保证玩家有稳定的购买力） */
+export const MONOPOLY = {
+  startCash: 400,
+  maxRounds: 15,
+  /** 经过起点 */
+  passBonus: 40,
+  /** 每轮结束按地产租金收取的被动收入比例 */
+  roundIncomeRate: 0.5,
+  /** 税率 */
+  taxRate: 0.05,
+  luckMin: 40,
+  luckMax: 90,
+  chestGood: 60,
+  chestBad: 15,
+  festival: 60,
+  hospital: 20,
+  /** AI 留存的现金安全线（越低越激进） */
+  aiReserve: 45,
 } as const;
 
 /** 随机小事件（在线 tick 概率触发） */
