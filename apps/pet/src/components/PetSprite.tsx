@@ -87,7 +87,8 @@ function accessoryLayout(def: AccessoryDef, face: FaceLayout, stage: GrowthStage
 
   switch (slot) {
     case 'hat':
-      return { x: 50, y: [5, 4, 3][si], w: [36, 32, 28][si], z: 30 };
+      // adult 眼线在 22%，帽檐必须收在眼线之上（y 压到 0、宽度收窄）
+      return { x: 50, y: [5, 4, 0][si], w: [36, 32, 26][si], z: 30 };
     case 'ears':
       // 头梁在头顶、耳罩落在头部两侧；压在表情层下方，避免挡住眼睛
       return { x: 50, y: [4, 2, 1][si], w: [64, 54, 48][si], z: 15 };

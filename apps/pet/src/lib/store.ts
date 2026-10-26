@@ -122,6 +122,8 @@ interface PetStore {
   doWork: () => void;
   doStudy: () => void;
   buyItem: (item: ShopItem) => void;
+  /** 直接加元宝（隐藏彩蛋用：无台词、无日记、无通知） */
+  addCoins: (n: number) => void;
   /** 小游戏结算：按得分发放奖励并更新该游戏最高分，返回奖励与新纪录标记 */
   finishMinigame: (game: GameKind, score: number) => { coins: number; mood: number; newBest: boolean };
   toggleSleep: () => void;
@@ -746,6 +748,14 @@ export const usePetStore = create<PetStore>()((set, get) => ({
       burst: { id: ++burstSeq, kind: item.cure || item.variant || item.scene ? 'sparkle' : 'heart' },
     });
     get().say('buy');
+  },
+
+  addCoins: (n) => {
+    const pet = get().pet;
+    if (!pet || !pet.alive || n <= 0) return;
+    const next: PetState = { ...pet, coins: pet.coins + n, updatedAt: Date.now() };
+    saveRaw(next);
+    set({ pet: next });
   },
 
   finishMinigame: (game, score) => {

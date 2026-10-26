@@ -1,13 +1,14 @@
 'use client';
 
 /**
- * 领养流程：选蛋（单行毛玻璃无级滚动，与首页底栏同款）→ 起名 →（可选）一句话 AI 定制 → 开始孵化。
+ * 领养流程：选蛋（单行毛玻璃无级滚动 + 闲置自动巡游 + 🎲 抽取动画）→ 起名 →（可选）一句话 AI 定制 → 开始孵化。
  * 页面为全幅暖色渐变（无白边框容器），底部有一条与游戏内 ActionPanel 一致的无级滚动动作条。
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { aiImageReady, aiReady, generatePetImage, loadAiSettings } from '@/lib/ai';
+import { sfx } from '@/lib/sfx';
 import { ui } from '@/lib/locale';
 import { YYP_BASE } from '@/lib/pingdingshan';
 import { usePetStore } from '@/lib/store';
@@ -27,23 +28,61 @@ function buildAiSkinRecord(name: string, dataUrl: string): CustomSkinRecord {
   };
 }
 
-/** 模块级随机挑一个与当前不同的官方配色（Math.random 被 react-hooks/purity 视为不纯调用，不放组件体内） */
-function randomVariantId(current: VariantId): VariantId {
-  const pool = VARIANTS.filter((v) => v.id !== current);
-  return pool[Math.floor(Math.random() * pool.length)].id;
+/** 模块级随机挑一颗蛋（Math.random 被 react-hooks/purity 视为不纯调用，不放组件体内） */
+function randomVariantIndex(current: VariantId): number {
+  const pool = VARIANTS.map((v, i) => ({ v, i })).filter(({ v }) => v.id !== current);
+  return pool[Math.floor(Math.random() * pool.length)].i;
+}
+
+/** easeOutCubic：抽取动画减速曲线 */
+const easeOutCubic = (p: number) => 1 - Math.pow(1 - p, 3);
+
+/** 自动巡游的交互暂停时间戳（模块级，避免组件体内的 Date.now 触发纯度规则） */
+const eggIdleUntil = { t: 0 };
+const bumpEggIdle = (ms = 2500) => {
+  eggIdleUntil.t = Date.now() + ms;
+};
+
+/** 蛋条轮盘抽取：整两圈 + easeOutCubic 减速落到目标蛋；完成回调只做 setState */
+function runEggDraw(
+  el: HTMLDivElement,
+  targetIdx: number,
+  onDone: () => void
+) {
+  const half = el.scrollWidth / 2;
+  const targetEl = el.children[targetIdx] as HTMLElement | undefined;
+  if (!half || !targetEl) {
+    // 兜底：无法测量时直接由调用方随机选中
+    onDone();
+    return;
+  }
+  const centerOffset = (el.clientWidth - targetEl.offsetWidth) / 2;
+  const targetScroll = targetEl.offsetLeft - centerOffset;
+  const startBase = ((el.scrollLeft % half) + half) % half;
+  const delta = (((targetScroll - startBase) % half) + half) % half;
+  const total = half * 2 + delta; // 整两圈 + 落到目标
+  const start = el.scrollLeft;
+  const t0 = performance.now();
+  const duration = 2400;
+
+  const step = (now: number) => {
+    const p = Math.min(1, (now - t0) / duration);
+    el.scrollLeft = start + total * easeOutCubic(p);
+    if (p < 1) {
+      requestAnimationFrame(step);
+      return;
+    }
+    // 落定：回卷到第一份内容内（两份内容完全一致，视觉无缝）
+    el.scrollLeft = ((el.scrollLeft % half) + half) % half;
+    sfx.pop();
+    onDone();
+  };
+  requestAnimationFrame(step);
 }
 
 /** 与 ActionPanel 一致的无边框胶囊视觉语言 */
 const CAPSULE =
   'pointer-events-auto rounded-[26px] bg-white/40 px-2 py-1.5 shadow-[0_10px_28px_rgba(138,106,77,0.14)] backdrop-blur-sm';
-
-/** 底部动作条入口 */
-interface StripEntry {
-  key: string;
-  icon: string;
-  label: string;
-  onClick: () => void;
-}
 
 export function HatchFlow() {
   const adopt = usePetStore((s) => s.adopt);
@@ -56,11 +95,43 @@ export function HatchFlow() {
   const [aiSentence, setAiSentence] = useState('');
   const [generating, setGenerating] = useState(false);
   const [aiError, setAiError] = useState(false);
+  /** 抽取动画进行中 / 刚抽中的蛋（弹跳高亮） */
+  const [drawing, setDrawing] = useState(false);
+  const [justDrawn, setJustDrawn] = useState<VariantId | null>(null);
 
   const stripRef = useRef<HTMLDivElement>(null);
   const eggStripRef = useRef<HTMLDivElement>(null);
   /** 拖拽滚动（桌面鼠标按住拖动，触屏原生滚动） */
   const dragRef = useRef<{ startX: number; startScroll: number } | null>(null);
+  /** 闲置自动巡游：交互后暂停（时间戳放模块级 eggIdleUntil，抽取期间强制暂停） */
+  const drawingRef = useRef(false);
+
+  /** 蛋条闲置自动巡游（内容渲染两份实现无缝循环；scrollLeft 取整，亚像素用累加器） */
+  useEffect(() => {
+    let raf = 0;
+    let last = performance.now();
+    let carry = 0;
+    const step = (now: number) => {
+      raf = requestAnimationFrame(step);
+      const el = eggStripRef.current;
+      if (!el || drawingRef.current || now < eggIdleUntil.t) {
+        last = now;
+        return;
+      }
+      const dt = Math.min(64, now - last);
+      last = now;
+      const half = el.scrollWidth / 2;
+      if (half <= 0) return;
+      carry += (24 * dt) / 1000;
+      const px = Math.floor(carry);
+      if (px <= 0) return;
+      carry -= px;
+      el.scrollLeft += px;
+      if (el.scrollLeft >= half) el.scrollLeft -= half;
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
 
   const aiSettings = typeof window === 'undefined' ? null : loadAiSettings();
@@ -94,8 +165,26 @@ export function HatchFlow() {
       : ''
     : '';
 
-  /** 🎲 随机配色：从其余官方配色中随机挑一颗蛋 */
-  const randomVariant = () => setVariant(randomVariantId(variant));
+  /** 🎲 抽取一颗蛋：蛋条轮盘滚动两圈后减速停在随机蛋上 */
+  const drawEgg = () => {
+    const el = eggStripRef.current;
+    if (!el || drawingRef.current) return;
+    const targetIdx = randomVariantIndex(variant);
+    drawingRef.current = true;
+    setDrawing(true);
+    bumpEggIdle(5200);
+    runEggDraw(el, targetIdx, () => {
+      drawingRef.current = false;
+      setDrawing(false);
+      setVariant(VARIANTS[targetIdx].id);
+      setJustDrawn(VARIANTS[targetIdx].id);
+      setTimeout(() => setJustDrawn(null), 1000);
+      bumpEggIdle();
+    });
+  };
+
+  /** 标记一次手动交互（暂停自动巡游） */
+  const markInteract = () => bumpEggIdle();
 
   /** 🎨 官方配色：按官方配色表顺序循环切换 */
   const cycleVariant = () => {
@@ -103,26 +192,15 @@ export function HatchFlow() {
     setVariant(VARIANTS[(idx + 1) % VARIANTS.length].id);
   };
 
-  const stripEntries: StripEntry[] = [
-    {
-      key: 'yyp',
-      icon: '📷',
-      label: locale === 'zh' ? '鹰悦拍' : 'YYP Photo',
-      onClick: () => window.open(YYP_BASE, '_blank', 'noopener,noreferrer'),
-    },
-    { key: 'random', icon: '🎲', label: locale === 'zh' ? '随机配色' : 'Random', onClick: randomVariant },
-    { key: 'official', icon: '🎨', label: locale === 'zh' ? '官方配色' : 'Official', onClick: cycleVariant },
-  ];
-
-  const stripButton = (entry: StripEntry) => (
+  const stripButton = (icon: string, label: string, onClick: () => void, disabled = false) => (
     <button
-      key={entry.key}
       type="button"
-      onClick={entry.onClick}
-      className="press flex w-[72px] shrink-0 snap-center flex-col items-center gap-0.5 rounded-2xl py-1.5 transition-colors hover:bg-white/60 active:bg-white/85"
+      disabled={disabled}
+      onClick={onClick}
+      className={`press flex w-[72px] shrink-0 snap-center flex-col items-center gap-0.5 rounded-2xl py-1.5 transition-colors hover:bg-white/60 active:bg-white/85 ${disabled ? 'opacity-40' : ''}`}
     >
-      <span className="text-[24px] leading-none drop-shadow-sm">{entry.icon}</span>
-      <span className="whitespace-nowrap text-[11px] font-bold tracking-wide">{entry.label}</span>
+      <span className="text-[24px] leading-none drop-shadow-sm">{icon}</span>
+      <span className="whitespace-nowrap text-[11px] font-bold tracking-wide">{label}</span>
     </button>
   );
 
@@ -151,22 +229,25 @@ export function HatchFlow() {
           <p className="mt-1 text-sm text-gugu-ink-soft">{t.adoptSubtitle}</p>
         </header>
 
-        {/* 选蛋：单行毛玻璃无级滚动（与底栏同款，无白边框卡片） */}
+        {/* 选蛋：单行毛玻璃无级滚动（内容两份无缝循环；闲置自动巡游，交互暂停） */}
         <div
           ref={eggStripRef}
           className={`no-scrollbar ${CAPSULE} flex w-full items-stretch gap-1 overflow-x-auto`}
           onWheel={(e) => {
+            markInteract();
             if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
               e.currentTarget.scrollLeft += e.deltaY;
               e.preventDefault();
             }
           }}
           onPointerDown={(e) => {
+            markInteract();
             if (e.pointerType !== 'mouse') return;
             dragRef.current = { startX: e.clientX, startScroll: eggStripRef.current?.scrollLeft ?? 0 };
           }}
           onPointerMove={(e) => {
             if (!dragRef.current || !eggStripRef.current) return;
+            markInteract();
             eggStripRef.current.scrollLeft = dragRef.current.startScroll - (e.clientX - dragRef.current.startX);
           }}
           onPointerUp={() => {
@@ -176,14 +257,18 @@ export function HatchFlow() {
             dragRef.current = null;
           }}
         >
-          {VARIANTS.map((v) => (
+          {[...VARIANTS, ...VARIANTS].map((v, i) => (
             <button
-              key={v.id}
+              key={`${v.id}-${i}`}
               type="button"
-              onClick={() => setVariant(v.id)}
+              disabled={drawing}
+              onClick={() => {
+                markInteract();
+                setVariant(v.id);
+              }}
               className={`press flex w-[72px] shrink-0 flex-col items-center gap-0.5 rounded-2xl py-1.5 transition-colors ${
                 variant === v.id ? 'bg-white/85 shadow-sm ring-2 ring-gugu-accent' : 'hover:bg-white/60 active:bg-white/85'
-              }`}
+              } ${justDrawn === v.id ? 'anim-pop' : ''}`}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -254,7 +339,25 @@ export function HatchFlow() {
           onPointerUp={onPointerUp}
           onPointerLeave={onPointerUp}
         >
-          {stripEntries.map(stripButton)}
+          {stripButton(
+            '📷',
+            locale === 'zh' ? '鹰悦拍' : 'YYP Photo',
+            () => window.open(YYP_BASE, '_blank', 'noopener,noreferrer')
+          )}
+          <button
+            type="button"
+            disabled={drawing}
+            onClick={drawEgg}
+            className={`press flex w-[72px] shrink-0 snap-center flex-col items-center gap-0.5 rounded-2xl py-1.5 transition-colors hover:bg-white/60 active:bg-white/85 ${drawing ? 'opacity-40' : ''}`}
+          >
+            <span className="text-[24px] leading-none drop-shadow-sm">🎲</span>
+            <span className="whitespace-nowrap text-[11px] font-bold tracking-wide">{locale === 'zh' ? '抽一颗' : 'Draw'}</span>
+          </button>
+          {stripButton(
+            '🎨',
+            locale === 'zh' ? '官方配色' : 'Official',
+            cycleVariant
+          )}
         </div>
       </div>
     </div>

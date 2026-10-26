@@ -4,7 +4,7 @@ import { useEscClose } from '@/hooks/useEscClose';
 
 /** 设置弹窗：语言切换 / 音效 / 改名 / 模式 / 备份 / AI（BYOK）/ 重置存档 / 关于（由父组件条件渲染） */
 
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLocale } from '@/hooks/useLocale';
 import { chatComplete, DEFAULT_AI_SETTINGS, loadAiSettings, saveAiSettings, type AiSettings } from '@/lib/ai';
 import { isSfxMuted, setSfxMuted } from '@/lib/sfx';
@@ -14,6 +14,22 @@ import { ui } from '@/lib/locale';
 import { usePetStore } from '@/lib/store';
 import type { PetState } from '@/lib/types';
 
+/** 连点追踪工厂：2 秒窗口内累计 5 次触发一次奖励（模块级，避免组件体内的 Date.now 纯度告警） */
+function createCasualTapTracker(onReward: () => void) {
+  let n = 0;
+  let at = 0;
+  return () => {
+    const now = Date.now();
+    if (now - at > 2000) n = 0;
+    n += 1;
+    at = now;
+    if (n >= 5) {
+      n = 0;
+      onReward();
+    }
+  };
+}
+
 export function SettingsDialog({ pet, onClose }: { pet: PetState; onClose: () => void }) {
   const { locale, setLocale } = useLocale();
   const reset = usePetStore((s) => s.reset);
@@ -21,8 +37,12 @@ export function SettingsDialog({ pet, onClose }: { pet: PetState; onClose: () =>
   const exportBackup = usePetStore((s) => s.exportBackup);
   const importBackup = usePetStore((s) => s.importBackup);
   const setMode = usePetStore((s) => s.setMode);
+  const addCoins = usePetStore((s) => s.addCoins);
   const t = ui(locale);
   useEscClose(onClose);
+
+  // 彩蛋：2 秒内连点「休闲」5 次 +1000 元宝（无台词/无通知/无提示；计时器在模块级工厂里）
+  const tapCasual = useMemo(() => createCasualTapTracker(() => addCoins(1000)), [addCoins]);
 
   const [confirming, setConfirming] = useState(false);
   const [ai, setAi] = useState<AiSettings>(() => (typeof window === 'undefined' ? DEFAULT_AI_SETTINGS : loadAiSettings()));
@@ -227,7 +247,14 @@ export function SettingsDialog({ pet, onClose }: { pet: PetState; onClose: () =>
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setMode(opt.id)}
+                onClick={() => {
+                  if (opt.id === 'casual') {
+                    setMode('casual');
+                    tapCasual();
+                  } else {
+                    setMode(opt.id);
+                  }
+                }}
                 className={`press rounded-xl border py-2 text-sm font-bold ${
                   pet.mode === opt.id ? 'border-gugu-accent bg-gugu-accent/10 text-gugu-accent' : 'border-amber-100 bg-white'
                 }`}
