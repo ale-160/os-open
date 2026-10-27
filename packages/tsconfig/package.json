@@ -1,0 +1,10 @@
+{
+  "name": "@os/tsconfig",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ale OS 共享 TypeScript 基础配置（Next.js 应用）",
+  "files": [
+    "base.json",
+    "next.json"
+  ]
+}

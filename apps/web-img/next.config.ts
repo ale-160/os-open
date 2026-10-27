@@ -1,14 +1,6 @@
-import type { NextConfig } from "next";
+import { withOsPreset } from '@os/next-preset';
 
-const nextConfig: NextConfig = {
-  output: "export",
-  basePath: process.env.APP_BASE_PATH || '',
-  trailingSlash: true,
-  images: {
-    unoptimized: true,
-  },
-  // 配置 Turbopack（Next.js 16 默认使用）
-  turbopack: {},
-};
-
-export default nextConfig;
+export default withOsPreset({
+  // 配置 Turbopack（Next.js 16 默认使用；构建脚本仍用 --webpack）
+  turbopack: {}
+});

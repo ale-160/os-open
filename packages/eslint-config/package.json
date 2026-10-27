@@ -1,0 +1,15 @@
+{
+  "name": "@os/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ale OS Next 应用共享 ESLint flat config",
+  "type": "module",
+  "main": "./index.mjs",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "dependencies": {
+    "eslint": "catalog:",
+    "eslint-config-next": "catalog:"
+  }
+}

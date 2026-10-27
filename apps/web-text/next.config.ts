@@ -1,12 +1,3 @@
-import type { NextConfig } from "next";
+import { withOsPreset } from '@os/next-preset';
 
-const config: NextConfig = {
-    output: 'export',
-    basePath: process.env.APP_BASE_PATH || '',
-    trailingSlash: true,
-    images: {
-        unoptimized: true,
-    },
-};
-
-export default config;
+export default withOsPreset();
