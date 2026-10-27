@@ -19,6 +19,39 @@ export interface OsApp {
   description: string;
   descriptionEn: string;
   repository: string;
+  /** 应用商城分类 */
+  category: AppCategory;
+}
+
+/** 应用商城分类：分类元数据见 APP_CATEGORIES */
+export type AppCategory = 'tools' | 'creative' | 'social' | 'games' | 'system';
+
+export interface AppCategoryMeta {
+  id: AppCategory;
+  /** 中文名 */
+  name: string;
+  /** 英文名 */
+  nameEn: string;
+}
+
+/** 分类展示顺序即数组顺序 */
+export const APP_CATEGORIES: readonly AppCategoryMeta[] = [
+  { id: 'tools', name: '工具', nameEn: 'Tools' },
+  { id: 'creative', name: '创意', nameEn: 'Creative' },
+  { id: 'social', name: '社交', nameEn: 'Social' },
+  { id: 'games', name: '游戏', nameEn: 'Games' },
+  { id: 'system', name: '系统', nameEn: 'System' }
+];
+
+/** 按注册表顺序把应用归入各分类（空分类不出现） */
+export function groupAppsByCategory(apps: readonly OsApp[]): Array<{
+  category: AppCategoryMeta;
+  apps: OsApp[];
+}> {
+  return APP_CATEGORIES.map(category => ({
+    category,
+    apps: apps.filter(app => app.category === category.id)
+  })).filter(group => group.apps.length > 0);
 }
 
 /** 桌面图标指向内嵌应用时使用的内部 URL 方案 */
@@ -40,7 +73,8 @@ export const OS_APPS: readonly OsApp[] = [
     description: '纯前端在线图片处理工具箱：压缩、水印、格式转换、GIF、PDF',
     descriptionEn:
       'Client-side image toolbox: compress, watermark, convert, GIF, PDF',
-    repository: 'https://github.com/ale-160/web-img'
+    repository: 'https://github.com/ale-160/web-img',
+    category: 'tools'
   },
   {
     id: 'gallery',
@@ -50,7 +84,8 @@ export const OS_APPS: readonly OsApp[] = [
     icon: '/apps/gallery.png',
     description: '浏览和管理系统资产库：预览、下载应用产物，或复制到系统剪贴板',
     descriptionEn: 'Browse and manage the system asset library: preview, download, copy to clipboard',
-    repository: 'https://github.com/ale-160/os-open'
+    repository: 'https://github.com/ale-160/os-open',
+    category: 'system'
   },
   {
     id: 'nchat',
@@ -60,7 +95,8 @@ export const OS_APPS: readonly OsApp[] = [
     icon: '/apps/nchat.png',
     description: '去中心化 P2P 聊天室：Ed25519 公钥身份、端到端私聊、文件传输（Beta）',
     descriptionEn: 'Decentralized P2P chat: Ed25519 identity, E2E DM, file transfer (Beta)',
-    repository: 'https://github.com/ale-160/nchat'
+    repository: 'https://github.com/ale-160/nchat',
+    category: 'social'
   },
   {
     id: 'typev',
@@ -70,7 +106,8 @@ export const OS_APPS: readonly OsApp[] = [
     icon: '/apps/typev.png',
     description: '脚本驱动的文字打字动画制作器：标签脚本、实时预览、录制导出视频',
     descriptionEn: 'Script-driven text animation studio: tag script, live preview, video export',
-    repository: 'https://github.com/ale-160/os-open'
+    repository: 'https://github.com/ale-160/os-open',
+    category: 'creative'
   },
   {
     id: 'pet',
@@ -80,7 +117,8 @@ export const OS_APPS: readonly OsApp[] = [
     icon: '/apps/pet.png',
     description: '原创养成桌宠：喂食洗澡打工学习，离线也陪你；可换肤可对话',
     descriptionEn: 'Original virtual pet: feed, bathe, play and grow together, even offline',
-    repository: 'https://github.com/ale-160/os-open'
+    repository: 'https://github.com/ale-160/os-open',
+    category: 'games'
   },
   {
     id: 'burger',
@@ -91,7 +129,8 @@ export const OS_APPS: readonly OsApp[] = [
     description: '非官方麦当劳主题横版街机射击原型：4 位汉堡战士、3 关 3 Boss、可继承食物配件',
     descriptionEn:
       'Unofficial fast-food arcade run-and-gun prototype: 4 burger heroes, 3 stages and bosses, inheritable gear',
-    repository: 'https://github.com/ale-160/os-open'
+    repository: 'https://github.com/ale-160/os-open',
+    category: 'games'
   },
   {
     id: 'web-text',
@@ -102,7 +141,8 @@ export const OS_APPS: readonly OsApp[] = [
     description: '在线 Markdown 编辑器：实时预览、历史版本、多文档管理',
     descriptionEn:
       'Online Markdown editor with live preview, version history and multi-doc',
-    repository: 'https://github.com/ale-160/web-text'
+    repository: 'https://github.com/ale-160/web-text',
+    category: 'tools'
   }
 ];
 

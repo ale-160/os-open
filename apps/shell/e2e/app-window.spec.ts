@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { dismissWelcome } from './helpers';
 
 /**
  * App 窗口（内嵌应用）冒烟：多任务模型——
@@ -6,15 +7,6 @@ import { test, expect, Page } from '@playwright/test';
  * （iframe 保活不销毁），运行中的应用出现在桌面 dock，可切回可关闭。
  * e2e 仅起 shell 的静态导出，/img、/text 用路由拦截返回桩页面。
  */
-async function dismissWelcome(page: Page) {
-  const welcome = page.getByRole('dialog', { name: /welcome|欢迎/i });
-  try {
-    await welcome.waitFor({ state: 'visible', timeout: 10_000 });
-    await welcome.getByRole('button', { name: /default configuration|默认配置/i }).click();
-  } catch {
-    // 无引导弹窗时直接继续
-  }
-}
 
 test.beforeEach(async ({ page }) => {
   // 拦截两个内嵌应用的路径，返回可识别的桩页面

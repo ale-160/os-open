@@ -244,7 +244,12 @@ export const STRINGS_ZH = {
   enterConfigUrlDesc: '提供一个完整的 JSON 配置文件 URL 地址（需包含 https://）',
   setupComplete: '设置完成',
   back: '返回',
-  
+  selectApps: '选择要添加的应用',
+  selectAppsDesc: '勾选你想要放到桌面的应用，之后可以随时在应用商城中增删',
+  selectAppsAll: '全选',
+  selectAppsClear: '全不选',
+  selectAppsConfirm: '开始使用',
+
   // 颜色名称
   black: '黑',
   white: '白',
@@ -626,7 +631,12 @@ export const STRINGS_EN = {
   enterConfigUrlDesc: 'Provide a complete URL to a JSON configuration file (must include https://)',
   setupComplete: 'Setup complete',
   back: 'Back',
-  
+  selectApps: 'Choose Apps to Add',
+  selectAppsDesc: 'Select the apps you want on your desktop. You can add or remove them anytime in the App Store',
+  selectAppsAll: 'Select All',
+  selectAppsClear: 'Clear All',
+  selectAppsConfirm: 'Get Started',
+
   // Color Names
   black: 'Black',
   white: 'White',

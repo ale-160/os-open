@@ -1,19 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
+import { dismissWelcome } from './helpers';
 
 /**
  * 全局命令面板（Spotlight）：Ctrl/⌘+K 或顶栏搜索按钮唤起，
  * 聚合系统应用/桌面图标/系统操作，回车执行；无结果回退网络搜索。
  * e2e 仅起 shell 的静态导出，/img、/text 用路由拦截返回桩页面。
  */
-async function dismissWelcome(page: Page) {
-  const welcome = page.getByRole('dialog', { name: /welcome|欢迎/i });
-  try {
-    await welcome.waitFor({ state: 'visible', timeout: 10_000 });
-    await welcome.getByRole('button', { name: /default configuration|默认配置/i }).click();
-  } catch {
-    // 无引导弹窗时直接继续
-  }
-}
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/img/**', route =>

@@ -1,4 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
+import { dismissWelcome } from './helpers';
 
 /**
  * 壁纸存储优化：本地上传的壁纸存入 IndexedDB 壁纸库，
@@ -9,16 +10,6 @@ import { test, expect, Page } from '@playwright/test';
 // 1x1 PNG
 const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
-
-async function dismissWelcome(page: Page) {
-  const welcome = page.getByRole('dialog', { name: /welcome|欢迎/i });
-  try {
-    await welcome.waitFor({ state: 'visible', timeout: 10_000 });
-    await welcome.getByRole('button', { name: /default configuration|默认配置/i }).click();
-  } catch {
-    // 无引导弹窗时直接继续
-  }
-}
 
 test('上传壁纸写入 IndexedDB，配置只留 asset:// 引用且背景生效', async ({ page }) => {
   await page.goto('/');
