@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-import { isWallpaperAssetRef, resolveWallpaperUrl } from '@/utils/osAssets';
+import { isWallpaperAssetRef, resolveWallpaperUrl } from '@os/shared/os-assets';
 
 // 模块级缓存：资产壁纸 dataUrl 跨组件/跨渲染复用，避免重复查库与切换壁纸时闪烁
 const resolvedCache = new Map<string, string>();

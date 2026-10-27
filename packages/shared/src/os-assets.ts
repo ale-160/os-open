@@ -1,15 +1,17 @@
 /**
- * Ale OS 系统资产库（壳侧）
+ * Ale OS 系统资产库
  *
  * 系统级图库 + 系统剪贴板 + 壁纸库，基于 IndexedDB（同源共享，壳与所有应用读写同一库）：
  * - 图库：应用把产物「存进去」，任何应用随时「取出来用」（拉模型）；
  * - 剪贴板：单槽，存最近一次复制的内容（图片或文本）；
  * - 壁纸：本地上传的壁纸以资产形式入库，配置里只存 `asset://<id>` 引用，
  *   避免把 base64 塞进 localStorage 的整份配置（5MB 容量告警）。
+ *
+ * v2：新增 wallpapers 存储（壁纸迁出 localStorage）。
+ * 旧 v1 应用打开已升级的库属合法操作（IndexedDB 只增版本不破坏旧 store）。
  */
 
 const DB_NAME = 'ale-os-assets';
-// v2：新增 wallpapers 存储（壁纸迁出 localStorage）。web-img/web-text 副本仍以 v1 打开已升级的库，属合法操作。
 const DB_VERSION = 2;
 const STORE_ASSETS = 'assets';
 const STORE_CLIPBOARD = 'clipboard';

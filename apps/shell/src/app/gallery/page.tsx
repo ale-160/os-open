@@ -9,7 +9,7 @@ import {
   getClipboardItem,
   setClipboardItem,
   type GalleryAsset
-} from '@/utils/osAssets';
+} from '@os/shared/os-assets';
 
 /**
  * 系统图库（Gallery App）

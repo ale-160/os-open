@@ -18,7 +18,7 @@ import { AdjustPanel } from '@/components/features/CompressPanel';
 import { WatermarkPanel } from '@/components/features/WatermarkPanel';
 import { MergePanel } from '@/components/features/MergePanel';
 import { downloadFile, formatFileSize } from '@/utils/file';
-import { saveAsset, setClipboardItem } from '@/utils/osAssets';
+import { saveAsset, setClipboardItem } from '@os/shared/os-assets';
 import { isPdfFile } from '@/utils/pdfToImage';
 import { normalizeImageFiles } from '@/utils/heicDecode';
 import type { ToolTab } from '@/data/presets';

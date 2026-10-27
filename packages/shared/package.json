@@ -1,0 +1,23 @@
+{
+  "name": "@os/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ale OS 运行时公共库：系统资产库、跨应用语言同步、样式工具",
+  "exports": {
+    ".": "./src/index.ts",
+    "./os-assets": "./src/os-assets.ts",
+    "./os-language": "./src/os-language.ts",
+    "./css": "./src/css.ts"
+  },
+  "dependencies": {
+    "clsx": "catalog:",
+    "tailwind-merge": "catalog:"
+  },
+  "peerDependencies": {
+    "react": ">=19"
+  },
+  "devDependencies": {
+    "@types/react": "catalog:",
+    "react": "catalog:"
+  }
+}

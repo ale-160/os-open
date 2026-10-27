@@ -9,7 +9,7 @@ import { canvasToBMP, encodeAVIF, encodeICO, encodeJXL, encodeTIFF } from '@/uti
 import { encodeGIF } from '@/utils/gifEncoder';
 import type { ConvertRequest, ConvertSuccess } from '@/workers/protocol';
 import { downloadFile, formatFileSize } from '@/utils/file';
-import { saveAsset } from '@/utils/osAssets';
+import { saveAsset } from '@os/shared/os-assets';
 import { normalizeImageFiles } from '@/utils/heicDecode';
 import { normalizeTiffFiles } from '@/utils/tiffDecode';
 import { normalizeJxlFiles } from '@/utils/jxlDecode';

@@ -2,6 +2,11 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import {
+  readOsLanguage,
+  subscribeOsLanguage,
+  writeOsLanguage
+} from '@os/shared/os-language';
 
 type Locale = 'zh' | 'en';
 
@@ -10,13 +15,10 @@ interface LocaleState {
   setLocale: (locale: Locale) => void;
 }
 
-/** Ale OS 系统共享语言键（壳与各应用统一读写，storage 事件实时同步） */
-const OS_LANGUAGE_KEY = 'ale-os-language';
-
 /**
  * 全局语言设置 Hook
- * zustand + persist 持久化，并与 Ale OS 系统语言双向同步：
- * - 初始化/收到 storage 事件时跟随 ale-os-language
+ * zustand + persist 持久化，并与 Ale OS 系统语言双向同步（实现见 @os/shared）：
+ * - 初始化/收到系统语言变更时跟随 ale-os-language
  * - setLocale 时写回共享键，壳与其他应用实时跟随
  */
 export const useLocale = create<LocaleState>()(
@@ -25,11 +27,7 @@ export const useLocale = create<LocaleState>()(
       locale: 'zh', // 默认中文
       setLocale: (locale) => {
         set({ locale });
-        try {
-          localStorage.setItem(OS_LANGUAGE_KEY, locale);
-        } catch {
-          /* 隐私模式等场景写入失败可忽略 */
-        }
+        writeOsLanguage(locale);
       },
     }),
     {
@@ -46,8 +44,6 @@ if (typeof window !== 'undefined') {
       if (current !== value) useLocale.setState({ locale: value });
     }
   };
-  applyShared(localStorage.getItem(OS_LANGUAGE_KEY));
-  window.addEventListener('storage', (e) => {
-    if (e.key === OS_LANGUAGE_KEY) applyShared(e.newValue);
-  });
+  applyShared(readOsLanguage());
+  subscribeOsLanguage(applyShared);
 }

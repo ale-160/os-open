@@ -10,7 +10,7 @@ import {
   getClipboardItem,
   type GalleryAsset,
   type ClipboardItemData
-} from '@/utils/osAssets';
+} from '@os/shared/os-assets';
 
 interface GalleryPickerModalProps {
   isOpen: boolean;

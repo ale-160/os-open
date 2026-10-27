@@ -11,7 +11,7 @@ import {
   saveWallpaper,
   WALLPAPER_ASSET_SCHEME,
   wallpaperIdFromRef
-} from './osAssets';
+} from '@os/shared/os-assets';
 
 beforeEach(() => {
   // 每个用例独立的 IndexedDB（同时覆盖从零建库到 v2 的路径）

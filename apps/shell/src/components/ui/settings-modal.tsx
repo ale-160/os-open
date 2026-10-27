@@ -37,7 +37,7 @@ import {
   saveWallpaper,
   wallpaperIdFromRef,
   WALLPAPER_ASSET_SCHEME
-} from '@/utils/osAssets';
+} from '@os/shared/os-assets';
 
 interface SettingsModalProps {
   isOpen: boolean;

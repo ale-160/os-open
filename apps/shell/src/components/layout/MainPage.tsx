@@ -12,14 +12,15 @@ import { useImportExport } from '@/hooks/useImportExport';
 import { Button } from '@/components/ui/button';
 import { ThemeToggleIcon } from '@/components/ui/theme-toggle-icon';
 import { extractDomain, generateFaviconCandidates } from '@/utils/url';
-import { saveWallpaper, WALLPAPER_ASSET_SCHEME } from '@/utils/osAssets';
+import { saveWallpaper, WALLPAPER_ASSET_SCHEME } from '@os/shared/os-assets';
 import { useResolvedWallpaper } from '@/hooks/useWallpaper';
 import { getStrings } from '@/data/i18n';
 import { getStructuredData } from '@/config/structuredData';
 import { AppWindowProvider, useAppWindow } from '@/components/app/AppWindow';
 import { AppStoreModal } from '@/components/app/AppStoreModal';
 import { PetWidget } from '@/components/pet/PetWidget';
-import { OS_LANGUAGE_KEY, type OsApp } from '@/config/apps';
+import { type OsApp } from '@/config/apps';
+import { writeOsLanguage, subscribeOsLanguage } from '@os/shared/os-language';
 import { HelpCircle, Globe, Heart, Search, Store } from 'lucide-react';
 
 // 懒加载模态框组件（仅在需要时加载）
@@ -157,27 +158,16 @@ function MainPageContent({ lang }: MainPageProps) {
 
   // 壳的语言变更写入共享键，内嵌应用通过 storage 事件实时跟随
   useEffect(() => {
-    try {
-      localStorage.setItem(OS_LANGUAGE_KEY, activeConfig.theme.language);
-    } catch {
-      // 隐私模式等场景下写入失败可忽略
-    }
+    writeOsLanguage(activeConfig.theme.language);
   }, [activeConfig.theme.language]);
 
-  // 应用内切换语言时，壳通过 storage 事件反向跟随
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== OS_LANGUAGE_KEY || !event.newValue) return;
-      const lang = event.newValue;
-      if (lang !== 'zh' && lang !== 'en') return;
-      if (lang === activeConfig.theme.language) return;
-      handleConfigUpdate({
-        theme: { ...activeConfig.theme, language: lang }
-      });
-    };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, [activeConfig.theme, handleConfigUpdate]);
+  // 应用内切换语言时，壳通过共享语言订阅反向跟随
+  useEffect(() => subscribeOsLanguage(lang => {
+    if (!lang || lang === activeConfig.theme.language) return;
+    handleConfigUpdate({
+      theme: { ...activeConfig.theme, language: lang }
+    });
+  }), [activeConfig.theme, handleConfigUpdate]);
 
   // ===== 壁纸迁移：旧配置里的 base64 壁纸（data:）迁入 IndexedDB 壁纸库，配置只留 asset:// 引用 =====
   // 导入的旧配置同样会经过这里被迁移；IndexedDB 不可用（如隐私模式）时保留 data: 内联，退回旧行为

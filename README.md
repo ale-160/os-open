@@ -58,10 +58,48 @@ os-open/
 ## 添加新应用（三步）
 
 1. `apps/` 下新建应用目录（任意能产出静态站点的框架），接入 `scripts/build-all.mjs`（加一行，带上对应的 `APP_BASE_PATH`）；
-2. `apps/shell/src/config/apps.ts` 注册表加一条 `OsApp`（id、名称、路径、图标）——商城自动上架；
+2. `apps/shell/src/config/apps.ts` 注册表加一条 `OsApp`（id、名称、路径、图标、**category**）——商城自动上架并归入对应分类；
 3. 需要出现在默认桌面时，在 `apps/shell/public/config.json` 加一个 `url: "app://<id>"` 的图标。
 
-应用间数据交换走系统资产库（`apps/*/src/utils/osAssets.ts`：`saveAsset` / `setClipboardItem` / `listAssets` / `getClipboardItem`）。
+### 共享技术栈（推荐直接复用）
+
+Next.js 应用不必重复配置与复制公共逻辑，声明依赖即可：
+
+```jsonc
+// package.json
+"dependencies": { "@os/shared": "workspace:*" },
+"devDependencies": {
+  "@os/tsconfig": "workspace:*",
+  "@os/eslint-config": "workspace:*",
+  "@os/next-preset": "workspace:*"
+}
+```
+
+```jsonc
+// tsconfig.json
+{ "extends": "@os/tsconfig/next.json", "compilerOptions": { "paths": { "@/*": ["./src/*"] } } }
+```
+
+```js
+// eslint.config.mjs
+import { createOsEslintConfig } from '@os/eslint-config';
+export default createOsEslintConfig();
+
+// next.config.ts —— 自动带 output:'export'、trailingSlash、APP_BASE_PATH、@os/* 转译
+import { withOsPreset } from '@os/next-preset';
+export default withOsPreset();
+```
+
+跨应用共享依赖统一写在 `pnpm-workspace.yaml` 的 `catalog:` 段，应用内用 `"next": "catalog:"` 引用，
+升级时改一处全系统生效。
+
+运行时公共能力（`@os/shared`）：
+
+| 模块 | 能力 |
+|---|---|
+| `@os/shared/os-assets` | 系统资产库：`saveAsset` / `listAssets` / `setClipboardItem` / `getClipboardItem`、壁纸库（`saveWallpaper` / `resolveWallpaperUrl`） |
+| `@os/shared/os-language` | 系统语言：`useOsLanguage`（React）与 `read/write/subscribeOsLanguage`（非 React），跨 iframe 实时同步 |
+| `@os/shared/css` | `cn()` 类名合并 |
 
 ## 本地开发
 
@@ -77,7 +115,8 @@ pnpm build        # 全量构建 + compose → out/
 pnpm e2e          # 壳的 Playwright e2e（serve out/）
 ```
 
-> 依赖用 pnpm workspace 管理；子应用互相隔离（strict hoisting），直接 import 未声明的依赖会构建失败。
+> 依赖用 pnpm workspace 管理（单一 lockfile + `catalog:` 统一版本）；子应用互相隔离（strict hoisting），直接 import 未声明的依赖会构建失败。
+> 共享包在 `packages/`（`@os/shared` 运行时能力、`@os/tsconfig` / `@os/eslint-config` / `@os/next-preset` 构建配置）。
 
 ## 部署（Cloudflare Pages）
 
