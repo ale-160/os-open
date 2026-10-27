@@ -17,41 +17,47 @@
 - **全局命令面板**：`Ctrl`/`⌘`+`K` 或顶栏搜索按钮唤起 Spotlight 式启动器（基于 [cmdk](https://cmdk.paco.me/)）——一步直达系统应用（注册表全量，含未上架桌面的）、桌面图标与系统操作（切主题/语言/设置/商城/帮助/回桌面），无结果时回退配置的搜索引擎。
 - **系统图库 + 系统剪贴板**：应用产物存入共享资产库（IndexedDB，本地存储），任何应用从图库取用——图片工具箱「保存到图库」，Markdown 编辑器「插入图片」挑选插入，P2P 聊天室聊天图片一键「存入图库」。无人为大小限制，容量仅受浏览器存储配额约束。
 - **壁纸走资产库**：本地上传的壁纸存入 IndexedDB 壁纸库，配置只保留 `asset://` 引用——不再把 base64 塞进 localStorage 的整份配置（旧配置加载时自动迁移），上传上限随之放宽到 8MB。
-- **应用商城**：顶栏商城入口管理桌面应用入口，删除的应用随时加回；注册表即上架清单。
+- **应用商城**：顶栏商城入口管理桌面应用入口，按分类（工具/创意/社交/游戏/系统）筛选，删除的应用随时加回；注册表即上架清单。首次进入系统时可在引导里勾选要放到桌面的应用。
 - **统一语言管理**：中文为主，根目录即中文站；壳与应用共享语言设置，切换全系统即时生效。
 - **统一毛玻璃视觉**：亮/暗主题下的玻璃层（顶栏 / dock / 弹窗）与极光渐变桌面底。
 
 ## 应用
 
-| 应用 | 路径 | 说明 |
-|---|---|---|
-| 桌面壳 shell | `/` | 网格桌面、多任务、主题、命令面板 |
-| 图片工具箱 web-img | `/img/` | 纯前端图片压缩/水印/格式转换/GIF/PDF |
-| Markdown 编辑器 web-text | `/text/` | 实时预览、历史版本、多文档 |
-| P2P 聊天室 nchat | `/chat/` | Ed25519 身份、端到端私聊、文件传输 |
-| 文字动画 TypeV | `/typev/` | 脚本驱动打字动画、录制导出 |
-| 咕咕 GuGu | `/pet/` | 原创养成桌宠：旅行、天气、日记、十款小游戏 |
-| 麦堡突击队 Burger Commando | `/burger/` | 第三方作者的非官方同人横版街机射击原型 |
+| 应用 | 路径 | 分类 | 说明 |
+|---|---|---|---|
+| 桌面壳 shell | `/` | 系统 | 网格桌面、多任务、主题、命令面板 |
+| 图片工具箱 web-img | `/img/` | 工具 | 纯前端图片压缩/水印/格式转换/GIF/PDF |
+| Markdown 编辑器 web-text | `/text/` | 工具 | 实时预览、历史版本、多文档 |
+| P2P 聊天室 nchat | `/chat/` | 社交 | Ed25519 身份、端到端私聊、文件传输 |
+| 文字动画 TypeV | `/typev/` | 创意 | 脚本驱动打字动画、录制导出 |
+| 咕咕 GuGu | `/pet/` | 游戏 | 原创养成桌宠：旅行、天气、日记、十款小游戏 |
+| 麦堡突击队 Burger Commando | `/burger/` | 游戏 | 第三方作者的非官方同人横版街机射击原型 |
 
 ## 架构
 
 ```
 os-open/
 ├── apps/
-│   ├── shell/      # 桌面壳（网格、文件夹、多页、主题、多任务）
+│   ├── shell/      # 桌面壳（网格、文件夹、多页、主题、多任务、商城）
 │   ├── web-img/    # 图片工具箱（/img/）
 │   ├── web-text/   # Markdown 编辑器（/text/）
 │   ├── nchat/      # P2P 聊天室（/chat/）
 │   ├── typev/      # 文字动画（/typev/）
 │   ├── pet/        # 咕咕桌宠（/pet/）
 │   └── burger/     # 麦堡突击队静态游戏（/burger/）
+├── packages/
+│   ├── shared/          # @os/shared：系统资产库 / 跨应用语言同步 / cn()（运行时公共库）
+│   ├── tsconfig/        # @os/tsconfig：共享 tsconfig 基础配置
+│   ├── eslint-config/   # @os/eslint-config：共享 ESLint flat config
+│   └── next-preset/     # @os/next-preset：Next.js 静态导出统一预设
 ├── scripts/
 │   ├── build-all.mjs   # 依次构建全部应用（子应用带 basePath）并合成
 │   └── compose.mjs     # 把全部静态导出合成单一 out/
-└── pnpm-workspace.yaml
+└── pnpm-workspace.yaml  # workspace + catalog（跨应用依赖版本单一来源）
 ```
 
 - 桌面壳构建到根路径 `/`；子应用分别以 `basePath` 静态导出后合入同一次部署，同源不同子路径。
+- 公共能力与构建配置沉淀在 `packages/@os/*`，应用声明 `workspace:*` 依赖即可复用（详见下文）；跨应用共享依赖的版本统一写在 `pnpm-workspace.yaml` 的 `catalog:` 段。
 - 各应用保留独立构建与测试，互不影响；壳的原有单测 + Playwright e2e 全量保留。
 - **图片/音视频素材不打包进仓库**：咕咕与 burger 的运行时素材走 R2 `https://public.ale160.com`（`gugu/**`、`burger/**`），素材 URL 带 `ASSET_VERSION` 防 CDN 旧缓存。
 
