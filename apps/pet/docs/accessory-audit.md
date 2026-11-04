@@ -37,6 +37,7 @@ node apps/pet/tools/gen-audit-doc.mjs                # 重新生成本文档
 | 2026-10-26 | b4b-68 | baby: warn:右翼被身体遮挡，仅左翼可见；adult: warn:同 baby | 冰晶翅膀素材偏单侧构图 |
 | 2026-10-26 | b4b-18 | baby: warn:救生圈围在颈/上胸，读作泳圈造型 |  |
 | 2026-10-26 | b4b-73 | baby: warn:金线围巾素材偏细，存在感弱但可见 |  |
+| 2026-11-04 | bandana | 平面素材 `acc/bandana.png` 当围巾整块贴脖，读不出「系在脖子上」的造型 | 换成穿戴态单图 `acc-worn/bandana-worn.png`（384×210）；`neck` 槽内单列 `BANDANA_STAGE`，按「环带中段上沿贴喙线下方」定位，R2 优先 + 本地兜底 |
 
 ## 台账
 
@@ -118,7 +119,7 @@ node apps/pet/tools/gen-audit-doc.mjs                # 重新生成本文档
 | scarf-plaid | 格纹围巾 / Plaid Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
 | scarf-red | 红围巾 / Red Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
 | scarf-yellow | 芥末黄围巾 / Mustard Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| bandana | 波点方巾 / Bandana | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
+| bandana | 波点方巾 / Bandana | b:✅ t:✅ a:✅ | ✅ | ✅ | 改用穿戴态单图 `acc-worn/bandana-worn.png`，走独立布局 `BANDANA_STAGE`（不走 neck 的固定宽度） |
 | scarf-check | 格纹绿围巾 / Check Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
 | scarf-rainbow | 彩虹围巾 / Rainbow Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
 | tie | 蝴蝶领结 / Bow Tie | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
