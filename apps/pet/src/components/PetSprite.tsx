@@ -90,6 +90,74 @@ const BANDANA_STAGE = [
   { w: 56, gap: 7.1 }, // adult：喙线 27.5%
 ] as const;
 
+/**
+ * 普通围巾（10 件）：素材离线重绘成「穿戴态」两层——`<id>-band.png`（环带 + 正面交叉折叠片）
+ * 与 `<id>-tails.png`（垂尾 + 流苏），两张图共用 320×187 同一坐标系，App 用同一套逻辑矩形摆放，
+ * 只差层级（band z30 盖住 tails 的根部）。波点方巾是一张整图，不在此列（见上面的 BANDANA_STAGE）。
+ * 与 master 的 neck / neckSmall 固定宽度无关：`anchor:'scarf'` 但不在本表的配件（如 b4b-7 / b4b-24）
+ * 仍走原来的判定与宽度。
+ */
+const SCARF_WORN_IDS = new Set<string>([
+  'scarf-star', 'scarf-plaid', 'scarf-red', 'scarf-yellow',
+  'scarf-check', 'scarf-rainbow', 'b4b-10', 'b4b-20', 'b4b-33', 'b4b-73',
+]);
+
+/**
+ * 头宽（% 容器宽，离线测 alpha 轮廓）。baby 64 / teen 57 是线上 408×512 素材的实测值；
+ * adult 48.8 对应线上 512×512 旧主体（换成 466×421 新主体后这一档要重测）。
+ * 波点方巾的 `BANDANA_STAGE.w` 也是同一头宽的 1.15 倍（73.6 ≈ 1.15×64、65.5 ≈ 1.15×57、56 ≈ 1.15×48.8）。
+ */
+const HEAD_W = [64, 57, 48.8] as const;
+
+/** 穿戴态围巾素材根目录：R2 与本地是同一相对路径，地址仍由 assetUrl() 统一改写 */
+const WORN_SCARF_BASE = `${BASE_PATH}/skins/gugu/acc-worn`;
+
+function wornScarfSrc(id: AccessoryId, layer: 'band' | 'tails'): string {
+  return `${WORN_SCARF_BASE}/${id}-${layer}.png`;
+}
+
+/**
+ * 围巾三阶段独立参数：
+ * `bandW` 环带宽度（头宽倍数）/ `bandH` 环带层高度（% 容器高）/ `bandGap` 环带整体相对喙线的下移量
+ * / `tailsW` 垂尾层宽度 / `tailBottom` 垂尾末端（% 容器高）。
+ * baby/teen 按参考图实测；adult 按同一规则、以头宽 48.8 等比换算，换新主体后要重测。
+ */
+const SCARF_STAGE = [
+  { bandW: 1.2, bandH: 45, bandGap: 1.2, tailsW: 56.2, tailBottom: 91 }, // baby：喙线 45.5%
+  { bandW: 1, bandH: 41, bandGap: 1.1, tailsW: 50.6, tailBottom: 89 }, // teen：喙线 36.5%
+  { bandW: 0.8, bandH: 32.4, bandGap: 1.4, tailsW: 39.8, tailBottom: 87 }, // adult：喙线 27.5%
+] as const;
+
+/** 素材行位（320×187 帧）：环带中段下缘 / 垂尾内容起点 */
+const SCARF_BAND_MID_BOTTOM_ROW = 66 / 187;
+const SCARF_TAILS_START_ROW = 54 / 187;
+/** 垂尾根部多盖 3.6% 容器高：根部藏在环带/折叠片底下，才不会露出接缝 */
+const SCARF_TAILS_ROOT_OVERLAP = 3.6;
+
+/**
+ * 围巾定位：环带层与垂尾层各一套矩形（不靠缩放整张贴图适配阶段）。
+ * - 环带层（整帧 320×187）：元素上缘 = 喙线 + `bandGap`；素材内容从第 4 行开始，中部上沿在第 28 行、
+ *   中部下缘在第 66 行，所以屏幕上环带贴着颈部，不会压到脸下方；
+ * - 垂尾层：内容在第 54..186 行，元素下缘让垂尾落到 `tailBottom`，上缘比环带中段下缘高
+ *   `SCARF_TAILS_ROOT_OVERLAP`，根部被环带与折叠片盖住。
+ */
+function wornScarfRect(face: FaceLayout, stage: GrowthStage) {
+  const si = stage === 'adult' ? 2 : stage === 'teen' ? 1 : 0;
+  const s = SCARF_STAGE[si];
+  const top = face.beakY * 100 + s.bandGap;
+  const w = s.bandW * HEAD_W[si];
+  const band = { left: 50 - w / 2, top, w, h: s.bandH };
+  const midBottom = top + s.bandH * SCARF_BAND_MID_BOTTOM_ROW;
+  const tailsH = (s.tailBottom - (midBottom - SCARF_TAILS_ROOT_OVERLAP)) / (1 - SCARF_TAILS_START_ROW);
+  const tails = {
+    left: 50 - s.tailsW / 2,
+    top: midBottom - SCARF_TAILS_ROOT_OVERLAP - tailsH * SCARF_TAILS_START_ROW,
+    w: s.tailsW,
+    h: tailsH,
+  };
+  return { band, tails };
+}
+
 interface AccLayout {
   x: number;
   y: number;
@@ -182,6 +250,43 @@ function AccessoryLayer({
   const def = accessoryById(accessory);
   if (!def) return null;
   const layoutFace = hasFaceOverlay ? DEFAULT_CUSTOM_FACE : face;
+  // 围巾类：环带(z30) + 垂尾(z29) 两层，都在身体与表情之上；back 层不出图
+  if (SCARF_WORN_IDS.has(def.id)) {
+    if (layer !== 'front') return null;
+    const r = wornScarfRect(layoutFace, stage);
+    const box = (q: { left: number; top: number; w: number; h: number }) => ({
+      left: `${q.left}%`,
+      top: `${q.top}%`,
+      width: `${q.w}%`,
+      height: `${q.h}%`,
+    });
+    const tailsSrc = wornScarfSrc(def.id, 'tails');
+    const bandSrc = wornScarfSrc(def.id, 'band');
+    return (
+      <>
+        {/* 垂尾层：根部藏在环带/折叠片底下，只露出垂落的布身 */}
+        <img
+          src={assetUrl(tailsSrc)}
+          alt=""
+          draggable={false}
+          onLoad={resetAssetState}
+          onError={(e) => fallbackToLocal(e, tailsSrc)}
+          className="pointer-events-none absolute object-fill"
+          style={{ ...box(r.tails), zIndex: 29, filter: 'drop-shadow(0 2px 2px rgba(60,20,10,0.24))' }}
+        />
+        {/* 环带层：含正面的交叉折叠片，压在垂尾根部之上 */}
+        <img
+          src={assetUrl(bandSrc)}
+          alt=""
+          draggable={false}
+          onLoad={resetAssetState}
+          onError={(e) => fallbackToLocal(e, bandSrc)}
+          className="pointer-events-none absolute object-fill"
+          style={{ ...box(r.band), zIndex: 30, filter: 'drop-shadow(0 3px 2px rgba(60,20,10,0.3))' }}
+        />
+      </>
+    );
+  }
   const l = accessoryLayout(def, layoutFace, stage);
   if ((l.z < 10) !== (layer === 'back')) return null;
   // 波点方巾用的是单独烘焙的穿戴态图（acc-worn/bandana-worn.png），同样 R2 优先、本地兜底
