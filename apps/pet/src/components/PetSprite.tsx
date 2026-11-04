@@ -7,9 +7,9 @@
 
 import { useEffect, useState } from 'react';
 import { THRESHOLD } from '@/lib/balance';
-import { bodyLocalSrc, bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
+import { BASE_PATH, bodyLocalSrc, bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
 import { accessoryById, accessoryLocalSrc, accessorySrc, type AccessoryDef } from '@/lib/accessories';
-import { fallbackToLocal, resetAssetState } from '@/lib/assetUrl';
+import { assetUrl, fallbackToLocal, resetAssetState } from '@/lib/assetUrl';
 import { usePetStore } from '@/lib/store';
 import type { AccessoryId, ActivityState, BurstData, GrowthStage, PetState } from '@/lib/types';
 
@@ -66,6 +66,30 @@ export function isBackAccessory(id: AccessoryId): boolean {
   return /(wings?|cape)/i.test(def.file);
 }
 
+/**
+ * 波点方巾（bandana）专属领巾布局。
+ * 素材是一张「穿戴态」单图（384×210 帧）：水平的颈环 + 结饰压在上沿 + 三角布垂在下方，
+ * 与普通围巾「整块平铺贴脖」的用法不同，所以不复用 neck / neckSmall 的固定宽度。
+ * 摆放规则只有一条：让素材里「环带中段上沿」（素材第 46 行）落在喙线下方一点。
+ * 参考图量得：环带横向跨度 ≈ 1.15 个头宽，环带上沿比喙线低约 0.2 个头宽。
+ */
+const BANDANA_LOCAL_SRC = `${BASE_PATH}/skins/gugu/acc-worn/bandana-worn.png`;
+const BANDANA_FRAME_ASPECT = 210 / 384;
+const BANDANA_BAND_ROW = 46 / 210;
+
+/**
+ * 三阶段专属参数（只作用于 bandana）：
+ * `w` 素材宽度（% 容器宽，≈ 1.15 × 头宽）；`gap` 环带中段上沿相对喙线的下移量（% 容器高）。
+ * baby/teen 按参考图直接量得；adult 头部比前两阶段小一圈（线上 old adult 素材头宽约 48.8% 容器宽），
+ * 于是 w 收到 56，gap 按同一比例取 7.1。
+ * 容器是 4:5，所以「宽度 %」换算成「高度 %」的像素系数是 0.8。
+ */
+const BANDANA_STAGE = [
+  { w: 73.6, gap: 11.2 }, // baby：喙线 45.5%
+  { w: 65.5, gap: 8.4 }, // teen：喙线 36.5%
+  { w: 56, gap: 7.1 }, // adult：喙线 27.5%
+] as const;
+
 interface AccLayout {
   x: number;
   y: number;
@@ -99,8 +123,15 @@ function accessoryLayout(def: AccessoryDef, face: FaceLayout, stage: GrowthStage
       const w = Math.max(30, Math.min(40, face.eyeDX * 200 * 1.75));
       return { x: 50, y: eyeY - w * 0.36, w, z: 30 };
     }
-    case 'neck':
+    case 'neck': {
+      // 波点方巾：一张「颈环 + 结饰 + 结下三角布」的穿戴态图，按“环带中段上沿贴喙线下方”定位
+      if (def.id === 'bandana') {
+        const b = BANDANA_STAGE[si];
+        const h = b.w * BANDANA_FRAME_ASPECT * 0.8;
+        return { x: 50, y: beakY + b.gap - h * BANDANA_BAND_ROW, w: b.w, z: 30 };
+      }
       return { x: 50, y: beakY + 2, w: [52, 46, 42][si], z: 30 };
+    }
     case 'neckSmall':
       return { x: 50, y: beakY + 1, w: [24, 22, 20][si], z: 30 };
     case 'bodyFront':
@@ -153,14 +184,18 @@ function AccessoryLayer({
   const layoutFace = hasFaceOverlay ? DEFAULT_CUSTOM_FACE : face;
   const l = accessoryLayout(def, layoutFace, stage);
   if ((l.z < 10) !== (layer === 'back')) return null;
+  // 波点方巾用的是单独烘焙的穿戴态图（acc-worn/bandana-worn.png），同样 R2 优先、本地兜底
+  const isBandana = def.id === 'bandana';
+  const localSrc = isBandana ? BANDANA_LOCAL_SRC : accessoryLocalSrc(def.id);
+  const src = isBandana ? assetUrl(BANDANA_LOCAL_SRC) : accessorySrc(def.id);
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={accessorySrc(def.id)}
+      src={src}
       alt=""
       draggable={false}
       onLoad={resetAssetState}
-      onError={(e) => fallbackToLocal(e, accessoryLocalSrc(def.id))}
+      onError={(e) => fallbackToLocal(e, localSrc)}
       className="pointer-events-none absolute object-contain"
       style={{ left: `${l.x - l.w / 2}%`, top: `${l.y}%`, width: `${l.w}%`, zIndex: l.z }}
     />
