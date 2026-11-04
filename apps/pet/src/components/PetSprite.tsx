@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import { THRESHOLD } from '@/lib/balance';
-import { BASE_PATH, bodyLocalSrc, bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
+import { BASE_PATH, bodyFallbackSrc, bodySrc, DEFAULT_CUSTOM_FACE, faceLayoutFor, type FaceLayout } from '@/lib/skins';
 import { accessoryById, accessoryLocalSrc, accessorySrc, type AccessoryDef } from '@/lib/accessories';
 import { assetUrl, fallbackToLocal, resetAssetState } from '@/lib/assetUrl';
 import { usePetStore } from '@/lib/store';
@@ -80,14 +80,14 @@ const BANDANA_BAND_ROW = 46 / 210;
 /**
  * 三阶段专属参数（只作用于 bandana）：
  * `w` 素材宽度（% 容器宽，≈ 1.15 × 头宽）；`gap` 环带中段上沿相对喙线的下移量（% 容器高）。
- * baby/teen 按参考图直接量得；adult 头部比前两阶段小一圈（线上 old adult 素材头宽约 48.8% 容器宽），
- * 于是 w 收到 56，gap 按同一比例取 7.1。
+ * baby/teen 按参考图直接量得；adult 换 466×421 新主体后头宽 58%（比 baby/teen 小），
+ * 按同一 1.15 倍关系取 66.7，gap 取 8.5。
  * 容器是 4:5，所以「宽度 %」换算成「高度 %」的像素系数是 0.8。
  */
 const BANDANA_STAGE = [
   { w: 73.6, gap: 11.2 }, // baby：喙线 45.5%
   { w: 65.5, gap: 8.4 }, // teen：喙线 36.5%
-  { w: 56, gap: 7.1 }, // adult：喙线 27.5%
+  { w: 66.7, gap: 8.5 }, // adult：喙线 38.4%（新主体头宽 58%）
 ] as const;
 
 /**
@@ -104,10 +104,10 @@ const SCARF_WORN_IDS = new Set<string>([
 
 /**
  * 头宽（% 容器宽，离线测 alpha 轮廓）。baby 64 / teen 57 是线上 408×512 素材的实测值；
- * adult 48.8 对应线上 512×512 旧主体（换成 466×421 新主体后这一档要重测）。
- * 波点方巾的 `BANDANA_STAGE.w` 也是同一头宽的 1.15 倍（73.6 ≈ 1.15×64、65.5 ≈ 1.15×57、56 ≈ 1.15×48.8）。
+ * adult 58 对应 2026-11 重绘的 466×421 新主体（含阶段缩放层），换图这一档必须重测。
+ * 波点方巾的 `BANDANA_STAGE.w` 也是同一头宽的 1.15 倍（73.6 ≈ 1.15×64、65.5 ≈ 1.15×57、66.7 ≈ 1.15×58）。
  */
-const HEAD_W = [64, 57, 48.8] as const;
+const HEAD_W = [64, 57, 58] as const;
 
 /** 穿戴态围巾素材根目录：R2 与本地是同一相对路径，地址仍由 assetUrl() 统一改写 */
 const WORN_SCARF_BASE = `${BASE_PATH}/skins/gugu/acc-worn`;
@@ -120,12 +120,12 @@ function wornScarfSrc(id: AccessoryId, layer: 'band' | 'tails'): string {
  * 围巾三阶段独立参数：
  * `bandW` 环带宽度（头宽倍数）/ `bandH` 环带层高度（% 容器高）/ `bandGap` 环带整体相对喙线的下移量
  * / `tailsW` 垂尾层宽度 / `tailBottom` 垂尾末端（% 容器高）。
- * baby/teen 按参考图实测；adult 按同一规则、以头宽 48.8 等比换算，换新主体后要重测。
+ * baby/teen 按参考图实测；adult 换 466×421 新主体后按头宽 58% 重测（环带高了 2.5%、垂尾宽了 7.5%）。
  */
 const SCARF_STAGE = [
   { bandW: 1.2, bandH: 45, bandGap: 1.2, tailsW: 56.2, tailBottom: 91 }, // baby：喙线 45.5%
   { bandW: 1, bandH: 41, bandGap: 1.1, tailsW: 50.6, tailBottom: 89 }, // teen：喙线 36.5%
-  { bandW: 0.8, bandH: 32.4, bandGap: 1.4, tailsW: 39.8, tailBottom: 87 }, // adult：喙线 27.5%
+  { bandW: 0.8, bandH: 38.5, bandGap: 1.4, tailsW: 47.3, tailBottom: 87 }, // adult：喙线 38.4%（新主体头宽 58%）
 ] as const;
 
 /** 素材行位（320×187 帧）：环带中段下缘 / 垂尾内容起点 */
@@ -157,6 +157,19 @@ function wornScarfRect(face: FaceLayout, stage: GrowthStage) {
   };
   return { band, tails };
 }
+
+/**
+ * 阶段整体缩放：baby / teen 是 408×512 画布，contain 后可见高 92.6% / 95.7%，不缩放。
+ * adult 新主体是 466×421（近方形），contain 后可见高只有 72.3%，
+ * 所以整体等比放大 1.2 并下移 1.6%：只缩不裁、不变形，脚底落在 94.8% 与地面阴影里。
+ * 缩放层必须罩住身体、表情和配件，四者的百分比坐标才共用一套基准。
+ */
+const STAGE_TRANSFORM: Record<GrowthStage, string> = {
+  egg: 'none',
+  baby: 'none',
+  teen: 'none',
+  adult: 'translateY(1.6%) scale(1.2)',
+};
 
 interface AccLayout {
   x: number;
@@ -354,57 +367,61 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
         className={`absolute inset-0 ${burst?.kind === 'wobble' ? 'anim-wobble' : ''} ${bodyAnim}`}
         style={{ transform: `scaleX(${facing})` }}
       >
-        {/* 披风/翅膀/背包：垫在身体图层之后 */}
-        {pet.equippedAccessory && accBack && (
-          <AccessoryLayer
-            accessory={pet.equippedAccessory}
-            face={face}
-            stage={pet.stage}
-            isEgg={isEgg}
-            hasFaceOverlay={!!customSkin?.faceOverlay}
-            layer="back"
+        {/* 阶段缩放层：adult 主体偏方，放大 1.2 倍才和 teen 视觉等高（自定义皮肤自带构图，不缩放） */}
+        <div className="absolute inset-0" style={{ transform: customSkin ? 'none' : STAGE_TRANSFORM[pet.stage] }}>
+          {/* 披风/翅膀/背包：垫在身体图层之后 */}
+          {pet.equippedAccessory && accBack && (
+            <AccessoryLayer
+              accessory={pet.equippedAccessory}
+              face={face}
+              stage={pet.stage}
+              isEgg={isEgg}
+              hasFaceOverlay={!!customSkin?.faceOverlay}
+              layer="back"
+            />
+          )}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={!isEgg && customSkin ? customSkin.src : bodySrc(pet.variant, pet.stage)}
+            alt={pet.name}
+            key={customSkin ? 'custom' : `${pet.variant}-${pet.stage}`}
+            className="relative z-10 h-full w-full object-contain"
+            draggable={false}
+            onLoad={resetAssetState}
+            onError={(e) => {
+              if (customSkin) {
+                usePetStore.getState().applySkin(null); // 自定义皮肤失效时回官方形象
+                return;
+              }
+              // 官方形象：adult 新主体（gugu/adult/…）失败时退到旧主体（gugu/<variant>-adult.png）
+              fallbackToLocal(e, bodyFallbackSrc(pet.variant, pet.stage));
+            }}
           />
-        )}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={!isEgg && customSkin ? customSkin.src : bodySrc(pet.variant, pet.stage)}
-          alt={pet.name}
-          key={customSkin ? 'custom' : `${pet.variant}-${pet.stage}`}
-          className="relative z-10 h-full w-full object-contain"
-          draggable={false}
-          onLoad={resetAssetState}
-          onError={(e) => {
-            if (customSkin) {
-              usePetStore.getState().applySkin(null); // 自定义皮肤失效时回官方形象
-              return;
-            }
-            fallbackToLocal(e, bodyLocalSrc(pet.variant, pet.stage));
-          }}
-        />
-        {/* 蛋裂纹（随啄壳进度增多） */}
-        {isEgg && <EggCracks tapsToHatch={pet.tapsToHatch} />}
-        {showFace && (
-          <Face
-            face={face}
-            sleeping={sleeping}
-            happy={happy}
-            sad={sad}
-            sick={sick}
-            chewing={anim === 'eating'}
-            washing={anim === 'washing'}
-            playing={anim === 'playing'}
-          />
-        )}
-        {pet.equippedAccessory && !accBack && (
-          <AccessoryLayer
-            accessory={pet.equippedAccessory}
-            face={face}
-            stage={pet.stage}
-            isEgg={isEgg}
-            hasFaceOverlay={!!customSkin?.faceOverlay}
-            layer="front"
-          />
-        )}
+          {/* 蛋裂纹（随啄壳进度增多） */}
+          {isEgg && <EggCracks tapsToHatch={pet.tapsToHatch} />}
+          {showFace && (
+            <Face
+              face={face}
+              sleeping={sleeping}
+              happy={happy}
+              sad={sad}
+              sick={sick}
+              chewing={anim === 'eating'}
+              washing={anim === 'washing'}
+              playing={anim === 'playing'}
+            />
+          )}
+          {pet.equippedAccessory && !accBack && (
+            <AccessoryLayer
+              accessory={pet.equippedAccessory}
+              face={face}
+              stage={pet.stage}
+              isEgg={isEgg}
+              hasFaceOverlay={!!customSkin?.faceOverlay}
+              layer="front"
+            />
+          )}
+        </div>
       </div>
 
       {/* 常驻粒子层 */}

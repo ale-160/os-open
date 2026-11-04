@@ -39,6 +39,7 @@ node apps/pet/tools/gen-audit-doc.mjs                # 重新生成本文档
 | 2026-10-26 | b4b-73 | baby: warn:金线围巾素材偏细，存在感弱但可见 |  |
 | 2026-11-04 | bandana | 平面素材 `acc/bandana.png` 当围巾整块贴脖，读不出「系在脖子上」的造型 | 换成穿戴态单图 `acc-worn/bandana-worn.png`（384×210）；`neck` 槽内单列 `BANDANA_STAGE`，按「环带中段上沿贴喙线下方」定位，R2 优先 + 本地兜底 |
 | 2026-11-04 | 10 件围巾 | 平摊素材整张叠在身体前，读成「横向围兜」，且统一缩放无法同时适配三阶段 | 重绘成穿戴态两层（`<id>-band.png` 环带/折叠片 z30、`<id>-tails.png` 垂尾 z29，320×187 同坐标系），新增 `SCARF_WORN_IDS` + `SCARF_STAGE` + `wornScarfRect()`；`anchor:'scarf'` 但不在表中的配件保持原逻辑 |
+| 2026-11-04 | 20 个变体 / adult 主体 | 线上 adult 还是 512×512 旧图，三阶段比例不统一 | 换成 466×421 重绘主体，落到 `skins/gugu/adult/<variant>-adult.png`（R2 `gugu/adult/…`）；旧 key `gugu/<variant>-adult.png` 保留作兜底、不覆盖；`FACE_LAYOUTS` 的 adult 抽出 `ADULT_FACE` 共用新锚点，并加 1.2 倍阶段缩放层 |
 
 ## 台账
 

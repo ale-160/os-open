@@ -17,12 +17,28 @@ const STAGE_SEGMENT: Record<GrowthStage, string> = {
   adult: 'adult',
 };
 
+/**
+ * 身体图本地路径。
+ * adult 是 2026-11 重绘的 466×421 主体，放在 `adult/` 子目录里；
+ * 旧的 `gugu/<variant>-adult.png` 不覆盖，留作兜底（线上 R2 上仍在）。
+ */
 export function bodyLocalSrc(variant: VariantId, stage: GrowthStage): string {
+  if (stage === 'adult') return `${SKIN_BASE}/adult/${variant}-adult.png`;
   return `${SKIN_BASE}/${variant}-${STAGE_SEGMENT[stage]}.png`;
 }
 
 export function bodySrc(variant: VariantId, stage: GrowthStage): string {
   return assetUrl(bodyLocalSrc(variant, stage));
+}
+
+/**
+ * 身体图兜底链的第二站：新主体（`gugu/adult/<variant>-adult.png`）失败时退到旧主体
+ * （`gugu/<variant>-adult.png`）；其它阶段退到本地同名文件。
+ * 只在一处定义，避免组件里再写一遍分支。
+ */
+export function bodyFallbackSrc(variant: VariantId, stage: GrowthStage): string {
+  if (stage === 'adult') return assetUrl(`${SKIN_BASE}/${variant}-${STAGE_SEGMENT.adult}.png`);
+  return bodyLocalSrc(variant, stage);
 }
 
 export interface VariantInfo {
@@ -73,6 +89,24 @@ export interface FaceLayout {
 
 export type FaceStage = Exclude<GrowthStage, 'egg'>;
 
+/**
+ * adult 段面锚点：2026-11 重绘主体（466×421，主体 417×421 居中）按参考图 439×480 直接提取，
+ * 五官基准与 baby/teen 那套旧锚点不同，所以单独抽出来共用——20 个变体只差配色，几何完全一致。
+ * （baby/teen 的数值仍保留在各变体里，未做合并不改行为）
+ */
+const ADULT_FACE: FaceLayout = {
+  eyeY: 0.3394,
+  eyeDX: 0.073,
+  eyeRx: 0.034,
+  eyeRy: 0.0413,
+  beakY: 0.3841,
+  beakSize: 0.0365,
+  blushY: 0.3515,
+  blushDX: 0.1288,
+  blushRx: 0.0279,
+  blushRy: 0.0215,
+};
+
 export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
   cream: {
     baby: {
@@ -99,18 +133,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   mint: {
     baby: {
@@ -137,18 +160,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   sakura: {
     baby: {
@@ -175,18 +187,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   choco: {
     baby: {
@@ -213,18 +214,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   lavender: {
     baby: {
@@ -251,18 +241,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   soda: {
     baby: {
@@ -289,18 +268,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   matcha: {
     baby: {
@@ -327,18 +295,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   peach: {
     baby: {
@@ -365,18 +322,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   ocean: {
     baby: {
@@ -403,18 +349,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   grape: {
     baby: {
@@ -441,18 +376,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   lemon: {
     baby: {
@@ -479,18 +403,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   'sakura-deep': {
     baby: {
@@ -517,18 +430,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   cotton: {
     baby: {
@@ -555,18 +457,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   charcoal: {
     baby: {
@@ -593,18 +484,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   caramel: {
     baby: {
@@ -631,18 +511,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   'mint-deep': {
     baby: {
@@ -669,18 +538,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   coral: {
     baby: {
@@ -707,18 +565,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   sky: {
     baby: {
@@ -745,18 +592,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   rose: {
     baby: {
@@ -783,18 +619,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
   olive: {
     baby: {
@@ -821,18 +646,7 @@ export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {
       blushRx: 0.042,
       blushRy: 0.028,
     },
-    adult: {
-      eyeY: 0.22,
-      eyeDX: 0.09,
-      eyeRx: 0.045,
-      eyeRy: 0.055,
-      beakY: 0.275,
-      beakSize: 0.04,
-      blushY: 0.24,
-      blushDX: 0.155,
-      blushRx: 0.042,
-      blushRy: 0.028,
-    },
+    adult: ADULT_FACE,
   },
 };
 export function faceLayoutFor(variant: VariantId, stage: GrowthStage): FaceLayout {
