@@ -38,6 +38,7 @@ node apps/pet/tools/gen-audit-doc.mjs                # 重新生成本文档
 | 2026-10-26 | b4b-18 | baby: warn:救生圈围在颈/上胸，读作泳圈造型 |  |
 | 2026-10-26 | b4b-73 | baby: warn:金线围巾素材偏细，存在感弱但可见 |  |
 | 2026-11-04 | bandana | 平面素材 `acc/bandana.png` 当围巾整块贴脖，读不出「系在脖子上」的造型 | 换成穿戴态单图 `acc-worn/bandana-worn.png`（384×210）；`neck` 槽内单列 `BANDANA_STAGE`，按「环带中段上沿贴喙线下方」定位，R2 优先 + 本地兜底 |
+| 2026-11-04 | 10 件围巾 | 平摊素材整张叠在身体前，读成「横向围兜」，且统一缩放无法同时适配三阶段 | 重绘成穿戴态两层（`<id>-band.png` 环带/折叠片 z30、`<id>-tails.png` 垂尾 z29，320×187 同坐标系），新增 `SCARF_WORN_IDS` + `SCARF_STAGE` + `wornScarfRect()`；`anchor:'scarf'` 但不在表中的配件保持原逻辑 |
 
 ## 台账
 
@@ -115,20 +116,20 @@ node apps/pet/tools/gen-audit-doc.mjs                # 重新生成本文档
 
 | id | 名称 | 自动检查 b/t/a | 视觉 baby | 视觉 adult | 备注 |
 |---|---|---|---|---|---|
-| scarf-star | 星星围巾 / Star Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| scarf-plaid | 格纹围巾 / Plaid Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| scarf-red | 红围巾 / Red Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| scarf-yellow | 芥末黄围巾 / Mustard Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
+| scarf-star | 星星围巾 / Star Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/scarf-star-band.png` + `-tails.png`，走 `SCARF_STAGE` |
+| scarf-plaid | 格纹围巾 / Plaid Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/scarf-plaid-band.png` + `-tails.png`，走 `SCARF_STAGE` |
+| scarf-red | 红围巾 / Red Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/scarf-red-band.png` + `-tails.png`，走 `SCARF_STAGE` |
+| scarf-yellow | 芥末黄围巾 / Mustard Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/scarf-yellow-band.png` + `-tails.png`，走 `SCARF_STAGE` |
 | bandana | 波点方巾 / Bandana | b:✅ t:✅ a:✅ | ✅ | ✅ | 改用穿戴态单图 `acc-worn/bandana-worn.png`，走独立布局 `BANDANA_STAGE`（不走 neck 的固定宽度） |
-| scarf-check | 格纹绿围巾 / Check Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| scarf-rainbow | 彩虹围巾 / Rainbow Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
+| scarf-check | 格纹绿围巾 / Check Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/scarf-check-band.png` + `-tails.png`，走 `SCARF_STAGE` |
+| scarf-rainbow | 彩虹围巾 / Rainbow Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/scarf-rainbow-band.png` + `-tails.png`，走 `SCARF_STAGE` |
 | tie | 蝴蝶领结 / Bow Tie | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| b4b-10 | 绿叶围巾 / Leaf Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
+| b4b-10 | 绿叶围巾 / Leaf Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/b4b-10-band.png` + `-tails.png`，走 `SCARF_STAGE` |
 | b4b-18 | 救生圈 / Life Ring | b:✅ t:✅ a:✅ | ⚠️ 救生圈围在颈/上胸，读作泳圈造型 | ✅ |  |
-| b4b-20 | 海浪围巾 / Wave Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| b4b-33 | 橙色格纹围巾 / Plaid Orange Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
+| b4b-20 | 海浪围巾 / Wave Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/b4b-20-band.png` + `-tails.png`，走 `SCARF_STAGE` |
+| b4b-33 | 橙色格纹围巾 / Plaid Orange Scarf | b:✅ t:✅ a:✅ | ✅ | ✅ | 穿戴态双层素材 `acc-worn/b4b-33-band.png` + `-tails.png`，走 `SCARF_STAGE` |
 | b4b-65 | 羽毛披肩 / Feather Shawl | b:✅ t:✅ a:✅ | ✅ | ✅ |  |
-| b4b-73 | 金线刺绣围巾 / Gold Scarf | b:✅ t:✅ a:✅ | ⚠️ 金线围巾素材偏细，存在感弱但可见 | ✅ |  |
+| b4b-73 | 金线刺绣围巾 / Gold Scarf | b:✅ t:✅ a:✅ | ⚠️ 金线围巾素材偏细，存在感弱但可见 | ✅ | 穿戴态双层素材 `acc-worn/b4b-73-band.png` + `-tails.png`，走 `SCARF_STAGE` |
 
 ### 项链/胸针/领结（颈部小件）（18 件）
 
