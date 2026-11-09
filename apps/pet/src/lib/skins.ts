@@ -90,21 +90,23 @@ export interface FaceLayout {
 export type FaceStage = Exclude<GrowthStage, 'egg'>;
 
 /**
- * adult 段面锚点：2026-11 重绘主体（466×421，主体 417×421 居中）按参考图 439×480 直接提取，
- * 五官基准与 baby/teen 那套旧锚点不同，所以单独抽出来共用——20 个变体只差配色，几何完全一致。
- * （baby/teen 的数值仍保留在各变体里，未做合并不改行为）
+ * adult 段面锚点：2026-11 重绘主体（466×421，内容 417×421 与参考图 adult-ref-439x480 的
+ * 内容区逐像素同尺寸，只是左侧多 49px 透明让位）按参考图直接量得。
+ * 数值是「adult 1.2 倍缩放层内」的坐标（transform 前）；换到屏幕后眼线 ≈33.8%H、
+ * 喙线 ≈38.7%H，与参考图一致（缩放层绕中心缩放，不能直接把屏幕值当常量用）。
+ * 20 个变体只差配色，几何完全一致。
  */
 const ADULT_FACE: FaceLayout = {
-  eyeY: 0.3394,
-  eyeDX: 0.073,
-  eyeRx: 0.034,
-  eyeRy: 0.0413,
-  beakY: 0.3841,
-  beakSize: 0.0365,
-  blushY: 0.3515,
-  blushDX: 0.1288,
-  blushRx: 0.0279,
-  blushRy: 0.0215,
+  eyeY: 0.3515,
+  eyeDX: 0.0644,
+  eyeRx: 0.0425,
+  eyeRy: 0.042,
+  beakY: 0.3927,
+  beakSize: 0.0215,
+  blushY: 0.3551,
+  blushDX: 0.1255,
+  blushRx: 0.034,
+  blushRy: 0.021,
 };
 
 export const FACE_LAYOUTS: Record<VariantId, Record<FaceStage, FaceLayout>> = {

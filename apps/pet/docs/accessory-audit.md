@@ -40,6 +40,7 @@ node apps/pet/tools/gen-audit-doc.mjs                # 重新生成本文档
 | 2026-11-04 | bandana | 平面素材 `acc/bandana.png` 当围巾整块贴脖，读不出「系在脖子上」的造型 | 换成穿戴态单图 `acc-worn/bandana-worn.png`（384×210）；`neck` 槽内单列 `BANDANA_STAGE`，按「环带中段上沿贴喙线下方」定位，R2 优先 + 本地兜底 |
 | 2026-11-04 | 10 件围巾 | 平摊素材整张叠在身体前，读成「横向围兜」，且统一缩放无法同时适配三阶段 | 重绘成穿戴态两层（`<id>-band.png` 环带/折叠片 z30、`<id>-tails.png` 垂尾 z29，320×187 同坐标系），新增 `SCARF_WORN_IDS` + `SCARF_STAGE` + `wornScarfRect()`；`anchor:'scarf'` 但不在表中的配件保持原逻辑 |
 | 2026-11-04 | 20 个变体 / adult 主体 | 线上 adult 还是 512×512 旧图，三阶段比例不统一 | 换成 466×421 重绘主体，落到 `skins/gugu/adult/<variant>-adult.png`（R2 `gugu/adult/…`）；旧 key `gugu/<variant>-adult.png` 保留作兜底、不覆盖；`FACE_LAYOUTS` 的 adult 抽出 `ADULT_FACE` 共用新锚点，并加 1.2 倍阶段缩放层；新主体加载失败退到旧 key 时取消缩放，避免旧图被放大溢出 |
+| 2026-11-09 | adult 锚点 / HEAD_W / 围巾双层 | PR② review 指出：adult 眼线/喙线锚点沿用旧值、HEAD_W 48.8 与任何实测行宽不符、环带与垂尾屏幕拉伸比不一致（1.78 vs 3.80） | 按 R2 实测重定：`ADULT_FACE` 用参考图内容区（417×421，与新主体同尺寸）重测并换算到 1.2 缩放层内坐标（屏幕眼线 33.8%、喙线 38.7%）；`HEAD_W` adult 改 47.9；环带/垂尾改用同一 320×187 帧矩形（`wornScarfRect` 同 sx/sy，只挪纵向原点），adult 垂尾末端收到缩放层内 83.5%（屏幕 92%，不再盖满腹部）；bandana adult 随头宽取 55.1 |
 
 ## 台账
 

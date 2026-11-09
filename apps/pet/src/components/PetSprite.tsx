@@ -80,14 +80,14 @@ const BANDANA_BAND_ROW = 46 / 210;
 /**
  * 三阶段专属参数（只作用于 bandana）：
  * `w` 素材宽度（% 容器宽，≈ 1.15 × 头宽）；`gap` 环带中段上沿相对喙线的下移量（% 容器高）。
- * baby/teen 按参考图直接量得；adult 换 466×421 新主体后头宽 58%（比 baby/teen 小），
- * 按同一 1.15 倍关系取 66.7，gap 取 8.5。
+ * baby/teen 按参考图直接量得；adult 换 466×421 新主体后头宽 47.9%（见 HEAD_W），
+ * 按同一 1.15 倍关系取 55.1，gap 取 8.5。
  * 容器是 4:5，所以「宽度 %」换算成「高度 %」的像素系数是 0.8。
  */
 const BANDANA_STAGE = [
   { w: 73.6, gap: 11.2 }, // baby：喙线 45.5%
   { w: 65.5, gap: 8.4 }, // teen：喙线 36.5%
-  { w: 66.7, gap: 8.5 }, // adult：喙线 38.4%（新主体头宽 58%）
+  { w: 55.1, gap: 8.5 }, // adult：喙线 39.3%（新主体头宽 47.9%）
 ] as const;
 
 /**
@@ -103,11 +103,13 @@ const SCARF_WORN_IDS = new Set<string>([
 ]);
 
 /**
- * 头宽（% 容器宽，离线测 alpha 轮廓）。baby 64 / teen 57 是线上 408×512 素材的实测值；
- * adult 58 对应 2026-11 重绘的 466×421 新主体（含阶段缩放层），换图这一档必须重测。
- * 波点方巾的 `BANDANA_STAGE.w` 也是同一头宽的 1.15 倍（73.6 ≈ 1.15×64、65.5 ≈ 1.15×57、66.7 ≈ 1.15×58）。
+ * 头宽（% 容器宽，离线测 alpha 轮廓；肩前最宽，不含展开的翅膀）。
+ * R2 线上实测：cream-baby 474×512 → 65.2%W、cream-teen 408×512 → 60.5%W、
+ * 新 adult 466×421（含左侧 49px 透明让位）→ 47.9%W（第 35% 行，原 48.8 / 58 都量错了）。
+ * 波点方巾的 `BANDANA_STAGE.w` 也按同一头宽的 1.15 倍取（73.6 ≈ 1.15×64、65.5 ≈ 1.15×57、55.1 ≈ 1.15×47.9）。
+ * baby/teen 沿用 64 / 57 的整数值，行为不变。
  */
-const HEAD_W = [64, 57, 58] as const;
+const HEAD_W = [64, 57, 47.9] as const;
 
 /** 穿戴态围巾素材根目录：R2 与本地是同一相对路径，地址仍由 assetUrl() 统一改写 */
 const WORN_SCARF_BASE = `${BASE_PATH}/skins/gugu/acc-worn`;
@@ -118,51 +120,71 @@ function wornScarfSrc(id: AccessoryId, layer: 'band' | 'tails'): string {
 
 /**
  * 围巾三阶段独立参数：
- * `bandW` 环带宽度（头宽倍数）/ `bandH` 环带层高度（% 容器高）/ `bandGap` 环带整体相对喙线的下移量
- * / `tailsW` 垂尾层宽度 / `tailBottom` 垂尾末端（% 容器高）。
- * baby/teen 按参考图实测；adult 换 466×421 新主体后按头宽 58% 重测（环带高了 2.5%、垂尾宽了 7.5%）。
+ * `bandW` 环带内容宽度（头宽倍数）/ `bandGap` 环带内容上沿相对喙线的下移量（% 容器高）
+ * / `tailBottom` 垂尾内容末端（% 容器高，缩放层内坐标）。
+ * baby/teen 按参考图实测、行为不变；adult 换 466×421 新主体后按头宽 47.9% 重测：
+ * 环带取 1 个头宽，垂尾末端从 87 收到 83.5——缩放层会把 87 放大到屏幕 96%，
+ * 那是脚底以下，评审说的「盖满腹部」正是这个。
+ * 两层不再各自定宽高，统一由 `wornScarfRect()` 用同一帧尺寸（同 sx/sy）摆放。
  */
 const SCARF_STAGE = [
-  { bandW: 1.2, bandH: 45, bandGap: 1.2, tailsW: 56.2, tailBottom: 91 }, // baby：喙线 45.5%
-  { bandW: 1, bandH: 41, bandGap: 1.1, tailsW: 50.6, tailBottom: 89 }, // teen：喙线 36.5%
-  { bandW: 0.8, bandH: 38.5, bandGap: 1.4, tailsW: 47.3, tailBottom: 87 }, // adult：喙线 38.4%（新主体头宽 58%）
+  { bandW: 1.2, bandGap: 1.2, tailBottom: 91 }, // baby：喙线 45.5%
+  { bandW: 1, bandGap: 1.1, tailBottom: 89 }, // teen：喙线 36.5%
+  { bandW: 1, bandGap: 1.4, tailBottom: 83.5 }, // adult：喙线 39.3%（新主体头宽 47.9%）
 ] as const;
 
-/** 素材行位（320×187 帧）：环带中段下缘 / 垂尾内容起点 */
-const SCARF_BAND_MID_BOTTOM_ROW = 66 / 187;
-const SCARF_TAILS_START_ROW = 54 / 187;
+/** 素材帧与内容行位（320×187 帧，R2 全部 20 张实测） */
+const SCARF_FRAME_W = 320;
+const SCARF_FRAME_H = 187;
+/** 环带内容：横向 x≈1..316、纵向 y=4..88；中列下缘实测到 79，根部压到整图 88 更稳 */
+const SCARF_BAND_CONTENT_W = 316;
+const SCARF_BAND_TOP_ROW = 4;
+const SCARF_BAND_BOTTOM_ROW = 88;
+/** 垂尾内容：x=76..251（176 宽）、y=54..186（132 行）；b4b-73 / scarf-yellow 的 x 略有出入 */
+const SCARF_TAILS_TOP_ROW = 54;
+const SCARF_TAILS_BOTTOM_ROW = 186;
 /** 垂尾根部多盖 3.6% 容器高：根部藏在环带/折叠片底下，才不会露出接缝 */
 const SCARF_TAILS_ROOT_OVERLAP = 3.6;
 
 /**
- * 围巾定位：环带层与垂尾层各一套矩形（不靠缩放整张贴图适配阶段）。
- * - 环带层（整帧 320×187）：元素上缘 = 喙线 + `bandGap`；素材内容从第 4 行开始，中部上沿在第 28 行、
- *   中部下缘在第 66 行，所以屏幕上环带贴着颈部，不会压到脸下方；
- * - 垂尾层：内容在第 54..186 行，元素下缘让垂尾落到 `tailBottom`，上缘比环带中段下缘高
- *   `SCARF_TAILS_ROOT_OVERLAP`，根部被环带与折叠片盖住。
+ * 围巾定位：环带层与垂尾层用同一个 320×187 帧矩形（相同宽高 → 相同 sx/sy），
+ * 只挪纵向原点。这样两层在屏幕上永远等比，不会出现「环带贴脖、垂尾被拉成细长带」。
+ * - 环带层：内容第 4 行 = 喙线 + `bandGap`，内容宽 = `bandW × HEAD_W`；
+ * - 垂尾层：纵向缩放由 `tailBottom` 反解，根部（第 54 行）压在环带内容下缘（第 88 行）以内。
  */
 function wornScarfRect(face: FaceLayout, stage: GrowthStage) {
   const si = stage === 'adult' ? 2 : stage === 'teen' ? 1 : 0;
   const s = SCARF_STAGE[si];
-  const top = face.beakY * 100 + s.bandGap;
-  const w = s.bandW * HEAD_W[si];
-  const band = { left: 50 - w / 2, top, w, h: s.bandH };
-  const midBottom = top + s.bandH * SCARF_BAND_MID_BOTTOM_ROW;
-  const tailsH = (s.tailBottom - (midBottom - SCARF_TAILS_ROOT_OVERLAP)) / (1 - SCARF_TAILS_START_ROW);
-  const tails = {
-    left: 50 - s.tailsW / 2,
-    top: midBottom - SCARF_TAILS_ROOT_OVERLAP - tailsH * SCARF_TAILS_START_ROW,
-    w: s.tailsW,
-    h: tailsH,
+  const bandTop = face.beakY * 100 + s.bandGap;
+  const bandContentW = s.bandW * HEAD_W[si];
+  const frameW = bandContentW * (SCARF_FRAME_W / SCARF_BAND_CONTENT_W);
+  // 每行多少 %H：环带内容下缘到垂尾末端之间要覆盖 84 + 132 行（根部重叠扣除）
+  const rowH =
+    (s.tailBottom - bandTop + SCARF_TAILS_ROOT_OVERLAP) /
+    (SCARF_BAND_BOTTOM_ROW - SCARF_BAND_TOP_ROW + SCARF_TAILS_BOTTOM_ROW - SCARF_TAILS_TOP_ROW);
+  const frameH = rowH * SCARF_FRAME_H;
+  const band = {
+    left: 50 - frameW / 2,
+    top: bandTop - SCARF_BAND_TOP_ROW * rowH,
+    w: frameW,
+    h: frameH,
   };
+  const tailsTop =
+    bandTop +
+    (SCARF_BAND_BOTTOM_ROW - SCARF_BAND_TOP_ROW) * rowH -
+    SCARF_TAILS_ROOT_OVERLAP -
+    SCARF_TAILS_TOP_ROW * rowH;
+  const tails = { left: 50 - frameW / 2, top: tailsTop, w: frameW, h: frameH };
   return { band, tails };
 }
 
 /**
- * 阶段整体缩放：baby / teen 是 408×512 画布，contain 后可见高 92.6% / 95.7%，不缩放。
- * adult 新主体是 466×421（近方形），contain 后可见高只有 72.3%，
- * 所以整体等比放大 1.2 并下移 1.6%：只缩不裁、不变形，脚底落在 94.8% 与地面阴影里。
+ * 阶段整体缩放：baby（474×512）contain 后可见高约 86%，teen（408×512）几乎占满高度，均不缩放。
+ * adult 新主体是 466×421（近方形），contain 后可见高只有 72.3%（上边距 34.25px），
+ * 所以整体等比放大 1.2 并下移 1.6%：可见高变成 86.8%、上沿 8.2%、底边 95.0%，
+ * 与 teen 视觉等高，脚底落在地面阴影里；内容左右各溢出容器约 19.8px（不裁切）。
  * 缩放层必须罩住身体、表情和配件，四者的百分比坐标才共用一套基准。
+ * 缩放在 transform-origin: center 上做，所以层内 y 百分比到屏幕 y 的换算不是简单乘 1.2。
  */
 const STAGE_TRANSFORM: Record<GrowthStage, string> = {
   egg: 'none',
