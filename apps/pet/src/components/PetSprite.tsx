@@ -330,6 +330,8 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
   const sick = pet.sick;
   const face = customSkin?.faceOverlay ? DEFAULT_CUSTOM_FACE : faceLayoutFor(pet.variant, pet.stage);
   const showFace = isEgg ? false : (customSkin ? customSkin.faceOverlay : true);
+  // adult 新主体加载失败退到旧主体时取消阶段缩放：旧图本身已占满容器，再放大会溢出
+  const [bodyFallback, setBodyFallback] = useState(false);
 
   const happy =
     !sleeping &&
@@ -368,7 +370,7 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
         style={{ transform: `scaleX(${facing})` }}
       >
         {/* 阶段缩放层：adult 主体偏方，放大 1.2 倍才和 teen 视觉等高（自定义皮肤自带构图，不缩放） */}
-        <div className="absolute inset-0" style={{ transform: customSkin ? 'none' : STAGE_TRANSFORM[pet.stage] }}>
+        <div className="absolute inset-0" style={{ transform: customSkin || bodyFallback ? 'none' : STAGE_TRANSFORM[pet.stage] }}>
           {/* 披风/翅膀/背包：垫在身体图层之后 */}
           {pet.equippedAccessory && accBack && (
             <AccessoryLayer
@@ -387,13 +389,17 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
             key={customSkin ? 'custom' : `${pet.variant}-${pet.stage}`}
             className="relative z-10 h-full w-full object-contain"
             draggable={false}
-            onLoad={resetAssetState}
+            onLoad={(e) => {
+              resetAssetState(e);
+              if (e.currentTarget.currentSrc.includes('/gugu/adult/')) setBodyFallback(false);
+            }}
             onError={(e) => {
               if (customSkin) {
-                usePetStore.getState().applySkin(null); // 自定义皮肤失效时回官方形象
+                usePetStore.getState().applySkin(null); // 自定义皮肤失效时退到官方形象
                 return;
               }
               // 官方形象：adult 新主体（gugu/adult/…）失败时退到旧主体（gugu/<variant>-adult.png）
+              if (pet.stage === 'adult') setBodyFallback(true);
               fallbackToLocal(e, bodyFallbackSrc(pet.variant, pet.stage));
             }}
           />
