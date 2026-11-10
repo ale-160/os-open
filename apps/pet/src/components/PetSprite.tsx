@@ -107,7 +107,8 @@ const SCARF_WORN_IDS = new Set<string>([
  * R2 线上实测：cream-baby 474×512 → 65.2%W、cream-teen 408×512 → 60.5%W、
  * 新 adult 466×421（含左侧 49px 透明让位）→ 47.9%W（第 35% 行，原 48.8 / 58 都量错了）。
  * 波点方巾的 `BANDANA_STAGE.w` 也按同一头宽的 1.15 倍取（73.6 ≈ 1.15×64、65.5 ≈ 1.15×57、55.1 ≈ 1.15×47.9）。
- * baby/teen 沿用 64 / 57 的整数值，行为不变。
+ * baby/teen 沿用 64 / 57 的整数值；统一帧矩形后 band 帧尺寸从 76.8×45 变为 77.8×41.5，
+ * teen 从 57×41 变为 57.7×47.6，视觉基本一致但并非严格「不变」。
  */
 const HEAD_W = [64, 57, 47.9] as const;
 
@@ -122,7 +123,8 @@ function wornScarfSrc(id: AccessoryId, layer: 'band' | 'tails'): string {
  * 围巾三阶段独立参数：
  * `bandW` 环带内容宽度（头宽倍数）/ `bandGap` 环带内容上沿相对喙线的下移量（% 容器高）
  * / `tailBottom` 垂尾内容末端（% 容器高，缩放层内坐标）。
- * baby/teen 按参考图实测、行为不变；adult 换 466×421 新主体后按头宽 47.9% 重测：
+ * baby/teen 按参考图实测，统一帧矩形后 band 帧尺寸略有调整（baby 76.8×45→77.8×41.5、
+ * teen 57×41→57.7×47.6），视觉基本一致；adult 换 466×421 新主体后按头宽 47.9% 重测：
  * 环带取 1 个头宽，垂尾末端从 87 收到 83.5——缩放层会把 87 放大到屏幕 96%，
  * 那是脚底以下，评审说的「盖满腹部」正是这个。
  * 两层不再各自定宽高，统一由 `wornScarfRect()` 用同一帧尺寸（同 sx/sy）摆放。
@@ -373,6 +375,12 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
   else if (walking) bodyAnim = 'anim-hop';
 
   const accBack = pet.equippedAccessory ? isBackAccessory(pet.equippedAccessory) : false;
+  // 阶段缩放：只有官方 adult 新主体需要 1.2×；baby/teen/蛋与兜底图都是 none
+  const stageScale = customSkin || bodyFallback ? 'none' : STAGE_TRANSFORM[pet.stage];
+  const adultScaled = stageScale !== 'none';
+  const particlesNode = (
+    <Particles sleeping={sleeping} eating={anim === 'eating'} washing={anim === 'washing'} playing={anim === 'playing'} sick={sick} working={anim === 'working'} studying={anim === 'studying'} trick={trick} />
+  );
 
   return (
     <div
@@ -382,8 +390,11 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
       role="button"
       aria-label={isEgg ? 'egg' : 'pet'}
     >
-      {/* 地面阴影 */}
-      <div className="absolute bottom-[2%] left-1/2 h-[7%] w-[64%] -translate-x-1/2 rounded-[50%] bg-[#8a6a4d]/20 blur-[3px]" />
+      {/* 地面阴影：adult 主体放大 1.2× 时同步放大，避免阴影相对身体显小 */}
+      <div
+        className="absolute bottom-[2%] left-1/2 -translate-x-1/2 rounded-[50%] bg-[#8a6a4d]/20 blur-[3px]"
+        style={{ width: adultScaled ? '76.8%' : '64%', height: adultScaled ? '8.4%' : '7%' }}
+      />
 
       {/* 身体 + 表情 */}
       <div
@@ -392,7 +403,7 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
         style={{ transform: `scaleX(${facing})` }}
       >
         {/* 阶段缩放层：adult 主体偏方，放大 1.2 倍才和 teen 视觉等高（自定义皮肤自带构图，不缩放） */}
-        <div className="absolute inset-0" style={{ transform: customSkin || bodyFallback ? 'none' : STAGE_TRANSFORM[pet.stage] }}>
+        <div className="absolute inset-0" style={{ transform: stageScale }}>
           {/* 披风/翅膀/背包：垫在身体图层之后 */}
           {pet.equippedAccessory && accBack && (
             <AccessoryLayer
@@ -439,6 +450,13 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
               playing={anim === 'playing'}
             />
           )}
+          {/* adult 缩放层创建了独立堆叠上下文：粒子必须放进同一上下文，z 12 压在配件（z15/20/29/30）之下；
+              反向 scaleX 抵消 bodyDiv 的镜像，保持粒子不随朝向翻转 */}
+          {adultScaled && (
+            <div className="pointer-events-none absolute inset-0" style={{ zIndex: 12, transform: `scaleX(${facing})` }}>
+              {particlesNode}
+            </div>
+          )}
           {pet.equippedAccessory && !accBack && (
             <AccessoryLayer
               accessory={pet.equippedAccessory}
@@ -452,8 +470,8 @@ export function PetSprite({ pet, anim, burst, walking, facing, customSkin, trick
         </div>
       </div>
 
-      {/* 常驻粒子层 */}
-      <Particles sleeping={sleeping} eating={anim === 'eating'} washing={anim === 'washing'} playing={anim === 'playing'} sick={sick} working={anim === 'working'} studying={anim === 'studying'} trick={trick} />
+      {/* 常驻粒子层（baby/teen/兜底图：无缩放层，直接放在根下） */}
+      {!adultScaled && particlesNode}
 
       {/* 摸摸爱心 / 破壳彩带 */}
       {burst?.kind === 'heart' && <BurstParticles key={`h-${burst.id}`} kind="heart" />}

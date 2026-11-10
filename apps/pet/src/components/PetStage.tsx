@@ -200,13 +200,22 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
       last = now;
       const speed = walking ? WALK_SPEED : running ? WALK_SPEED * 4.4 : 0;
       if (speed > 0) {
+        // adult 缩放层（1.2×）会把容器左右各外扩 0.1×容器宽，朝外走到 BOUND_L/BOUND_R 时
+        // 翼尖会越过舞台左/右边界被 overflow-hidden 裁掉。按实际容器宽动态收边界。
+        const vw = window.innerWidth || 1;
+        const stageW = wrapRef.current?.parentElement?.clientWidth || vw;
+        const rootW = Math.min(240, Math.max(170, vw * 0.46));
+        const scale = pet.stage === 'adult' ? 1.2 : 1;
+        const pad = (50 * scale * rootW) / stageW; // 百分比
+        const lo = pet.stage === 'adult' ? Math.max(BOUND_L, pad) : BOUND_L;
+        const hi = pet.stage === 'adult' ? Math.min(BOUND_R, 100 - pad) : BOUND_R;
         px += dirRef.current * speed * dt;
-        if (px >= BOUND_R) {
-          px = BOUND_R;
+        if (px >= hi) {
+          px = hi;
           dirRef.current = -1;
           setFacing(-1);
-        } else if (px <= BOUND_L) {
-          px = BOUND_L;
+        } else if (px <= lo) {
+          px = lo;
           dirRef.current = 1;
           setFacing(1);
         }
@@ -216,7 +225,7 @@ export function PetStage({ onPetMenu, className }: PetStageProps) {
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);
-  }, [walking, running]);
+  }, [walking, running, pet.stage]);
 
   // 长按 / 右键菜单
   const pressRef = useRef<{ x: number; y: number; timer: number; fired: boolean } | null>(null);
