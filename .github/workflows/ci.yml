@@ -65,6 +65,11 @@ jobs:
       - name: web-text unit tests
         run: pnpm --filter web-text test
 
+      - name: typev typecheck / unit tests
+        run: |
+          pnpm --filter typev typecheck
+          pnpm --filter typev test
+
       - name: Build all apps + compose
         env:
           NEXT_TELEMETRY_DISABLED: 1
