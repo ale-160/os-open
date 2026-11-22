@@ -29,7 +29,7 @@
 | 图片工具箱 web-img | `/img/` | 工具 | 纯前端图片压缩/水印/格式转换/GIF/PDF |
 | Markdown 编辑器 web-text | `/text/` | 工具 | 实时预览、历史版本、多文档 |
 | P2P 聊天室 nchat | `/chat/` | 社交 | Ed25519 身份、端到端私聊、文件传输 |
-| 文字动画 TypeV | `/typev/` | 创意 | 脚本驱动打字动画、录制导出 |
+| 文字动画 TypeV | `/typev/` | 创意 | 脚本驱动打字动画、录制导出 WebM / GIF、存入系统图库 |
 | 咕咕 GuGu | `/pet/` | 游戏 | 原创养成桌宠：旅行、天气、日记、十款小游戏 |
 | 麦堡突击队 Burger Commando | `/burger/` | 游戏 | 第三方作者的非官方同人横版街机射击原型 |
 
@@ -46,7 +46,7 @@ os-open/
 │   ├── pet/        # 咕咕桌宠（/pet/）
 │   └── burger/     # 麦堡突击队静态游戏（/burger/）
 ├── packages/
-│   ├── shared/          # @os/shared：系统资产库 / 跨应用语言同步 / cn()（运行时公共库）
+│   ├── shared/          # @os/shared：系统资产库 / 跨应用语言同步 / cn() / GIF 编码（运行时公共库）
 │   ├── tsconfig/        # @os/tsconfig：共享 tsconfig 基础配置
 │   ├── eslint-config/   # @os/eslint-config：共享 ESLint flat config
 │   └── next-preset/     # @os/next-preset：Next.js 静态导出统一预设
@@ -107,6 +107,7 @@ export default withOsPreset();
 | `@os/shared/os-assets` | 系统资产库：`saveAsset` / `listAssets` / `setClipboardItem` / `getClipboardItem`、壁纸库（`saveWallpaper` / `resolveWallpaperUrl`） |
 | `@os/shared/os-language` | 系统语言：`useOsLanguage`（React）与 `read/write/subscribeOsLanguage`（非 React），跨 iframe 实时同步 |
 | `@os/shared/css` | `cn()` 类名合并 |
+| `@os/shared/gif-encoder` | 纯 TS GIF89a 编码器：`encodeGIF`（单帧）/ `encodeAnimatedGIF`（多帧）/ `GifAnimationEncoder`（流式逐帧，长动画防 OOM）；图片工具箱、TypeV 共用 |
 
 ## 本地开发
 

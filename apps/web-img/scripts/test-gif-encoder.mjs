@@ -2,8 +2,12 @@
  * GIF 编码器往返验证脚本（Node 环境，不依赖浏览器）。
  *
  * 用法：
- *   node node_modules/typescript/bin/tsc src/utils/gifEncoder.ts --outDir .test-tmp --module commonjs --target es2020
+ *   node node_modules/typescript/bin/tsc src/utils/gifEncoder.ts --outDir .test-tmp --rootDir ../.. --module commonjs --target es2020 --skipLibCheck
  *   node scripts/test-gif-encoder.mjs
+ *
+ * 编码器源码位于 packages/shared/src/gif-encoder.ts（@os/shared/gif-encoder），
+ * src/utils/gifEncoder.ts 只是相对路径转发；以仓库根为 rootDir 编译后，
+ * 产物按源码目录结构落在 .test-tmp/apps/web-img/... 与 .test-tmp/packages/shared/...。
  *
  * 原理：用一份按 GIF89a 规范独立实现的参考解码器解析编码器输出，
  * 逐像素比对还原结果——精确颜色场景要求完全一致，量化场景校验结构有效性。
@@ -12,7 +16,9 @@ import { createRequire } from 'node:module';
 import assert from 'node:assert';
 
 const require_ = createRequire(process.cwd() + '/package.json');
-const { encodeGIF, encodeAnimatedGIF } = require_('./.test-tmp/gifEncoder.js');
+const { encodeGIF, encodeAnimatedGIF, GifAnimationEncoder } = require_(
+  './.test-tmp/apps/web-img/src/utils/gifEncoder.js'
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 参考解码器（独立实现，不与编码器共享任何代码）
@@ -339,5 +345,36 @@ console.log('  ok  mismatched frame size rejected');
 // 13. 空帧列表必须抛错
 await assert.rejects(async () => encodeAnimatedGIF([]), /no frames/);
 console.log('  ok  empty frames rejected');
+
+// 14. 流式编码器（GifAnimationEncoder）与一次性 encodeAnimatedGIF 字节完全一致
+{
+  const framesIn = [
+    { imageData: makeImageData(10, 6, (p) => [p * 3 & 0xff, 40, 200, 255]), delayMs: 70 },
+    { imageData: makeImageData(10, 6, (p) => (p % 4 === 0 ? [0, 0, 0, 0] : [250, 10, 10, 255])), delayMs: 140 },
+  ];
+  const enc = new GifAnimationEncoder({ loop: true });
+  for (const f of framesIn) enc.addFrame(f);
+  assert.strictEqual(enc.frameCount, 2);
+  const streamed = Buffer.from(await enc.finish().arrayBuffer());
+  const oneShot = Buffer.from(await encodeAnimatedGIF(framesIn).arrayBuffer());
+  assert.ok(streamed.equals(oneShot), 'streaming output must equal one-shot output');
+  assert.throws(() => enc.addFrame(framesIn[0]), /already finished/);
+  assert.throws(() => new GifAnimationEncoder().finish(), /no frames/);
+  console.log('  ok  streaming encoder matches one-shot output');
+}
+
+// 15. 大帧（LZW 码流远超函数参数上限）不能因展开 push 抛 RangeError
+{
+  let s = 7;
+  const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const big = makeImageData(1024, 768, () => [
+    Math.floor(rnd() * 256), Math.floor(rnd() * 256), Math.floor(rnd() * 256), 255,
+  ]);
+  const single = decodeGIF(Buffer.from(await encodeGIF(big).arrayBuffer()));
+  assert.strictEqual(single.width, 1024);
+  const anim = decodeGIF(Buffer.from(await encodeAnimatedGIF([{ imageData: big, delayMs: 100 }]).arrayBuffer()));
+  assert.strictEqual(anim.frames.length, 1);
+  console.log('  ok  large 1024x768 noise frame (single + animated)');
+}
 
 console.log('all tests passed');

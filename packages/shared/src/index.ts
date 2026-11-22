@@ -35,3 +35,14 @@ export {
   useOsLanguage
 } from './os-language';
 export type { OsLanguage, UseOsLanguageOptions } from './os-language';
+
+export {
+  encodeGIF,
+  encodeAnimatedGIF,
+  GifAnimationEncoder
+} from './gif-encoder';
+export type {
+  GifImageData,
+  GifFrameInput,
+  GifAnimationOptions
+} from './gif-encoder';

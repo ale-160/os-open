@@ -63,6 +63,7 @@ export default function Home() {
                 canvasRef={canvasRef} 
                 isCanvasReady={isCanvasReady}
                 isSettingsOpen={isSettingsOpen}
+                maxVisibleLines={maxVisibleLines}
               />
             </div>
           </div>

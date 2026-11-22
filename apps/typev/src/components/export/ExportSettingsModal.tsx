@@ -3,6 +3,9 @@
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { useExportSettings } from '@/hooks/useExportSettings';
+import { useLocale } from '@/hooks/useLocale';
+import { GIF_MAX_EDGE, GIF_MAX_FPS, GIF_MAX_FRAMES } from '@/lib/gifPlan';
+import type { ExportSettings } from '@/types/script';
 
 interface ExportSettingsModalProps {
   isOpen: boolean;
@@ -14,6 +17,8 @@ interface ExportSettingsModalProps {
  */
 export default function ExportSettingsModal({ isOpen, onClose }: ExportSettingsModalProps) {
   const { settings, setSettings } = useExportSettings();
+  const { locale } = useLocale();
+  const zh = locale === 'zh';
 
   /**
    * 处理分辨率变化
@@ -33,6 +38,16 @@ export default function ExportSettingsModal({ isOpen, onClose }: ExportSettingsM
     setSettings({
       ...settings,
       frameRate: value
+    });
+  };
+
+  /**
+   * 处理导出格式变化
+   */
+  const handleFormatChange = (value: ExportSettings['format']) => {
+    setSettings({
+      ...settings,
+      format: value
     });
   };
 
@@ -87,17 +102,23 @@ export default function ExportSettingsModal({ isOpen, onClose }: ExportSettingsM
           {/* 格式选择 */}
           <div>
             <label className="block text-gray-300 text-sm font-medium mb-2">
-              导出格式
+              {zh ? '导出格式' : 'Export Format'}
             </label>
             <select
               value={settings.format}
-              disabled
-              className="w-full px-4 py-2 bg-gray-800 text-gray-500 border border-gray-700 rounded-lg cursor-not-allowed"
+              onChange={(e) => handleFormatChange(e.target.value as ExportSettings['format'])}
+              className="w-full px-4 py-2 bg-gray-800 text-white border border-gray-700 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
             >
-              <option value="webm">WebM (可用)</option>
-              <option value="gif">GIF (暂不可用)</option>
+              <option value="webm">{zh ? 'WebM 视频（实时录制）' : 'WebM video (live recording)'}</option>
+              <option value="gif">{zh ? 'GIF 动图（逐帧渲染整段动画）' : 'GIF (renders the whole animation)'}</option>
             </select>
-            <p className="text-gray-500 text-xs mt-1">GIF 格式暂未实现</p>
+            {settings.format === 'gif' && (
+              <p className="text-gray-500 text-xs mt-1">
+                {zh
+                  ? `GIF 帧率最高 ${GIF_MAX_FPS} FPS、最长边 ≤ ${GIF_MAX_EDGE}px、最多 ${GIF_MAX_FRAMES} 帧`
+                  : `GIF is capped at ${GIF_MAX_FPS} FPS, ${GIF_MAX_EDGE}px on the long edge and ${GIF_MAX_FRAMES} frames`}
+              </p>
+            )}
           </div>
         </div>
 

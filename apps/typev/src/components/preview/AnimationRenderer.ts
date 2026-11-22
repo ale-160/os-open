@@ -129,13 +129,53 @@ export class AnimationRenderer {
     const currentTime = performance.now();
     const elapsedTime = this.startTime !== null ? currentTime - this.startTime : 0;
 
-    // 从 globalStyle 读取倍速值，默认 1
-    const speedValue = parseFloat(this.script.globalStyle?.speed || '1');
-    // 倍速转换：speedFactor = speed（值越大越快，越小越慢）
-    const speedFactor = speedValue || 1;
-    // 调整后的时间
-    const adjustedTime = elapsedTime * speedFactor;
+    // 调整后的时间（倍速）
+    const adjustedTime = this.toAdjustedTime(elapsedTime);
 
+    this.renderAdjustedTime(adjustedTime);
+
+    // 检查是否所有行都已显示完毕
+    const totalDuration = this.script.lines.reduce((sum, line) => sum + line.duration * 1000, 0);
+    if (adjustedTime >= totalDuration && totalDuration > 0) {
+      if (this.loop) {
+        // 循环播放：重置时间
+        this.startTime = performance.now();
+        this.splitLinesCache.clear();
+        this.completedLinesForTypewriter = [];
+        this.completedLineIndices.clear();
+      } else {
+        // 保持最后一帧显示，不自动停止
+        return;
+      }
+    }
+
+    // 继续下一帧
+    this.animationId = requestAnimationFrame(() => this.animate());
+  }
+
+  /**
+   * 真实流逝时间 → 动画时间（globalStyle.speed 倍速，值越大越快，默认 1）
+   */
+  private toAdjustedTime(elapsedTimeMs: number): number {
+    const speedValue = parseFloat(this.script.globalStyle?.speed || '1');
+    const speedFactor = speedValue || 1;
+    return elapsedTimeMs * speedFactor;
+  }
+
+  /**
+   * 离线渲染指定时刻的一帧（GIF 导出用，不依赖 requestAnimationFrame / 实时时钟）。
+   * 与实时播放走同一套绘制逻辑；部分效果（大小跳跃）带有跨帧状态，
+   * 因此调用方须按时间递增顺序逐帧调用，并使用独立的渲染器实例。
+   * @param elapsedTimeMs - 自动画开始起的真实时间（毫秒，未乘倍速）
+   */
+  renderFrame(elapsedTimeMs: number): void {
+    this.renderAdjustedTime(this.toAdjustedTime(Math.max(0, elapsedTimeMs)));
+  }
+
+  /**
+   * 按动画时间绘制一帧（实时播放与离线导出共用）
+   */
+  private renderAdjustedTime(adjustedTime: number) {
     // 确定当前行索引，以获取该行的 effect
     let currentLineIndex = -1;
     for (let i = 0; i < this.lineStartTimes.length; i++) {
@@ -159,24 +199,6 @@ export class AnimationRenderer {
       // 简单居中打字机模式（默认）
       this.renderSimpleCenterTypewriter(adjustedTime);
     }
-
-    // 检查是否所有行都已显示完毕
-    const totalDuration = this.script.lines.reduce((sum, line) => sum + line.duration * 1000, 0);
-    if (adjustedTime >= totalDuration && totalDuration > 0) {
-      if (this.loop) {
-        // 循环播放：重置时间
-        this.startTime = performance.now();
-        this.splitLinesCache.clear();
-        this.completedLinesForTypewriter = [];
-        this.completedLineIndices.clear();
-      } else {
-        // 保持最后一帧显示，不自动停止
-        return;
-      }
-    }
-
-    // 继续下一帧
-    this.animationId = requestAnimationFrame(() => this.animate());
   }
 
   /**

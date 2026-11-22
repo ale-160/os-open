@@ -16,7 +16,41 @@ import {
  *
  * 浏览与管理 Ale OS 系统资产库（IndexedDB，本机存储）：
  * 图片工具箱等应用的产物保存在这里，可预览、下载、复制到系统剪贴板或删除。
+ * 资产以 data URL 存储；视频（如文字动画导出的 WebM）以 <video> 呈现，且不进系统剪贴板（剪贴板仅承载图片）。
  */
+
+/** data URL 是否为视频资产 */
+function isVideoAsset(asset: GalleryAsset): boolean {
+  return asset.dataUrl.startsWith('data:video/');
+}
+
+interface AssetMediaProps {
+  asset: GalleryAsset;
+  className: string;
+  /** 预览大图时显示播放控件；缩略图静音循环自动播放 */
+  controls?: boolean;
+  onClick?: (e: React.MouseEvent) => void;
+}
+
+function AssetMedia({ asset, className, controls = false, onClick }: AssetMediaProps) {
+  if (isVideoAsset(asset)) {
+    return (
+      <video
+        src={asset.dataUrl}
+        aria-label={asset.name}
+        className={className}
+        onClick={onClick}
+        controls={controls}
+        autoPlay={!controls}
+        muted={!controls}
+        loop
+        playsInline
+      />
+    );
+  }
+  return <img src={asset.dataUrl} alt={asset.name} className={className} onClick={onClick} />;
+}
+
 export default function GalleryPage() {
   const [assets, setAssets] = useState<GalleryAsset[]>([]);
   const [clipboardImage, setClipboardImage] = useState<GalleryAsset | null>(null);
@@ -60,7 +94,7 @@ export default function GalleryPage() {
   const handleDownload = useCallback((asset: GalleryAsset) => {
     const link = document.createElement('a');
     link.href = asset.dataUrl;
-    link.download = asset.name || 'image.png';
+    link.download = asset.name || (isVideoAsset(asset) ? 'video.webm' : 'image.png');
     link.click();
     toast.success('已开始下载');
   }, []);
@@ -135,9 +169,8 @@ export default function GalleryPage() {
                   key={asset.id}
                   className="group overflow-hidden rounded-2xl border border-border bg-card/60 backdrop-blur transition-shadow hover:shadow-lg"
                 >
-                  <img
-                    src={asset.dataUrl}
-                    alt={asset.name}
+                  <AssetMedia
+                    asset={asset}
                     onClick={() => setPreview(asset)}
                     className="h-36 w-full cursor-zoom-in object-cover"
                   />
@@ -149,13 +182,15 @@ export default function GalleryPage() {
                       <span className="text-[10px] text-muted-foreground">{formatDate(asset.createdAt)}</span>
                     </div>
                     <div className="mt-2 flex items-center gap-1">
-                      <button
-                        onClick={() => void handleCopyToClipboard(asset)}
-                        className="flex-1 rounded-md bg-muted px-2 py-1 text-[11px] hover:bg-muted/70 transition-colors"
-                        title="复制到系统剪贴板"
-                      >
-                        <Clipboard className="mx-auto h-3 w-3" />
-                      </button>
+                      {!isVideoAsset(asset) && (
+                        <button
+                          onClick={() => void handleCopyToClipboard(asset)}
+                          className="flex-1 rounded-md bg-muted px-2 py-1 text-[11px] hover:bg-muted/70 transition-colors"
+                          title="复制到系统剪贴板"
+                        >
+                          <Clipboard className="mx-auto h-3 w-3" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDownload(asset)}
                         className="flex-1 rounded-md bg-muted px-2 py-1 text-[11px] hover:bg-muted/70 transition-colors"
@@ -186,9 +221,9 @@ export default function GalleryPage() {
           className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 bg-black/80 p-6 backdrop-blur-sm"
           onClick={() => setPreview(null)}
         >
-          <img
-            src={preview.dataUrl}
-            alt={preview.name}
+          <AssetMedia
+            asset={preview}
+            controls
             className="max-h-[75vh] max-w-full rounded-xl shadow-2xl"
             onClick={e => e.stopPropagation()}
           />

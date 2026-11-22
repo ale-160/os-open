@@ -6,6 +6,8 @@ import StyleGuideModal from '@/components/guide/StyleGuideModal';
 import { useExportSettings } from '@/hooks/useExportSettings';
 import { useScript } from '@/hooks/useScript';
 import { useLocale } from '@/hooks/useLocale';
+import { GIF_MAX_EDGE, GIF_MAX_FPS, GIF_MAX_FRAMES } from '@/lib/gifPlan';
+import type { ExportSettings } from '@/types/script';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -50,6 +52,15 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       frameRate: value
     });
   };
+
+  const handleFormatChange = (value: ExportSettings['format']) => {
+    setSettings({
+      ...settings,
+      format: value
+    });
+  };
+
+  const zh = locale === 'zh';
 
   /**
    * 处理播放设置变化
@@ -221,12 +232,12 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           {/* 导出设置面板 */}
           {activeTab === 'export' && (
             <div className="space-y-6">
-              <h3 className="text-white text-lg font-semibold">导出设置</h3>
-              
+              <h3 className="text-white text-lg font-semibold">{zh ? '导出设置' : 'Export Settings'}</h3>
+
               {/* 分辨率选择 */}
               <div>
                 <label className="block text-gray-200 text-sm font-medium mb-2">
-                  分辨率
+                  {zh ? '分辨率' : 'Resolution'}
                 </label>
                 <select
                   value={`${settings.resolution.width}x${settings.resolution.height}`}
@@ -241,7 +252,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {/* 帧率选择 */}
               <div>
                 <label className="block text-gray-200 text-sm font-medium mb-2">
-                  帧率 (FPS)
+                  {zh ? '帧率 (FPS)' : 'Frame Rate (FPS)'}
                 </label>
                 <select
                   value={settings.frameRate}
@@ -257,17 +268,25 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {/* 格式选择 */}
               <div>
                 <label className="block text-gray-200 text-sm font-medium mb-2">
-                  导出格式
+                  {zh ? '导出格式' : 'Export Format'}
                 </label>
                 <select
                   value={settings.format}
-                  disabled
-                  className="w-full px-4 py-2 bg-gray-900 text-gray-500 border border-gray-800 rounded-lg cursor-not-allowed"
+                  onChange={(e) => handleFormatChange(e.target.value as ExportSettings['format'])}
+                  className="w-full px-4 py-2 bg-gray-900 text-white border border-gray-800 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500 outline-none"
                 >
-                  <option value="webm">WebM (可用)</option>
-                  <option value="gif">GIF (暂不可用)</option>
+                  <option value="webm">{zh ? 'WebM 视频（实时录制）' : 'WebM video (live recording)'}</option>
+                  <option value="gif">{zh ? 'GIF 动图（逐帧渲染整段动画）' : 'GIF (renders the whole animation)'}</option>
                 </select>
-                <p className="text-gray-500 text-xs mt-1">GIF 格式暂未实现</p>
+                <p className="text-gray-500 text-xs mt-1">
+                  {settings.format === 'gif'
+                    ? (zh
+                      ? `GIF 帧率最高 ${GIF_MAX_FPS} FPS、最长边 ≤ ${GIF_MAX_EDGE}px、最多 ${GIF_MAX_FRAMES} 帧（超长动画自动降帧率）`
+                      : `GIF is capped at ${GIF_MAX_FPS} FPS, ${GIF_MAX_EDGE}px on the long edge and ${GIF_MAX_FRAMES} frames (long animations use a lower frame rate)`)
+                    : (zh
+                      ? '点击工具栏录制按钮开始，再次点击停止并下载'
+                      : 'Click the record button in the toolbar to start; click again to stop and download')}
+                </p>
               </div>
             </div>
           )}
