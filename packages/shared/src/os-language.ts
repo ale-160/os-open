@@ -9,67 +9,22 @@
  *
  * React 消费方用 useOsLanguage；非 React（zustand 等）用
  * readOsLanguage / writeOsLanguage / subscribeOsLanguage 自行接线。
+ * 不能引入 React 的应用（如 Vue 的 nchat）改从 `@os/shared/os-language-core` 引用。
  */
 
 import { useCallback, useEffect, useState } from 'react';
 
-export type OsLanguage = 'zh' | 'en';
+import { readOsLanguage, subscribeOsLanguage, writeOsLanguage } from './os-language-core';
+import type { OsLanguage } from './os-language-core';
 
-/** 全系统共享语言键（localStorage） */
-export const OS_LANGUAGE_KEY = 'ale-os-language';
-
-/** 同帧订阅事件（写入者派发，弥补 storage 事件不通知本帧） */
-const OS_LANGUAGE_EVENT = 'os-language-change';
-
-function parseLanguage(value: string | null | undefined): OsLanguage | null {
-  return value === 'zh' || value === 'en' ? value : null;
-}
-
-/** 读取共享语言；无记录或值非法返回 null */
-export function readOsLanguage(): OsLanguage | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return parseLanguage(localStorage.getItem(OS_LANGUAGE_KEY));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * 写入共享语言。storage 事件只通知其他帧，
- * 本帧订阅者通过自定义事件即时收到。
- */
-export function writeOsLanguage(lang: OsLanguage): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(OS_LANGUAGE_KEY, lang);
-  } catch {
-    // 隐私模式等场景写入失败可忽略（本帧状态仍由调用方自行维护）
-  }
-  window.dispatchEvent(new CustomEvent<OsLanguage>(OS_LANGUAGE_EVENT, { detail: lang }));
-}
-
-/**
- * 订阅共享语言变更（storage 事件 + 同帧自定义事件）。
- * 回调参数可能为 null（键被移除时）。返回取消订阅函数。
- */
-export function subscribeOsLanguage(
-  callback: (lang: OsLanguage | null) => void
-): () => void {
-  if (typeof window === 'undefined') return () => {};
-  const onStorage = (event: StorageEvent) => {
-    if (event.key === OS_LANGUAGE_KEY) callback(parseLanguage(event.newValue));
-  };
-  const onCustom = (event: Event) => {
-    callback((event as CustomEvent<OsLanguage>).detail);
-  };
-  window.addEventListener('storage', onStorage);
-  window.addEventListener(OS_LANGUAGE_EVENT, onCustom);
-  return () => {
-    window.removeEventListener('storage', onStorage);
-    window.removeEventListener(OS_LANGUAGE_EVENT, onCustom);
-  };
-}
+// 无框架内核（读/写/订阅）拆在 os-language-core，供非 React 应用单独引用；此处原样再导出保持兼容
+export {
+  OS_LANGUAGE_KEY,
+  readOsLanguage,
+  writeOsLanguage,
+  subscribeOsLanguage
+} from './os-language-core';
+export type { OsLanguage } from './os-language-core';
 
 export interface UseOsLanguageOptions {
   /** 旧独立站时期的个人语言键，仅用于一次性迁移（如 web-img-language） */

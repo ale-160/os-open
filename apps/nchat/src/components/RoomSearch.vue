@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue'
+import { t } from '@/i18n/index.js'
 
 const props = defineProps({
   online: { type: Boolean, default: false },
@@ -24,20 +25,20 @@ function onSearch() {
         class="search-input"
         v-model="keyword"
         type="text"
-        placeholder="搜索房间名或别名，如 ale160 / 阿乐一百六"
+        :placeholder="t('roomSearch.placeholder')"
         @keyup.enter="onSearch"
       />
-      <button class="btn" @click="onSearch" title="搜索网络中的房间">搜索</button>
-      <button class="btn primary" @click="emit('create')" title="创建新房间">
-        创建
+      <button class="btn" @click="onSearch" :title="t('roomSearch.searchTitle')">{{ t('roomSearch.search') }}</button>
+      <button class="btn primary" @click="emit('create')" :title="t('roomSearch.createTitle')">
+        {{ t('roomSearch.create') }}
       </button>
     </div>
     <div class="search-status" v-if="keyword">
-      <span>搜索: "{{ keyword }}"</span>
-      <button class="btn-link" @click="emit('clear')">清除</button>
+      <span>{{ t('roomSearch.status', { keyword }) }}</span>
+      <button class="btn-link" @click="emit('clear')">{{ t('roomSearch.clear') }}</button>
     </div>
     <p class="hint" v-if="!online">
-      信令未连接，仅显示本地缓存的房间
+      {{ t('roomSearch.offlineHint') }}
     </p>
   </div>
 </template>

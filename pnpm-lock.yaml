@@ -81,6 +81,9 @@ importers:
       '@noble/hashes':
         specifier: ^2.2.0
         version: 2.4.0
+      '@os/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       idb:
         specifier: ^8.0.4
         version: 8.0.4
@@ -97,6 +100,9 @@ importers:
       '@vitejs/plugin-vue':
         specifier: ^6.0.10
         version: 6.0.10(vite@5.4.21(@types/node@26.6.5)(lightningcss@1.33.0))(vue@3.5.44(typescript@5.9.3))
+      fake-indexeddb:
+        specifier: ^6.2.6
+        version: 6.2.6
       peer:
         specifier: ^1.0.2
         version: 1.0.2

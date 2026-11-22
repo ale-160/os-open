@@ -75,7 +75,7 @@ scripts/             # build-all（构建编排）、compose（产物合成）�
 
 - **系统图库 / 剪贴板**（IndexedDB，本机存储）：`import { saveAsset, getClipboardItem, listAssets, setClipboardItem } from '@os/shared/os-assets'`
   —— `saveAsset` 存产物、`getClipboardItem` 取剪贴板，实现跨应用数据流转；
-- **统一语言**：`import { useOsLanguage } from '@os/shared/os-language'`（React）或 `read/write/subscribeOsLanguage`（非 React）
+- **统一语言**：`import { useOsLanguage } from '@os/shared/os-language'`（React）或 `read/write/subscribeOsLanguage`（非 React；不能引入 React 的应用如 Vue 改从 `@os/shared/os-language-core` 引用）
   —— 读写共享键 `ale-os-language`（`zh`/`en`），默认中文，跨 iframe 实时同步，无需自己监听 storage 事件。
 
 ## 规范

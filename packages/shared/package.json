@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./os-assets": "./src/os-assets.ts",
+    "./os-language-core": "./src/os-language-core.ts",
     "./os-language": "./src/os-language.ts",
     "./css": "./src/css.ts"
   },

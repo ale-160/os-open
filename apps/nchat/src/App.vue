@@ -16,6 +16,7 @@ import RoomSettingsDialog from './components/RoomSettingsDialog.vue'
 import PromptInstall from './components/PromptInstall.vue'
 import { IconClose, IconLock, IconInfo, IconCheck, IconAlert } from './components/icons'
 import TopologyView from './components/TopologyView.vue'
+import { t } from './i18n/index.js'
 
 const {
   state,
@@ -631,13 +632,13 @@ function onCloseTopology() {
               />
             </svg>
             <h2 class="welcome-title">nchat</h2>
-            <p class="welcome-sub">去中心化 P2P 聊天室</p>
+            <p class="welcome-sub">{{ t('app.tagline') }}</p>
             <p class="welcome-desc">
-              没有中心服务器，消息只在节点之间直接流转。<br />
-              搜索或创建一个房间，与同一网络中的节点实时通信。
+              {{ t('app.desc1') }}<br />
+              {{ t('app.desc2') }}
             </p>
             <div class="welcome-actions">
-              <button class="btn primary" @click="showCreateDialog = true">＋ 创建房间</button>
+              <button class="btn primary" @click="showCreateDialog = true">{{ t('app.createRoom') }}</button>
             </div>
           </div>
         </template>
@@ -664,7 +665,7 @@ function onCloseTopology() {
 
         <div v-else class="empty-state">
           <div class="empty-icon">🔍</div>
-          <p>选择左侧功能开始</p>
+          <p>{{ t('app.emptyPick') }}</p>
         </div>
       </div>
 
@@ -759,23 +760,23 @@ function onCloseTopology() {
     <div v-if="passwordPrompt" class="modal-overlay" @click.self="passwordPrompt = null">
       <div class="modal-card">
         <div class="modal-head">
-          <h3 class="modal-title">加入房间「{{ passwordPrompt.name }}」</h3>
+          <h3 class="modal-title">{{ t('app.passwordTitle', { name: passwordPrompt.name }) }}</h3>
           <button class="modal-close" @click="passwordPrompt = null"><IconClose :size="20" /></button>
         </div>
         <div class="modal-body">
-          <p style="margin: 0 0 var(--sp-3); color: var(--text-dim);">该房间需要密码</p>
+          <p style="margin: 0 0 var(--sp-3); color: var(--text-dim);">{{ t('app.passwordDesc') }}</p>
           <input
             v-model="passwordInput"
             type="password"
             class="form-input"
-            placeholder="输入密码"
+            :placeholder="t('app.passwordPlaceholder')"
             @keydown.enter="onJoinWithPassword"
             autofocus
           />
         </div>
         <div class="modal-footer">
-          <button class="btn" @click="passwordPrompt = null">取消</button>
-          <button class="btn primary" @click="onJoinWithPassword">加入</button>
+          <button class="btn" @click="passwordPrompt = null">{{ t('app.cancel') }}</button>
+          <button class="btn primary" @click="onJoinWithPassword">{{ t('app.join') }}</button>
         </div>
       </div>
     </div>

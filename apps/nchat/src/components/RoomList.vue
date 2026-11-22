@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CONFIG } from '../config.js'
+import { t } from '@/i18n/index.js'
 import { IconLock, IconUser, IconChat, IconEdit, IconStar, IconUserPlus } from './icons'
 
 const props = defineProps({
@@ -75,10 +76,10 @@ function loadMore() {
 function timeAgo(ts) {
   if (!ts) return ''
   const diff = Date.now() - ts
-  if (diff < 60000) return '刚刚'
-  if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前'
-  if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前'
-  return Math.floor(diff / 86400000) + '天前'
+  if (diff < 60000) return t('time.justNow')
+  if (diff < 3600000) return t('time.minutesAgo', { n: Math.floor(diff / 60000) })
+  if (diff < 86400000) return t('time.hoursAgo', { n: Math.floor(diff / 3600000) })
+  return t('time.daysAgo', { n: Math.floor(diff / 86400000) })
 }
 
 function accessIconName(rules) {
@@ -105,32 +106,32 @@ function speakIconName(rules) {
         :class="{ active: filterTab === 'faved' }"
         @click="filterTab = 'faved'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        收藏 <span class="tab-count">{{ favedCount }}</span>
+        {{ t('rooms.tabFaved') }} <span class="tab-count">{{ favedCount }}</span>
       </button>
       <button
         class="filter-tab"
         :class="{ active: filterTab === 'joined' }"
         @click="filterTab = 'joined'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        已加入 <span class="tab-count">{{ joinedCount }}</span>
+        {{ t('rooms.tabJoined') }} <span class="tab-count">{{ joinedCount }}</span>
       </button>
       <button
         class="filter-tab"
         :class="{ active: filterTab === 'discover' }"
         @click="filterTab = 'discover'; visibleCount = CONFIG.ROOM_PAGE_SIZE"
       >
-        发现 <span class="tab-count">{{ allCount }}</span>
+        {{ t('rooms.tabDiscover') }} <span class="tab-count">{{ allCount }}</span>
       </button>
     </div>
 
     <div class="list-body">
       <div v-if="!visibleRooms.length" class="empty">
-        <p v-if="searching">未找到匹配的房间</p>
-        <p v-else-if="filterTab === 'joined'">未加入任何房间</p>
-        <p v-else-if="filterTab === 'faved'">未收藏任何房间</p>
-        <p v-else>暂未发现房间</p>
-        <p class="sub" v-if="!searching && filterTab === 'discover'">点击「创建」发起第一个房间</p>
-        <p class="sub" v-else-if="searching">尝试其他关键词或清除搜索</p>
+        <p v-if="searching">{{ t('rooms.emptySearch') }}</p>
+        <p v-else-if="filterTab === 'joined'">{{ t('rooms.emptyJoined') }}</p>
+        <p v-else-if="filterTab === 'faved'">{{ t('rooms.emptyFaved') }}</p>
+        <p v-else>{{ t('rooms.emptyDiscover') }}</p>
+        <p class="sub" v-if="!searching && filterTab === 'discover'">{{ t('rooms.emptyDiscoverHint') }}</p>
+        <p class="sub" v-else-if="searching">{{ t('rooms.emptySearchHint') }}</p>
       </div>
       <button
         v-for="r in visibleRooms"
@@ -143,7 +144,7 @@ function speakIconName(rules) {
         <span
           class="fav-btn"
           :class="{ faved: favNames.has(r.name) }"
-          :title="favNames.has(r.name) ? '取消收藏' : '收藏'"
+          :title="favNames.has(r.name) ? t('rooms.favRemove') : t('rooms.favAdd')"
           role="button"
           @click.stop="emit('toggle-fav', r.name)"
         >
@@ -152,7 +153,7 @@ function speakIconName(rules) {
         <!-- 邀请按钮：生成分享链接/二维码 -->
         <span
           class="invite-btn"
-          :title="'邀请加入 ' + r.name"
+          :title="t('rooms.invite', { name: r.name })"
           role="button"
           @click.stop="emit('invite', r.name)"
         >
@@ -167,19 +168,19 @@ function speakIconName(rules) {
             <IconEdit v-else-if="speakIconName(r.rules) === 'edit'" :size="12" :title="'发言: ' + r.rules?.speak" />
           </span>
           {{ r.name }}
-          <span v-if="joinedNames.has(r.name)" class="room-badge joined">已加入</span>
-          <span v-if="favNames.has(r.name)" class="room-badge faved">收藏</span>
+          <span v-if="joinedNames.has(r.name)" class="room-badge joined">{{ t('rooms.badgeJoined') }}</span>
+          <span v-if="favNames.has(r.name)" class="room-badge faved">{{ t('rooms.badgeFaved') }}</span>
         </div>
         <div class="room-aliases" v-if="r.aliases && r.aliases.length">
           {{ r.aliases.join(' · ') }}
         </div>
         <div class="room-meta">
-          <span class="members">{{ r.memberCount > 0 ? `${r.memberCount}人在线` : '暂无成员' }}</span>
+          <span class="members">{{ r.memberCount > 0 ? t('rooms.membersOnline', { count: r.memberCount }) : t('rooms.noMembers') }}</span>
           <span class="ago" v-if="r.lastUpdate">{{ timeAgo(r.lastUpdate) }}</span>
         </div>
       </button>
       <button v-if="hasMore" class="load-more-btn" @click="loadMore">
-        加载更多（剩余 {{ filteredByTab.length - visibleCount }} 个）
+        {{ t('rooms.loadMore', { count: filteredByTab.length - visibleCount }) }}
       </button>
     </div>
   </div>

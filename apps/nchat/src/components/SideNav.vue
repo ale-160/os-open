@@ -12,6 +12,7 @@ import {
   IconSettings,
   IconTopology
 } from './icons'
+import { t } from '@/i18n/index.js'
 
 const props = defineProps({
   activeNav: { type: String, default: 'chat' },
@@ -25,8 +26,8 @@ const { isDesktop, sideNavOpen, closeAll } = useLayout()
 
 // 全局导航项
 const NAV_ITEMS = [
-  { key: 'chat', label: '会话', Icon: IconChat },
-  { key: 'search', label: '搜索', Icon: IconSearch }
+  { key: 'chat', labelKey: 'nav.chat', Icon: IconChat },
+  { key: 'search', labelKey: 'nav.search', Icon: IconSearch }
 ]
 
 // 昵称首字母（取第一个字符，大写；无则用 '?'）
@@ -71,11 +72,11 @@ function initial(name) {
         :key="item.key"
         class="nav-item"
         :class="{ active: activeNav === item.key }"
-        :title="item.label"
+        :title="t(item.labelKey)"
         @click="emit('nav', item.key); if (!isDesktop) closeAll()"
       >
         <component :is="item.Icon" :size="22" />
-        <span class="nav-label" v-if="!isDesktop || sideNavOpen">{{ item.label }}</span>
+        <span class="nav-label" v-if="!isDesktop || sideNavOpen">{{ t(item.labelKey) }}</span>
       </button>
     </div>
 
@@ -83,21 +84,21 @@ function initial(name) {
     <div class="nav-bottom">
       <button
         class="nav-item"
-        :title="'网络拓扑'"
+        :title="t('nav.topologyTitle')"
         @click="emit('open-topology'); if (!isDesktop) closeAll()"
       >
         <IconTopology :size="22" />
-        <span class="nav-label" v-if="!isDesktop || sideNavOpen">拓扑</span>
+        <span class="nav-label" v-if="!isDesktop || sideNavOpen">{{ t('nav.topology') }}</span>
       </button>
 
       <button
         class="nav-item"
         :class="{ active: activeNav === 'settings' }"
-        :title="'设置'"
+        :title="t('nav.settings')"
         @click="emit('open-settings'); if (!isDesktop) closeAll()"
       >
         <IconSettings :size="22" />
-        <span class="nav-label" v-if="!isDesktop || sideNavOpen">设置</span>
+        <span class="nav-label" v-if="!isDesktop || sideNavOpen">{{ t('nav.settings') }}</span>
       </button>
 
       <div class="nav-spacer" v-if="!isDesktop || sideNavOpen" />
@@ -105,7 +106,7 @@ function initial(name) {
       <button
         class="nav-user"
         :class="{ on: online, off: !online }"
-        :title="online ? '在线 · 点击打开设置' : '离线 · 点击打开设置'"
+        :title="online ? t('nav.userOnline') : t('nav.userOffline')"
         @click="emit('open-settings'); if (!isDesktop) closeAll()"
       >
         <span class="avatar-letter">{{ initial(ownName) }}</span>

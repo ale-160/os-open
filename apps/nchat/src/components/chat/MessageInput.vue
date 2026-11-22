@@ -8,10 +8,12 @@ import {
   IconReact,
   IconClose
 } from '../icons'
+import { t } from '@/i18n/index.js'
 
 const props = defineProps({
   disabled: { type: Boolean, default: false },
-  placeholder: { type: String, default: '输入消息，回车发送，Shift+Enter 换行' },
+  // 空串表示使用默认文案（随系统语言切换）
+  placeholder: { type: String, default: '' },
   replyingTo: { type: Object, default: null }
 })
 
@@ -58,19 +60,19 @@ function onFileChange(e) {
     <!-- 回复引用条 -->
     <div class="reply-bar" v-if="replyingTo">
       <span class="reply-icon"><IconThread :size="14" /></span>
-      <span class="reply-label">回复 {{ replyingTo.name || '对方' }}</span>
-      <span class="reply-snippet">{{ replyingTo.text || '（文件/图片消息）' }}</span>
-      <button class="reply-close" @click="emit('cancel-reply')" title="取消回复">
+      <span class="reply-label">{{ t('input.replyTo', { name: replyingTo.name || t('input.replyPeer') }) }}</span>
+      <span class="reply-snippet">{{ replyingTo.text || t('input.replyFile') }}</span>
+      <button class="reply-close" @click="emit('cancel-reply')" :title="t('input.cancelReply')">
         <IconClose :size="14" />
       </button>
     </div>
 
     <div class="input-row">
       <div class="input-toolbar">
-        <button class="icon-btn" @click="showAttach = !showAttach" title="附件">
+        <button class="icon-btn" @click="showAttach = !showAttach" :title="t('input.attach')">
           <IconPlus :size="20" />
         </button>
-        <button class="icon-btn" @click="showEmoji = !showEmoji" title="表情">
+        <button class="icon-btn" @click="showEmoji = !showEmoji" :title="t('input.emoji')">
           <IconReact :size="20" />
         </button>
       </div>
@@ -79,7 +81,7 @@ function onFileChange(e) {
         <textarea
           v-model="draft"
           class="input-field"
-          :placeholder="placeholder"
+          :placeholder="placeholder || t('input.placeholder')"
           @input="handleInput"
           @keydown="handleKeydown"
           :disabled="props.disabled"
@@ -89,7 +91,7 @@ function onFileChange(e) {
       </div>
 
       <div class="input-actions">
-        <button class="icon-btn primary" :disabled="!canSend" @click="handleSend" title="发送">
+        <button class="icon-btn primary" :disabled="!canSend" @click="handleSend" :title="t('input.send')">
           <IconSend :size="20" />
         </button>
       </div>

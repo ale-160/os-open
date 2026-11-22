@@ -11,6 +11,7 @@ import RoomSearch from './RoomSearch.vue'
 import RoomList from './RoomList.vue'
 import MessageSearch from './MessageSearch.vue'
 import { IconPlus, IconSettings, IconX, IconMenu } from './icons'
+import { t } from '@/i18n/index.js'
 
 const props = defineProps({
   activeNav: { type: String, default: 'chat' },
@@ -54,9 +55,9 @@ const { isDesktop, listBarOpen, toggleListBar } = useLayout()
 // 当前导航标题
 const navTitle = computed(() => {
   switch (props.activeNav) {
-    case 'chat': return '会话'
-    case 'search': return '搜索'
-    default: return '会话'
+    case 'chat': return t('nav.chat')
+    case 'search': return t('nav.search')
+    default: return t('nav.chat')
   }
 })
 
@@ -79,11 +80,11 @@ const showManage = computed(() => props.activeNav === 'chat')
 
     <!-- Sheet 头部（仅移动端） -->
     <header class="sheet-header" v-if="!isDesktop">
-      <button class="icon-btn" @click="emit('menu')" title="菜单"><IconMenu :size="20" /></button>
+      <button class="icon-btn" @click="emit('menu')" :title="t('listbar.menu')"><IconMenu :size="20" /></button>
       <h2 class="sheet-title">{{ navTitle }}</h2>
       <div class="sheet-actions">
-        <button v-if="showManage" class="icon-btn" @click="emit('manage'); toggleListBar()" title="管理"><IconSettings :size="20" /></button>
-        <button v-if="showCreate" class="icon-btn primary" @click="emit('create'); toggleListBar()" title="创建"><IconPlus :size="20" /></button>
+        <button v-if="showManage" class="icon-btn" @click="emit('manage'); toggleListBar()" :title="t('listbar.manage')"><IconSettings :size="20" /></button>
+        <button v-if="showCreate" class="icon-btn primary" @click="emit('create'); toggleListBar()" :title="t('listbar.create')"><IconPlus :size="20" /></button>
       </div>
     </header>
 
@@ -97,8 +98,8 @@ const showManage = computed(() => props.activeNav === 'chat')
         <div class="listbar-head" v-if="isDesktop">
           <span class="listbar-title">{{ navTitle }}</span>
           <div class="listbar-actions">
-            <button v-if="showManage" class="icon-btn-mini" @click="emit('manage')" title="管理">管理</button>
-            <button v-if="showCreate" class="icon-btn-mini primary" @click="emit('create')"><IconPlus :size="16" /></button>
+            <button v-if="showManage" class="icon-btn-mini" @click="emit('manage')" :title="t('listbar.manage')">{{ t('listbar.manage') }}</button>
+            <button v-if="showCreate" class="icon-btn-mini primary" @click="emit('create')" :title="t('listbar.create')"><IconPlus :size="16" /></button>
           </div>
         </div>
         <RoomSearch :online="online" :keyword="searchKeyword" @search="emit('search', $event)" @clear="emit('clear')" @create="emit('create')" />

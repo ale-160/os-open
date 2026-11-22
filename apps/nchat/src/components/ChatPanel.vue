@@ -27,7 +27,8 @@ import {
   IconTrash,
   IconReact
 } from './icons'
-import { saveAsset } from '../utils/osAssets'
+import { galleryKey, saveChatImageToGallery } from '../utils/gallery.js'
+import { t } from '../i18n/index.js'
 
 const props = defineProps({
   currentRoom: { type: String, default: '' },
@@ -278,36 +279,23 @@ function requestDownload(file) {
 const gallerySavedIds = ref(new Set())
 const gallerySavingIds = ref(new Set())
 
-async function blobUrlToDataUrl(blobUrl) {
-  const blob = await (await fetch(blobUrl)).blob()
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(blob)
-  })
-}
-
 async function onSaveGallery(file) {
   if (!file) return
+  const key = galleryKey(file)
   try {
-    let dataUrl = file.dataUrl
-    if (!dataUrl && file.blobUrl) {
-      dataUrl = await blobUrlToDataUrl(file.blobUrl)
-    }
-    if (!dataUrl) {
+    gallerySavingIds.value = new Set(gallerySavingIds.value).add(key)
+    const result = await saveChatImageToGallery(file)
+    if (result.status === 'needs-download') {
       // 原图未加载（仅元信息）：先向发送者拉取，完成后可再次保存
       requestDownload(file)
       return
     }
-    gallerySavingIds.value = new Set(gallerySavingIds.value).add(file.fileId || file.name)
-    await saveAsset({ name: file.name || 'nchat-image', dataUrl })
-    gallerySavedIds.value = new Set(gallerySavedIds.value).add(file.fileId || file.name)
+    gallerySavedIds.value = new Set(gallerySavedIds.value).add(key)
   } catch (e) {
     /* 存储失败静默（如隐私模式 IndexedDB 不可用），按钮态不复位为未保存 */
   } finally {
     const next = new Set(gallerySavingIds.value)
-    next.delete(file.fileId || file.name)
+    next.delete(key)
     gallerySavingIds.value = next
   }
 }
@@ -406,20 +394,20 @@ function onLocated(msgId) {
       <div class="chat-body">
         <div v-if="!inRoom" class="chat-empty">
           <div class="empty-icon"><IconChat :size="48" /></div>
-          <p>欢迎来到 nchat</p>
+          <p>{{ t('chat.welcome') }}</p>
           <p class="sub">
-            这是一个去中心化 P2P 聊天室，没有中心服务器存储你的消息。<br />
-            在左侧搜索或创建房间，与同一网络中的节点实时通信。
+            {{ t('chat.welcomeDesc1') }}<br />
+            {{ t('chat.welcomeDesc2') }}
           </p>
           <p class="sub stat" v-if="stats.received || stats.sent">
-            本次会话：已收 {{ stats.received }} / 已发 {{ stats.sent }}
+            {{ t('chat.sessionStats', { received: stats.received, sent: stats.sent }) }}
           </p>
         </div>
 
         <template v-else>
           <div v-if="!messages.length" class="chat-empty small">
-            <p>房间内暂无消息</p>
-            <p class="sub">在下方输入第一条消息吧</p>
+            <p>{{ t('chat.emptyRoom') }}</p>
+            <p class="sub">{{ t('chat.emptyRoomHint') }}</p>
           </div>
 
           <MessageList
@@ -450,19 +438,19 @@ function onLocated(msgId) {
 
       <!-- 多选操作栏 -->
       <div v-if="multiSelect.active" class="multi-select-bar">
-        <span class="ms-count">已选 {{ multiSelect.ids.size }} 条</span>
+        <span class="ms-count">{{ t('chat.selected', { count: multiSelect.ids.size }) }}</span>
         <div class="ms-actions">
-          <button class="ms-btn primary" :disabled="deletableCount === 0" @click="batchDelete" title="仅限自己 5 分钟内发送的消息">
-            <IconTrash :size="14" /> 删除{{ deletableCount ? ` (${deletableCount})` : '' }}
+          <button class="ms-btn primary" :disabled="deletableCount === 0" @click="batchDelete" :title="t('chat.deleteSelectedTitle')">
+            <IconTrash :size="14" /> {{ t('chat.deleteSelected') }}{{ deletableCount ? ` (${deletableCount})` : '' }}
           </button>
-          <button class="ms-btn" @click="exitMultiSelect">取消</button>
+          <button class="ms-btn" @click="exitMultiSelect">{{ t('chat.cancel') }}</button>
         </div>
       </div>
 
       <!-- 输入区 -->
       <MessageInput
         :disabled="!inRoom"
-        :placeholder="inRoom ? `发送到 ${currentRoom}` : '输入消息，回车发送，Shift+Enter 换行'"
+        :placeholder="inRoom ? t('input.placeholderRoom', { room: currentRoom }) : t('input.placeholder')"
         :replying-to="replyingTo"
         @send="onSend"
         @file="onSendFile"

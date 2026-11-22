@@ -10,6 +10,7 @@ import {
   IconVoice,
   IconSettings
 } from '../icons'
+import { t } from '@/i18n/index.js'
 
 const props = defineProps({
   currentRoom: { type: String, default: '' },
@@ -33,37 +34,37 @@ const showAnnouncement = computed(() => !!props.announcement?.text)
 <template>
   <header class="chat-header">
     <div class="header-left">
-      <button class="icon-btn back-btn" @click="emit('back')" title="返回房间列表">
+      <button class="icon-btn back-btn" @click="emit('back')" :title="t('header.back')">
         <IconBack :size="20" />
       </button>
       <div class="room-title">
         <span class="room-name"># {{ currentRoom }}</span>
-        <span class="room-meta" v-if="typingName">{{ typingName }} 正在输入…</span>
-        <span class="room-meta" v-else>{{ memberCount }} 人 · {{ online ? '在线' : '离线' }}</span>
+        <span class="room-meta" v-if="typingName">{{ t('header.typing', { name: typingName }) }}</span>
+        <span class="room-meta" v-else>{{ t('header.meta', { count: memberCount, status: online ? t('header.online') : t('header.offline') }) }}</span>
       </div>
     </div>
 
     <div class="header-right">
-      <button v-if="pinnedMsgIds.length" class="icon-btn" @click="emit('toggle-pin', pinnedMsgIds[0])" title="置顶消息">
+      <button v-if="pinnedMsgIds.length" class="icon-btn" @click="emit('toggle-pin', pinnedMsgIds[0])" :title="t('header.pinned')">
         <IconPin :size="18" class="filled" />
       </button>
-      <button v-if="inRoom" class="icon-btn danger" @click="emit('leave')" title="退出房间（清除所有聊天记录）">
+      <button v-if="inRoom" class="icon-btn danger" @click="emit('leave')" :title="t('header.leave')">
         <IconLeave :size="18" />
       </button>
       <!-- 发布公告（创建者/高星成员）：点击在公告栏打开编辑器 -->
-      <button v-if="canSetAnnouncement" class="icon-btn" :class="{ active: showAnnouncement }" @click="emit('edit-announcement')" title="发布公告">
+      <button v-if="canSetAnnouncement" class="icon-btn" :class="{ active: showAnnouncement }" @click="emit('edit-announcement')" :title="t('header.announce')">
         <IconAnnounce :size="18" />
       </button>
-      <button v-if="inRoom" class="icon-btn" :class="{ active: callOpen }" @click="emit('toggle-call')" :title="callOpen ? '收起音视频通话' : '音视频通话'">
+      <button v-if="inRoom" class="icon-btn" :class="{ active: callOpen }" @click="emit('toggle-call')" :title="callOpen ? t('header.callClose') : t('header.callOpen')">
         <IconVoice :size="18" />
       </button>
-      <button class="icon-btn" @click="emit('more')" title="更多">
+      <button class="icon-btn" @click="emit('more')" :title="t('header.more')">
         <IconMenu :size="20" />
       </button>
-      <button v-if="inRoom" class="icon-btn" :class="{ active: memberOpen }" @click="emit('toggle-member')" :title="memberOpen ? '收起成员列表' : '展开成员列表'">
+      <button v-if="inRoom" class="icon-btn" :class="{ active: memberOpen }" @click="emit('toggle-member')" :title="memberOpen ? t('header.membersClose') : t('header.membersOpen')">
         <IconUser :size="18" />
       </button>
-      <button class="icon-btn" @click="emit('open-settings')" title="设置">
+      <button class="icon-btn" @click="emit('open-settings')" :title="t('header.settings')">
         <IconSettings :size="18" />
       </button>
     </div>

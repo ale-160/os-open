@@ -6,6 +6,7 @@
  */
 import { ref, watch } from 'vue'
 import { IconSearch, IconClose, IconFile, IconChat } from './icons'
+import { t } from '@/i18n/index.js'
 
 const props = defineProps({
   results: { type: Array, default: () => [] },
@@ -75,14 +76,14 @@ watch(() => props.searching, () => {})
         class="input msg-search-input"
         v-model="keyword"
         type="text"
-        placeholder="搜索消息内容…"
+        :placeholder="t('msgSearch.placeholder')"
         @input="onInput"
         autofocus
       />
       <button
         v-if="keyword"
         class="btn-mini icon-only-btn msg-search-clear"
-        title="清除"
+        :title="t('msgSearch.clear')"
         @click="onClear"
       >
         <IconClose :size="14" />
@@ -92,12 +93,12 @@ watch(() => props.searching, () => {})
     <!-- 搜索状态提示 -->
     <div v-if="keyword && searching" class="msg-search-status">
       <span class="spinner-mini"></span>
-      <span>正在搜索…</span>
+      <span>{{ t('msgSearch.searching') }}</span>
     </div>
 
     <!-- 结果列表 -->
     <div v-if="keyword && results.length" class="msg-search-list">
-      <div class="msg-search-count">{{ results.length }} 条结果</div>
+      <div class="msg-search-count">{{ t('msgSearch.count', { count: results.length }) }}</div>
       <button
         v-for="item in results"
         :key="item.id"
@@ -127,15 +128,15 @@ watch(() => props.searching, () => {})
 
     <!-- 空结果 -->
     <div v-else-if="keyword && !searching" class="msg-search-empty">
-      <p>未找到匹配的消息</p>
-      <p class="sub">尝试更换关键词，或等待网络节点回复</p>
+      <p>{{ t('msgSearch.empty') }}</p>
+      <p class="sub">{{ t('msgSearch.emptyHint') }}</p>
     </div>
 
     <!-- 初始状态 -->
     <div v-else-if="!keyword" class="msg-search-hint">
       <IconSearch :size="32" />
-      <p>搜索所有房间的消息</p>
-      <p class="sub">支持本地缓存 + 网络节点聚合搜索</p>
+      <p>{{ t('msgSearch.idle') }}</p>
+      <p class="sub">{{ t('msgSearch.idleHint') }}</p>
     </div>
   </div>
 </template>
