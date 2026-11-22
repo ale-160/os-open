@@ -42,6 +42,8 @@ export const HistoryModal = ({
     return date.toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-US');
   };
 
+  // history 含固定版本；普通版本区只展示/计数未固定的条目
+  const unpinned = history.filter(item => !item.pinned);
   const storageInfo = getStorageInfo(currentContent, history, pinned);
 
   return (
@@ -148,12 +150,12 @@ export const HistoryModal = ({
               )}
               
               {/* 普通版本 */}
-              {history.length > 0 && (
+              {unpinned.length > 0 && (
                 <>
                   <div className="px-4 py-2 bg-muted/20 text-xs font-medium text-muted-foreground sticky top-0">
-                    {t.history} ({history.length})
+                    {t.history} ({unpinned.length})
                   </div>
-                  {history.filter(item => !item.pinned).map(version => (
+                  {unpinned.map(version => (
                     <div
                       key={version.id}
                       className="p-3 hover:bg-muted cursor-pointer transition-colors border-b border-border last:border-b-0"

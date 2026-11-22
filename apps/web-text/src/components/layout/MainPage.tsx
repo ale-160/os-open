@@ -31,6 +31,14 @@ import {
   importBackup,
   renameHistoryEntry,
 } from '@/utils/storage';
+import { pushHistoryEntry } from '@/utils/history';
+import {
+  appendMarkdownImage,
+  countText,
+  docNameFromFileName,
+  ensureMdExtension,
+  isMarkdownFileName,
+} from '@/utils/text';
 
 type ViewMode = 'edit' | 'split' | 'preview';
 
@@ -88,16 +96,6 @@ function ViewControls({
 interface MainPageProps {
   lang: 'en' | 'zh';
 }
-
-const HISTORY_LIMIT = 50;
-
-// 字数统计：中文按字、英文按词
-const countText = (text: string): { chars: number; words: number } => {
-  const chars = text.length;
-  const cjk = (text.match(/[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/g) || []).length;
-  const latin = (text.match(/[A-Za-z0-9]+(?:['’-][A-Za-z0-9]+)*/g) || []).length;
-  return { chars, words: cjk + latin };
-};
 
 const downloadBlob = (blob: Blob, fileName: string): void => {
   const url = URL.createObjectURL(blob);
@@ -273,12 +271,12 @@ export default function MainPage({ lang }: MainPageProps) {
       timestamp: updatedAt,
     };
     setHistory(prev => {
-      const filtered = prev.filter(item => item.content !== newContent);
-      const updated = [entry, ...filtered].slice(0, HISTORY_LIMIT);
+      // 固定版本不参与去重/淘汰（旧逻辑会在内容相同或超 50 条时把固定版本删掉）
+      const updated = pushHistoryEntry(prev, entry);
       void saveHistory(doc.id, updated);
       return updated;
     });
-  }, [t.saveToFileFailed]);
+  }, [t.saveFailed, t.saveToFileFailed]);
 
   const handleContentChange = useCallback(
     (newContent: string) => {
@@ -299,12 +297,7 @@ export default function MainPage({ lang }: MainPageProps) {
   // ===== Ale OS 系统资产：从系统图库 / 系统剪贴板插入图片到当前文档 =====
   const handleInsertFromGallery = useCallback(
     (dataUrl: string, name: string) => {
-      const safeName = name.replace(/[[\]]/g, '');
-      const markdownImage = `![${safeName}](${dataUrl})`;
-      const next = contentRef.current
-        ? `${contentRef.current}\n\n${markdownImage}\n`
-        : `${markdownImage}\n`;
-      handleContentChange(next);
+      handleContentChange(appendMarkdownImage(contentRef.current, dataUrl, name));
       setShowGalleryPicker(false);
       toast.success(t.imageInserted);
     },
@@ -383,7 +376,7 @@ export default function MainPage({ lang }: MainPageProps) {
         }
       }
     },
-    [docs, currentDocId, t, t.deleteDocFailed, handleNewDoc]
+    [docs, currentDocId, t, handleNewDoc]
   );
 
   const handleDeleteDoc = useCallback((doc: Doc) => {
@@ -461,7 +454,7 @@ export default function MainPage({ lang }: MainPageProps) {
   const doExport = useCallback(
     (fileName: string) => {
       const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
-      downloadBlob(blob, fileName.endsWith('.md') ? fileName : `${fileName}.md`);
+      downloadBlob(blob, ensureMdExtension(fileName));
       toast.success(t.exported);
     },
     [content, t.exported]
@@ -536,9 +529,7 @@ export default function MainPage({ lang }: MainPageProps) {
   // 导入 .md 文件 → 新建文档
   const handleImportFiles = useCallback(
     (files: FileList | File[]) => {
-      const mdFiles = Array.from(files).filter(f =>
-        /\.(md|markdown|txt)$/i.test(f.name)
-      );
+      const mdFiles = Array.from(files).filter(f => isMarkdownFileName(f.name));
       if (mdFiles.length === 0) {
         toast.error(t.importBackupFailed);
         return;
@@ -551,7 +542,7 @@ export default function MainPage({ lang }: MainPageProps) {
             const now = Date.now();
             const doc: Doc = {
               id: uid(),
-              name: file.name.replace(/\.(md|markdown|txt)$/i, ''),
+              name: docNameFromFileName(file.name),
               content: String(reader.result ?? ''),
               createdAt: now,
               updatedAt: now,
@@ -600,7 +591,7 @@ export default function MainPage({ lang }: MainPageProps) {
       const now = Date.now();
       const doc: Doc = {
         id: uid(),
-        name: file.name.replace(/\.(md|markdown|txt)$/i, ''),
+        name: docNameFromFileName(file.name),
         content: text,
         createdAt: now,
         updatedAt: now,

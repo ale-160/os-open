@@ -44,7 +44,7 @@ export function renderMarkdownHtml(content: string, title: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${title.replace(/</g, '&lt;')}</title>
+  <title>${title.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github.min.css" />
   <style>${EXPORT_CSS}</style>
 </head>

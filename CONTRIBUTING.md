@@ -34,16 +34,16 @@ packages/
 ├── tsconfig/        # @os/tsconfig：共享 tsconfig
 ├── eslint-config/   # @os/eslint-config：共享 ESLint flat config
 └── next-preset/     # @os/next-preset：Next.js 静态导出统一预设
-scripts/             # build-all（构建编排）与 compose（产物合成）
+scripts/             # build-all（构建编排）、compose（产物合成）、attach-domain（绑定自定义域）
 ```
 
 ## 新增一个应用（三步）
 
 1. **`apps/` 下新建应用目录**：任何能产出静态站点的框架都可以（Next.js、Vite、Astro…）。
    子路径部署约定：读取环境变量 `APP_BASE_PATH`（如 `/my-app`）作为部署前缀（Next.js 应用直接用 `@os/next-preset` 的 `withOsPreset()` 即可）。
-2. **`scripts/build-all.mjs` 加一行**：
+2. **`scripts/build-all.mjs` 的 `APPS` 加一项**：
    ```js
-   run('pnpm', ['--filter', 'my-app', 'build'], { APP_BASE_PATH: '/my-app' });
+   { name: 'my-app', env: { APP_BASE_PATH: '/my-app' } },
    ```
    同时在 `scripts/compose.mjs` 的 `parts` 数组加 `['apps/my-app/out', 'my-app']`。
 3. **注册表加一条 `OsApp`**（`apps/shell/src/config/apps.ts`），带 `category` 字段（tools/creative/social/games/system）——应用商城自动上架并归入分类。

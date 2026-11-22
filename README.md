@@ -51,8 +51,9 @@ os-open/
 │   ├── eslint-config/   # @os/eslint-config：共享 ESLint flat config
 │   └── next-preset/     # @os/next-preset：Next.js 静态导出统一预设
 ├── scripts/
-│   ├── build-all.mjs   # 依次构建全部应用（子应用带 basePath）并合成
-│   └── compose.mjs     # 把全部静态导出合成单一 out/
+│   ├── build-all.mjs     # 并发构建全部应用（子应用带 basePath，BUILD_CONCURRENCY 默认 2）并合成
+│   ├── compose.mjs       # 把全部静态导出合成单一 out/
+│   └── attach-domain.mjs # （仅首次）给 Cloudflare Pages 绑定自定义域
 └── pnpm-workspace.yaml  # workspace + catalog（跨应用依赖版本单一来源）
 ```
 
@@ -63,7 +64,7 @@ os-open/
 
 ## 添加新应用（三步）
 
-1. `apps/` 下新建应用目录（任意能产出静态站点的框架），接入 `scripts/build-all.mjs`（加一行，带上对应的 `APP_BASE_PATH`）；
+1. `apps/` 下新建应用目录（任意能产出静态站点的框架），接入 `scripts/build-all.mjs`（`APPS` 加一项，带上对应的 `APP_BASE_PATH`）并在 `scripts/compose.mjs` 的 `parts` 加上产物目录；
 2. `apps/shell/src/config/apps.ts` 注册表加一条 `OsApp`（id、名称、路径、图标、**category**）——商城自动上架并归入对应分类；
 3. 需要出现在默认桌面时，在 `apps/shell/public/config.json` 加一个 `url: "app://<id>"` 的图标。
 

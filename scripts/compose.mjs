@@ -1,9 +1,13 @@
 /**
- * 把各应用的静态导出合成为单一站点：
+ * 把各应用的静态导出合成为单一站点（由 build-all.mjs 在全部构建成功后调用）：
  *   apps/shell/out     → out/          （桌面壳，根路径）
- *   apps/web-img/out   → out/img/      （图片工具箱，/img/）
- *   apps/web-text/out  → out/text/     （Markdown 编辑器，/text/）
- * 并写入 GitHub Pages 所需的 .nojekyll 与 CNAME。
+ *   apps/web-img/out   → out/img/      （图片工具箱）
+ *   apps/web-text/out  → out/text/     （Markdown 编辑器）
+ *   apps/nchat/out     → out/chat/     （P2P 聊天室）
+ *   apps/typev/out     → out/typev/    （文字动画）
+ *   apps/pet/out       → out/pet/      （咕咕桌宠）
+ *   apps/burger/out    → out/burger/   （麦堡突击队）
+ * 任一产物缺失即报错退出。
  */
 import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';

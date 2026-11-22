@@ -61,7 +61,9 @@ export const getTextSize = (text: string): number => {
 // 格式化显示大小
 export const formatSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  const kb = (bytes / 1024).toFixed(1);
+  // 按四舍五入后的值判断进位，避免出现 “1024.0 KB”
+  if (Number(kb) < 1024) return `${kb} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
@@ -162,13 +164,17 @@ export async function saveHistory(docId: string, entries: HistoryEntry[]): Promi
 
 // ---------- 存储用量统计 ----------
 
+// history 允许包含 pinned 条目（MainPage 的 history 即全部版本）：
+// 这些条目只计入 pinnedSize，避免固定版本被重复计算。
 export const getStorageInfo = (
   content: string,
   history: HistoryEntry[],
   pinned: HistoryEntry[]
 ): StorageInfo => {
   const contentSize = getTextSize(content);
-  const historySize = history.reduce((acc, item) => acc + getTextSize(item.content), 0);
+  const historySize = history
+    .filter((item) => !item.pinned)
+    .reduce((acc, item) => acc + getTextSize(item.content), 0);
   const pinnedSize = pinned.reduce((acc, item) => acc + getTextSize(item.content), 0);
 
   return {
@@ -275,16 +281,26 @@ export async function migrateLegacyStorage(defaultName: string): Promise<string 
     legacyPinned = [];
   }
 
-  const merged: HistoryEntry[] = [...legacyPinned, ...legacyHistory]
-    .filter((item) => item && typeof item.id === 'string')
-    .map((item) => ({
-      id: item.id,
-      docId,
-      content: String(item.content ?? ''),
-      timestamp: Number(item.timestamp) || Date.now(),
-      pinned: Boolean(item.pinned),
-      name: typeof item.name === 'string' ? item.name : undefined,
-    }));
+  // 旧 pinned 键里的条目本身就是固定版本（不一定带 pinned 标记）；
+  // 同一 id 同时出现在两个列表时以固定版本为准，避免被普通版本覆盖丢掉固定状态。
+  const toArray = (value: unknown): HistoryEntry[] => (Array.isArray(value) ? value : []);
+  const byId = new Map<string, HistoryEntry>();
+  const collect = (items: HistoryEntry[], fromPinnedKey: boolean) => {
+    for (const item of items) {
+      if (!item || typeof item.id !== 'string' || byId.has(item.id)) continue;
+      byId.set(item.id, {
+        id: item.id,
+        docId,
+        content: String(item.content ?? ''),
+        timestamp: Number(item.timestamp) || Date.now(),
+        pinned: fromPinnedKey || Boolean(item.pinned),
+        name: typeof item.name === 'string' ? item.name : undefined,
+      });
+    }
+  };
+  collect(toArray(legacyPinned), true);
+  collect(toArray(legacyHistory), false);
+  const merged = [...byId.values()];
 
   if (merged.length > 0) {
     await saveHistory(docId, merged);
