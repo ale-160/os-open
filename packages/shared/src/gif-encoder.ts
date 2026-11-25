@@ -9,7 +9,8 @@
  *
  * 纯 TS、无 DOM 依赖（仅用到 Blob），浏览器 / Node 均可运行。
  * 起源于 web-img（图片工具箱），现作为 `@os/shared/gif-encoder` 供各应用复用；
- * web-img 的 CI 往返测试（apps/web-img/scripts/test-gif-encoder.mjs）覆盖本文件。
+ * 单测：同目录 gif-encoder.test.ts（含独立 LZW 解码器的像素往返）；
+ * web-img 的 CI 往返测试（apps/web-img/scripts/test-gif-encoder.mjs）同样覆盖本文件。
  */
 
 /**

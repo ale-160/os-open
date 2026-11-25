@@ -2,7 +2,7 @@
   "name": "@os/shared",
   "version": "0.1.0",
   "private": true,
-  "description": "Ale OS 运行时公共库：系统资产库、跨应用语言同步、样式工具",
+  "description": "Ale OS 运行时公共库：系统资产库、跨应用语言同步、样式工具、GIF 编码",
   "exports": {
     ".": "./src/index.ts",
     "./os-assets": "./src/os-assets.ts",
@@ -10,6 +10,10 @@
     "./os-language": "./src/os-language.ts",
     "./css": "./src/css.ts",
     "./gif-encoder": "./src/gif-encoder.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "clsx": "catalog:",
@@ -19,7 +23,15 @@
     "react": ">=19"
   },
   "devDependencies": {
+    "@os/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "@types/react": "catalog:",
-    "react": "catalog:"
+    "@types/react-dom": "catalog:",
+    "fake-indexeddb": "^6.2.6",
+    "jsdom": "^31.0.1",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "^3.2.4"
   }
 }
