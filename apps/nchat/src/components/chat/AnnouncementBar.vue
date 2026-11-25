@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { IconAnnounce, IconEdit, IconClose, IconCheck } from '../icons'
+import { IconAnnounce, IconEdit, IconClose } from '../icons'
 
 const props = defineProps({
   announcement: { type: Object, default: null },

@@ -10,7 +10,7 @@ import PeerInfo from './PeerInfo.vue'
 import RoomSearch from './RoomSearch.vue'
 import RoomList from './RoomList.vue'
 import MessageSearch from './MessageSearch.vue'
-import { IconPlus, IconSettings, IconX, IconMenu } from './icons'
+import { IconPlus, IconSettings, IconMenu } from './icons'
 import { t } from '@/i18n/index.js'
 
 const props = defineProps({

@@ -29,8 +29,6 @@ import {
   clearRoomData,
   getStorageStats,
   getLatestTimestamp,
-  getMessageLimit,
-  setMessageLimit,
   trimRoomMessages
 } from '../lib/db.js'
 import {
@@ -347,6 +345,17 @@ function describeError(e) {
   return e?.message || '未知错误'
 }
 
+// Phase 3.5: 浏览器通知开关状态（默认开启，持久化到 localStorage）
+const NOTIFICATIONS_KEY = 'nchat:notifications:enabled'
+const notificationsEnabled = ref(loadNotificationsEnabled())
+function loadNotificationsEnabled() {
+  try {
+    return localStorage.getItem(NOTIFICATIONS_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
 function pushNotification(type, text, tag) {
   const id = Date.now() + '-' + Math.random().toString(36).slice(2, 6)
   notifications.value.push({ id, type, text, timestamp: Date.now() })
@@ -370,7 +379,7 @@ function pushNotification(type, text, tag) {
 function setNotificationsEnabled(next) {
   notificationsEnabled.value = !!next
   try {
-    localStorage.setItem('nchat:notifications:enabled', String(!!next))
+    localStorage.setItem(NOTIFICATIONS_KEY, String(!!next))
   } catch (e) {
     /* ignore */
   }
@@ -444,7 +453,7 @@ function wireEvents(net) {
   })
 
   // 加入申请已提交
-  net.addEventListener('join:requested', (e) => {
+  net.addEventListener('join:requested', () => {
     pushNotification('info', `加入申请已提交，等待房间管理员审核…`)
   })
 
@@ -498,7 +507,7 @@ function wireEvents(net) {
     remoteStream.value = e.detail.stream
   })
 
-  net.addEventListener('media:close', (e) => {
+  net.addEventListener('media:close', () => {
     remoteStream.value = null
   })
 
@@ -1414,16 +1423,6 @@ async function downloadFile(fileId, fromPeerId) {
   return ok
 }
 
-/** data URL → blob URL（同步转换；blob URL 可被新标签页打开/原生下载，不受 Chrome data URL 导航限制） */
-function dataUrlToBlobUrl(dataUrl) {
-  const [meta, b64] = String(dataUrl).split(',')
-  const mime = (meta && meta.match(/data:(.*?)(;|$)/)?.[1]) || ''
-  const bin = atob(b64)
-  const bytes = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
-  return URL.createObjectURL(new Blob([bytes], { type: mime }))
-}
-
 /** 搜索房间：设置关键词过滤 + 查询网络节点和本地缓存 */
 async function searchRooms(keyword) {
   searchKeyword.value = keyword || ''
@@ -1893,6 +1892,9 @@ export function useChat() {
     getRoleStatsInfo,
     // 通知
     dismissNotification,
+    // Phase 3.5: 浏览器通知开关
+    notificationsEnabled,
+    setNotificationsEnabled,
     // 音视频通话（开发测试用）
     startMediaCall,
     answerMediaCall,

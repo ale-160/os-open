@@ -6,7 +6,7 @@
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
+npm run dev      # http://localhost:8528
 ```
 
 ## 提交 PR 前

@@ -2,7 +2,7 @@
  * 响应式布局状态机
  * 管理 SideNav / ListBar / MemberList 在不同断点的显隐与交互
  */
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 
 export function useLayout() {
   const width = ref(window.innerWidth)

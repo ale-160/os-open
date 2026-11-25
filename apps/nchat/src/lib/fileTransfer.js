@@ -4,7 +4,7 @@
  */
 import { sha256Hex, sign, verify as edVerify } from './crypto.js'
 import { buildMessage, MsgType, BinKind } from './protocol.js'
-import { addHolder, getHolders } from './db.js'
+import { addHolder } from './db.js'
 
 // 文件传输常量（从 peer.js 拷贝）
 const FILE_BIN_CONCURRENCY = 3
@@ -22,7 +22,7 @@ let _outgoingFiles = new Map() // fileId -> { room, arrayBuffer, name, type, siz
 let _fileChunks = new Map() // fileId -> { total, chunks: Map, meta, firstSeen }
 
 /** 生成缩略图（仅图片） */
-async function makeThumbnailFromBlob(file, maxDim = 160) {
+export async function makeThumbnailFromBlob(file, maxDim = 160) {
   return new Promise((resolve) => {
     if (!file.type?.startsWith('image/')) { resolve(null); return }
     const url = URL.createObjectURL(file)
@@ -211,7 +211,7 @@ export async function _pushFileChunksToPeer(net, connKey, fileId, entry) {
 
 /** 处理入站 FILE_CHUNK（bin 通道） */
 export async function _onFileChunkBin(net, connKey, data) {
-  const { fileId, index, total, chunkSize, totalHashHex, fileSig, from, fileName, fileType, fileSize, room, name } = data
+  const { fileId, index, total, totalHashHex, from, fileName, fileType, fileSize, room, name } = data
   if (!fileId || typeof index !== 'number' || typeof total !== 'number') return
 
   const entry = net.connections.get(connKey)
@@ -350,19 +350,41 @@ export async function _assembleFile(net, fileId, agg) {
   dbg('file:assembled', fileId, totalLen, 'bytes')
 }
 
-/** 处理 FILE_REQUEST（对端请求分片重发） */
+/**
+ * 处理 FILE_REQUEST（对端按需拉取分片，见 PeerNetwork.requestFile）。
+ * payload: { fileId, chunkSize, modulo?, position? } —— 按请求方的 chunkSize 切片
+ * （保证与其已部分接收的分片索引对齐）；带 modulo/position 时只回传
+ * index % modulo === position 的分片（多源并行）。兼容显式 indices 数组。
+ * 持有缓存在 net._outgoingFiles（发送端 sendFileMessage 与接收端 _assembleFile 共用）。
+ */
 export async function _onFileRequest(net, connKey, msg) {
-  const { fileId, indices } = msg.payload || {}
-  if (!fileId || !Array.isArray(indices)) return
-  const entry = _outgoingFiles?.get(fileId)
-  if (!entry) return
-  const { arrayBuffer, chunkSize, totalChunks, totalHashHex, fileSig, name, type, size, room } = entry
-  for (const i of indices) {
-    if (i < 0 || i >= totalChunks) continue
+  const { fileId, indices, modulo, position } = msg.payload || {}
+  if (!fileId) return
+  const entry = net._outgoingFiles?.get(fileId)
+  if (!entry) return // 本节点不持有该文件：静默（广播请求下由持有者响应）
+  const { arrayBuffer, totalHashHex, fileSig, name, type, size, room } = entry
+  const reqSize = Number(msg.payload.chunkSize)
+  const chunkSize = Number.isInteger(reqSize) && reqSize >= 1024 && reqSize <= 262144
+    ? reqSize
+    : entry.chunkSize || PULL_CHUNK_SIZE
+  const totalChunks = Math.ceil(arrayBuffer.byteLength / chunkSize)
+  let wanted
+  if (Array.isArray(indices)) {
+    wanted = indices
+  } else {
+    wanted = []
+    const mod = Number.isInteger(modulo) && modulo > 0 ? modulo : 1
+    const pos = Number.isInteger(position) ? position : 0
+    for (let i = 0; i < totalChunks; i++) if (i % mod === pos) wanted.push(i)
+  }
+  // 优先直连请求者；经转发到达时回退到来向连接
+  const targetConnKey = net._connKeyForPeerId?.(msg.from) || connKey
+  for (const i of wanted) {
+    if (!Number.isInteger(i) || i < 0 || i >= totalChunks) continue
     const offset = i * chunkSize
     const len = Math.min(chunkSize, arrayBuffer.byteLength - offset)
     const buf = arrayBuffer.slice(offset, offset + len)
-    await net._sendBinary(connKey, {
+    await net._sendBinary(targetConnKey, {
       kind: BinKind.FILE_CHUNK,
       fileId,
       index: i,
@@ -370,7 +392,8 @@ export async function _onFileRequest(net, connKey, msg) {
       chunkSize,
       totalHashHex,
       fileSig,
-      from: net.identity.peerId,
+      // 原始发送者：接收端以它校验 fileSig（holder 转供时不能填自己）
+      from: entry.originalFrom || net.identity.peerId,
       fileName: name,
       fileType: type,
       fileSize: size,

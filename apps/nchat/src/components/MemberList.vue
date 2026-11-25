@@ -9,15 +9,10 @@ import { useLayout } from '@/composables/useLayout.js'
 import {
   IconCheck,
   IconClose,
-  IconUp,
-  IconDown,
-  IconEdit,
   IconStar,
-  IconUserPlus,
   IconMicOff,
   IconUserX,
   IconUserMinus,
-  IconSearch,
   IconX
 } from './icons'
 
@@ -88,29 +83,6 @@ const filteredMembers = computed(() => {
   )
 })
 
-function moveUp(peerId) {
-  const arr = orderedMembers.value.map((m) => m.peerId)
-  const idx = arr.indexOf(peerId)
-  if (idx <= 0) return
-  ;[arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]]
-  orderOverride.value = new Map(arr.map((id, i) => [id, i]))
-  rebuild()
-}
-
-function moveDown(peerId) {
-  const arr = orderedMembers.value.map((m) => m.peerId)
-  const idx = arr.indexOf(peerId)
-  if (idx < 0 || idx >= arr.length - 1) return
-  ;[arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]]
-  orderOverride.value = new Map(arr.map((id, i) => [id, i]))
-  rebuild()
-}
-
-function startEditStars(member) {
-  starsEditing.value = member.peerId
-  starsInput.value = member.stars || 1
-}
-
 function commitStars() {
   if (starsEditing.value) {
     const stars = Math.max(1, Math.min(99, Number(starsInput.value) || 1))
@@ -160,15 +132,10 @@ function kickMember(member) {
   }
 }
 
-function openBanEditor(mode) {
-  banMode.value = mode
-  banEditing.value = true
-}
-
 function commitBan() {
   const v = Math.max(0, Math.min(99, Number(banInput.value) || 0))
   if (banMode.value === 'room') {
-    emit('set-room-ban', v)
+    emit('ban', v) // 房间级阈值：App 以 @ban 绑定 onSetRoomBan
   } else {
     emit('set-ban', v)
   }

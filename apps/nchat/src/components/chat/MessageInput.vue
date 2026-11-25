@@ -3,8 +3,6 @@ import { ref, computed } from 'vue'
 import {
   IconSend,
   IconPlus,
-  IconFile,
-  IconImage,
   IconReact,
   IconClose
 } from '../icons'
@@ -44,14 +42,6 @@ function handleKeydown(e) {
     e.preventDefault()
     handleSend()
   }
-}
-
-function onFileChange(e) {
-  const file = e.target.files?.[0]
-  if (file) {
-    emit('file', file)
-  }
-  e.target.value = ''
 }
 </script>
 

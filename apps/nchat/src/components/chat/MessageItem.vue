@@ -9,10 +9,7 @@ import {
   IconImage,
   IconVoice,
   IconFile,
-  IconVideo,
   IconCheck,
-  IconClose,
-  IconCopy,
   IconThread,
   IconStar,
 } from '../icons'
@@ -156,15 +153,20 @@ function dataUrlToBlobUrl(dataUrl) {
   return URL.createObjectURL(new Blob([bytes], { type: mime }))
 }
 
-function openPreview(file) {
+async function openPreview(file) {
   if (isText(file.type)) {
-    let text = ''
-    if (file.blobUrl) {
-      fetch(file.blobUrl).then(res => res.text()).then(t => text = t).catch(() => {})
-    } else if (file.dataUrl) {
-      text = file.dataUrl.split(',')[1] ? atob(file.dataUrl.split(',')[1]) : ''
-    }
+    // 先同步打开窗口（保留用户手势，避免被拦截），再等文本读完写入
     const w = window.open()
+    let text = ''
+    try {
+      if (file.blobUrl) {
+        text = await (await fetch(file.blobUrl)).text()
+      } else if (file.dataUrl) {
+        text = file.dataUrl.split(',')[1] ? atob(file.dataUrl.split(',')[1]) : ''
+      }
+    } catch {
+      /* 读取失败：显示空白 */
+    }
     if (w) {
       w.document.write('<pre style="white-space:pre-wrap;word-break:break-word;font-family:monospace;padding:16px;">' + escapeHtml(text) + '</pre>')
     }
@@ -186,16 +188,17 @@ function downloadFile(file) {
     document.body.removeChild(a)
     if (!file.blobUrl) setTimeout(() => URL.revokeObjectURL(url), 30000)
   } catch (e) {
+    console.warn('[nchat] download failed:', e?.message)
   }
 }
 
 function escapeHtml(s) {
   return String(s)
-    .replace(/&/g, '&')
-    .replace(/</g, '<')
-    .replace(/>/g, '>')
-    .replace(/"/g, '"')
-    .replace(/'/g, "'")
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }
 </script>
 

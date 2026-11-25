@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useChat } from '../composables/useChat.js'
 import { shortPeerId } from '../lib/crypto.js'
-import { IconClose, IconVideo, IconVoice } from './icons'
+import { IconClose, IconVideo } from './icons'
 
 const props = defineProps({
   members: { type: Array, default: () => [] }

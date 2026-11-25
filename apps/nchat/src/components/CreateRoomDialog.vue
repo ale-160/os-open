@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { AccessRule, SpeakRule } from '../lib/protocol.js'
 import { CONFIG } from '../config.js'
-import { IconClose, IconLock, IconUser, IconChat, IconDown, IconUp } from './icons'
+import { IconClose, IconUser, IconChat, IconDown, IconUp } from './icons'
 
 const emit = defineEmits(['create', 'close'])
 

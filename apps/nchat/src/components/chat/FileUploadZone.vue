@@ -1,10 +1,6 @@
 <script setup>
 import { ref } from 'vue'
 import {
-  IconFile,
-  IconImage,
-  IconVideo,
-  IconVoice,
   IconX,
   IconPlus
 } from '../icons'

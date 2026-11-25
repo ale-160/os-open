@@ -16,7 +16,6 @@ const props = defineProps({
 const emit = defineEmits(['close', 'toggle-mute', 'set-min-stars', 'unblock', 'export'])
 
 const isMuted = computed(() => props.mutedRooms.includes(props.room))
-const starsInput = ref(props.minBlockStars)
 const starsDraft = ref(String(props.minBlockStars))
 
 function saveMinStars() {

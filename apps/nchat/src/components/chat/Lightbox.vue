@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { IconClose, IconDownload, IconImage, IconCheck } from '../icons'
 
 const props = defineProps({
@@ -23,10 +23,6 @@ const galleryTitle = computed(() => {
   if (inGallery.value) return '已存入系统图库'
   return props.file?.dataUrl || props.file?.blobUrl ? '存入系统图库' : '加载原图后存入系统图库'
 })
-
-function isImage(type) {
-  return ['image/png', 'image/jpeg', 'image/gif', 'image/webp', 'image/svg+xml', 'image/bmp'].includes(type)
-}
 
 function formatSize(bytes) {
   if (!bytes) return ''

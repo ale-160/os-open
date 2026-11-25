@@ -9,23 +9,9 @@ import ChatHeader from './chat/ChatHeader.vue'
 import PinBar from './chat/PinBar.vue'
 import AnnouncementBar from './chat/AnnouncementBar.vue'
 import Lightbox from './chat/Lightbox.vue'
-import FileUploadZone from './chat/FileUploadZone.vue'
 import {
-  IconBack,
-  IconLeave,
   IconChat,
-  IconFile,
-  IconImage,
-  IconVoice,
-  IconDoc,
-  IconDownload,
-  IconSend,
-  IconClose,
-  IconAnnounce,
-  IconEdit,
-  IconPin,
-  IconTrash,
-  IconReact
+  IconTrash
 } from './icons'
 import { galleryKey, saveChatImageToGallery } from '../utils/gallery.js'
 import { t } from '../i18n/index.js'
@@ -69,32 +55,6 @@ const emit = defineEmits([
 // Phase 2.4: 群内视图 tab（聊天 / 云文档）
 const activeTab = ref('chat')
 const inRoom = computed(() => !!props.currentRoom)
-
-// Phase 2.2: 公告编辑器
-const editingAnnouncement = ref(false)
-const announcementDraft = ref('')
-
-function startEditAnnouncement() {
-  announcementDraft.value = props.announcement?.text || ''
-  editingAnnouncement.value = true
-}
-
-function saveAnnouncement() {
-  emit('set-announcement', announcementDraft.value.trim())
-  editingAnnouncement.value = false
-  announcementDraft.value = ''
-}
-
-function cancelEditAnnouncement() {
-  editingAnnouncement.value = false
-  announcementDraft.value = ''
-}
-
-function clearAnnouncement() {
-  emit('set-announcement', '')
-  editingAnnouncement.value = false
-  announcementDraft.value = ''
-}
 
 // ===== Phase 2.3: Pin 置顶 =====
 const pinListExpanded = ref(false)
@@ -231,21 +191,6 @@ const lightboxFile = computed(() => {
   return m?.file || null
 })
 
-function openLightbox(file) {
-  if (!file) return
-  const fileId = file.fileId || file.id || null
-  lightboxFileId.value = fileId
-  downloadFailed.value = false
-  if (fileId) {
-    const next = new Set(downloadingIds.value)
-    next.delete(fileId)
-    downloadingIds.value = next
-  }
-  if (file.isMeta && fileId) {
-    requestDownload(file)
-  }
-}
-
 function closeLightbox() {
   lightboxFileId.value = null
 }
@@ -325,10 +270,6 @@ watch(
   },
   { deep: true }
 )
-
-function onLocated(msgId) {
-  emit('located', msgId)
-}
 </script>
 
 <template>

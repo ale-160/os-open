@@ -4,7 +4,6 @@ import {
   getAllSignalingServers,
   getDiagnostics
 } from '../config.js'
-import { formatBytes } from '../lib/db.js'
 import { exportIdentityBackup, importIdentityBackup, shortPeerId } from '../lib/crypto.js'
 import { getMessageLimit, setMessageLimit, trimRoomMessages, getAllRooms } from '../lib/db.js'
 import { IconClose } from './icons'
@@ -18,10 +17,7 @@ const {
   roleStats,
   domains,
   NodeRole,
-  getCapabilities,
   setCapabilities,
-  getRoleStatsInfo,
-  getDomainsInfo,
   // Phase 3.5: 通知
   setNotificationsEnabled,
   notificationsEnabled
@@ -46,7 +42,6 @@ async function onMsgLimitChange() {
   }
 }
 const servers = ref([])
-const currentServer = ref(null)
 
 // 新增信令服务器表单
 const newHost = ref('')
@@ -161,7 +156,7 @@ function onAdd() {
     secure: newSecure.value,
     label: newLabel.value.trim() || `${host}:${newPort.value}`
   }
-  const ok = emit('add-server', cfg)
+  emit('add-server', cfg)
   // 父组件处理，这里仅清空表单
   newHost.value = ''
   newPort.value = '9000'
