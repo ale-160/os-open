@@ -13,4 +13,4 @@
   - 导出设置弹窗的格式选项与限制说明跟随界面语言中英切换
 - **保存到图库**：导出的 GIF / WebM 一键「保存到图库」，以 dataURL 写入 Ale OS 系统资产库（`@os/shared/os-assets`），系统图库与其他应用即时可见；系统图库对视频资产以 `<video>` 呈现（此前显示为坏图）
 - **操作提示**：接入 sonner toast，导出完成 / 取消 / 保存结果均有反馈
-- **单元测试**：接入 vitest（`pnpm --filter typev test`），22 个用例覆盖 GIF 帧采样、尺寸封顶、时长计算与编码往返（`src/lib/gifPlan.test.ts`、`src/lib/gifEncoder.test.ts`）；typecheck 与单测已接入 CI
+- **单元测试**：接入 vitest（`pnpm --filter typev test`），覆盖 GIF 帧采样、尺寸封顶与时长计算（`src/lib/gifPlan.test.ts`）；GIF 编码往返测试随编码器迁至 `@os/shared`；typecheck 与单测已接入 CI
