@@ -17,7 +17,7 @@ const LEGACY_KEY = 'nchat:signaling'
 
 function defaultSignaling() {
   if (typeof window === 'undefined') {
-    return { host: 'localhost', port: 9000, path: '/', secure: false, key: 'peerjs' }
+    return { host: 'localhost', port: 9000, path: '/peerjs', secure: false, key: 'peerjs' }
   }
   const loc = window.location
   // 信令服务器跟随页面 host:port
@@ -29,7 +29,7 @@ function defaultSignaling() {
   return {
     host,
     port,
-    path: '/',
+    path: '/peerjs',
     secure,
     key: 'peerjs',
     label: `自动（${host}:${port}）`
