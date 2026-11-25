@@ -14,10 +14,11 @@
   "author": "web-img Team",
   "license": "MIT",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 8528",
     "build": "next build --webpack",
-    "start": "next start",
+    "start": "next start -p 8528",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "preview": "npx serve out"
   },
   "dependencies": {

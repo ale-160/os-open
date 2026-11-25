@@ -45,7 +45,7 @@ npm install
 npm run dev
 ```
 
-打开 [http://localhost:3000](http://localhost:3000) 查看效果。
+打开 [http://localhost:8528](http://localhost:8528) 查看效果。
 
 ## 开源协议
 

@@ -4,7 +4,6 @@
  * - 桌面端：64px 图标栏
  * - 移动端：280px 抽屉（含品牌、导航标签、用户头像、版本信息）
  */
-import { computed } from 'vue'
 import { useLayout } from '@/composables/useLayout.js'
 import {
   IconChat,
@@ -14,7 +13,7 @@ import {
 } from './icons'
 import { t } from '@/i18n/index.js'
 
-const props = defineProps({
+defineProps({
   activeNav: { type: String, default: 'chat' },
   online: { type: Boolean, default: false },
   ownName: { type: String, default: '' }

@@ -92,7 +92,20 @@ async function withStore<T>(
 ): Promise<T> {
   const db = await openDb();
   try {
-    return await run(db.transaction(storeName, mode).objectStore(storeName));
+    const tx = db.transaction(storeName, mode);
+    // 必须在发起请求前挂上监听：事务可能在 run 返回前就已提交。
+    // 请求失败（未 preventDefault）会使事务中止，因此只需监听 complete / abort
+    const done = new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => reject(tx.error ?? new DOMException('Transaction aborted', 'AbortError'));
+    });
+    // run 抛错时 done 也会随事务中止而 reject，避免未处理的 rejection
+    done.catch(() => {});
+    const result = await run(tx.objectStore(storeName));
+    // 等事务真正提交：写入在提交阶段失败（配额不足、事务中止等）时向调用方抛错，
+    // 而不是在请求排队后就报告「已保存」
+    await done;
+    return result;
   } finally {
     db.close();
   }
@@ -166,8 +179,10 @@ export async function deleteWallpaper(id: string): Promise<void> {
  * 其他形式（渐变/远程 URL/data:）原样返回，null 表示不是壁纸 URL。
  */
 export async function resolveWallpaperUrl(url: string): Promise<string | null> {
+  if (!isWallpaperAssetRef(url)) return url || null;
+  // 空引用（`asset://`）不是可用的壁纸 URL，不能原样返回
   const id = wallpaperIdFromRef(url);
-  if (!id) return url || null;
+  if (!id) return null;
   const asset = await getWallpaper(id);
   return asset?.dataUrl ?? null;
 }

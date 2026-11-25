@@ -115,16 +115,17 @@ export default withOsPreset();
 pnpm install
 
 pnpm dev          # 壳的开发服务器（localhost:8525）
-pnpm --filter web-img dev    # 单独开发某个应用
-pnpm --filter web-text dev
+pnpm --filter web-img dev    # 单独开发某个应用（localhost:8528）
+pnpm --filter web-text dev   # localhost:8529
 
 pnpm test         # 所有应用的单测
+pnpm typecheck    # 全部包的类型检查（pnpm -r --if-present typecheck）
 pnpm build        # 全量构建 + compose → out/
 pnpm e2e          # 壳的 Playwright e2e（serve out/）
 ```
 
 > 依赖用 pnpm workspace 管理（单一 lockfile + `catalog:` 统一版本）；子应用互相隔离（strict hoisting），直接 import 未声明的依赖会构建失败。
-> 共享包在 `packages/`（`@os/shared` 运行时能力、`@os/tsconfig` / `@os/eslint-config` / `@os/next-preset` 构建配置）。
+> 共享包在 `packages/`（`@os/shared` 运行时能力，自带 vitest 单测 `pnpm --filter @os/shared test`；`@os/tsconfig` / `@os/eslint-config` / `@os/next-preset` 构建配置）。
 
 ## 部署（Cloudflare Pages）
 

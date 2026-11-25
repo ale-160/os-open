@@ -90,6 +90,7 @@
 
 ### 修复
 
+- **GIF 编码大帧爆栈**：此前把整帧 LZW 码流以 `out.push(...bytes)` 展开拼接，大尺寸帧（如 1024×768 噪点图）超出函数参数上限抛 `RangeError: Maximum call stack size exceeded`，现改为按片收集、最后交给 Blob 拼接；`scripts/test-gif-encoder.mjs` 新增大帧与流式编码一致性 2 个用例
 - **内存泄漏**：`useImageEditor` 中测量图片尺寸的临时 ObjectURL 从不释放、预览 URL 未纳入跟踪、历史 dataURL 堆积在 Map 中，现统一跟踪并在替换/卸载时释放
 - **内存泄漏**：水印面板更换水印图、合并面板移除/更换追加图片时未释放旧 ObjectURL
 - **挂起问题**：主界面旋转/镜像在图片加载失败时会永久等待（无 `onerror` 处理），现增加错误提示
@@ -98,6 +99,8 @@
 
 ### 变更
 
+- **GIF 编码器迁入 `@os/shared`**：GIF89a 编码器沉淀为系统公共库 `@os/shared/gif-encoder`（与 TypeV 共用，另新增流式 `GifAnimationEncoder`），`src/utils/gifEncoder.ts` 改为从共享包转出，`encodeGIF` / `encodeAnimatedGIF` API 不变，调用方无需改动
+- **dev 端口固定为 8528**：`pnpm --filter web-img dev` 固定监听 `localhost:8528`（壳 8525、typev 8526、pet 8527、web-text 8529），多应用同时开发不再抢端口
 - **UI 优化**：
   - 转换页：移动端自适应布局（设置面板与文件列表上下堆叠）、格式选择改为双列网格、质量滑块统一为带输入框组件、空状态展示输入格式徽章、设置更改后提示"重新转换以更新结果"
   - 主界面：预览面板新增体积变化徽章（较原图 -x% 绿色 / +x% 琥珀色）；原图/预览双栏在窄屏下自动堆叠

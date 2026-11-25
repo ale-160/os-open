@@ -2,6 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 变更
+
+- **dev 端口固定为 8529**：`pnpm --filter web-text dev` 固定监听 `localhost:8529`（壳 8525、typev 8526、pet 8527、web-img 8528），多应用同时开发不再抢端口
+- **新增 `typecheck` 脚本**：`pnpm --filter web-text typecheck`（`tsc --noEmit`），已接入根 `pnpm typecheck` 与 CI
+
 ## [0.1.1] - 2026-08-03
 
 ### 新增

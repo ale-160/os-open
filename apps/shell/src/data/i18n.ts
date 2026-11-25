@@ -353,7 +353,32 @@ export const STRINGS_ZH = {
   
   // 语言设置提示
   languageSwitchTip: '切换语言后，界面将立即更新。刷新页面后语言设置将保持。',
-  
+
+  // 系统图库（/gallery/）
+  gallery: {
+    title: '系统图库',
+    subtitle: 'Ale OS 共享资产库——各应用保存的图片与视频都在这里（仅存于你的浏览器本机）',
+    clipboardSection: '系统剪贴板',
+    clipboardImageName: '剪贴板图片',
+    downloadClipboardImage: '下载剪贴板图片',
+    libraryCount: '图库（{count}）',
+    emptyTitle: '图库还是空的',
+    emptyHint: '在这些应用里存入图库的内容会出现在这里：',
+    emptySourceImageToolbox: '图片工具箱：处理图片后点「保存到图库」',
+    emptySourceTypeV: '文字动画：导出 GIF / 视频后点「保存到图库」',
+    emptySourceChat: 'P2P 聊天室：打开聊天图片后点「存入图库」',
+    copyToClipboard: '复制到系统剪贴板',
+    download: '下载',
+    delete: '删除',
+    deleteAsset: '删除 {name}',
+    deleted: '已从图库删除',
+    downloadStarted: '已开始下载',
+    copied: '已复制到系统剪贴板',
+    copyFailed: '复制失败',
+    dateLocale: 'zh-CN',
+    htmlLang: 'zh-CN',
+  },
+
   // 内置图标名称映射
   iconNames: {
     home: '首页',
@@ -742,7 +767,32 @@ export const STRINGS_EN = {
   
   // Language Setting Tips
   languageSwitchTip: 'Interface will update immediately after switching language. Language settings will be preserved after page refresh.',
-  
+
+  // System Gallery (/gallery/)
+  gallery: {
+    title: 'Gallery',
+    subtitle: 'Ale OS shared asset library — images and videos saved by apps live here (stored only in this browser)',
+    clipboardSection: 'System Clipboard',
+    clipboardImageName: 'Clipboard image',
+    downloadClipboardImage: 'Download clipboard image',
+    libraryCount: 'Library ({count})',
+    emptyTitle: 'Your gallery is empty',
+    emptyHint: 'Items saved to the gallery from these apps will show up here:',
+    emptySourceImageToolbox: 'Image Toolbox: process an image, then click “Save to gallery”',
+    emptySourceTypeV: 'TypeV: export a GIF or video, then click “Save to Gallery”',
+    emptySourceChat: 'P2P Chat: open a chat image, then click “Save to Gallery”',
+    copyToClipboard: 'Copy to system clipboard',
+    download: 'Download',
+    delete: 'Delete',
+    deleteAsset: 'Delete {name}',
+    deleted: 'Deleted from gallery',
+    downloadStarted: 'Download started',
+    copied: 'Copied to system clipboard',
+    copyFailed: 'Copy failed',
+    dateLocale: 'en-US',
+    htmlLang: 'en',
+  },
+
   // Built-in Icon Names
   iconNames: {
     home: 'Home',

@@ -7,7 +7,7 @@ packages:
 # vitest / vite 各 app 版本策略不同，暂不纳入。
 catalog:
   # 框架
-  next: 16.4.2
+  next: 16.4.6
   react: 19.3.1
   react-dom: 19.3.1
   # 样式（Tailwind 4 + shadcn 配套）
@@ -25,7 +25,12 @@ catalog:
   # 工具链
   typescript: ^5
   eslint: ^9
-  eslint-config-next: 16.4.2
+  eslint-config-next: 16.4.6
+  # 非 Next 应用（nchat：Vue + Vite）的 ESLint flat config
+  "@eslint/js": ^9
+  eslint-plugin-vue: ^10.12.0
+  vue-eslint-parser: ^10.4.0
+  globals: ^16.4.0
   "@types/node": ^26.6.5
   "@types/react": ^19
   "@types/react-dom": ^19

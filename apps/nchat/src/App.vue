@@ -14,7 +14,7 @@ import RoomManager from './components/RoomManager.vue'
 import InviteDialog from './components/InviteDialog.vue'
 import RoomSettingsDialog from './components/RoomSettingsDialog.vue'
 import PromptInstall from './components/PromptInstall.vue'
-import { IconClose, IconLock, IconInfo, IconCheck, IconAlert } from './components/icons'
+import { IconClose, IconInfo, IconCheck, IconAlert } from './components/icons'
 import TopologyView from './components/TopologyView.vue'
 import { t } from './i18n/index.js'
 
@@ -23,14 +23,11 @@ const {
   peers,
   rooms,
   currentRoom,
-  messages,
   members,
   stats,
   searchKeyword,
-  pendingRequests,
   storageStats,
   notifications,
-  downloadingIds,
   fileProgress,
   announcements,
   // Phase 2.3: Pin 置顶
@@ -39,6 +36,7 @@ const {
   toggleStar,
   currentRoomStarred,
   // 屏蔽体系（P1-4）
+  blockedPeers,
   visibleMessages,
   toggleBlockPeer,
   minBlockStars,
@@ -51,7 +49,6 @@ const {
   // 房间收藏（手动收藏）
   favoriteRooms,
   toggleFavorite,
-  isFavorite,
   // Phase 2.4: 云文档
   currentRoomDocs,
   createDoc,
@@ -72,7 +69,6 @@ const {
   joinRoom,
   leaveCurrentRoom,
   leaveRoomByName,
-  clearRoomData,
   backToRoomList,
   sendRoomMessage,
   retryMessage,
@@ -87,13 +83,9 @@ const {
   clearSearch,
   filteredRooms,
   joinedRooms,
-  isCurrentUserOwner,
-  canUserApprove,
   canSetAnnouncement,
   setAnnouncement,
-  // 审核/邀请/星标
-  approveJoin,
-  rejectJoin,
+  // 邀请/星标
   inviteMember,
   setMemberStars,
   setRoomRules,
@@ -103,17 +95,13 @@ const {
   kickMember,
   // 房间与存储管理
   clearRoomStorage,
-  deleteRoomCompletely,
-  switchToRoom,
   refreshStorageStats,
   // 信令服务器管理
-  getSignalingServers,
   getCurrentSignaling,
   addCustomSignalingServer,
   removeCustomSignalingServer,
   switchSignalingServer,
   resetSignalingServers,
-  getDiagnosticsInfo,
   // 通知
   dismissNotification,
   // Phase 4.2: 拓扑
@@ -121,15 +109,11 @@ const {
 } = useChat()
 
 const {
-  width,
   sideNavOpen,
   listBarOpen,
   memberOpen,
   isDesktop,
-  isTablet,
-  isMobile,
   toggleSideNav,
-  toggleListBar,
   toggleMember,
   closeAll
 } = useLayout()
@@ -153,25 +137,6 @@ const activeNav = ref('chat')
 
 // Phase 2.5: 从搜索结果跳转定位的消息 ID（传递给 ChatPanel）
 const pendingLocateMsgId = ref('')
-
-// 屏蔽规则计算
-const currentRoomBanBelow = computed(() => {
-  if (!currentRoom.value) return 0
-  const r = rooms.value.find((x) => x.name === currentRoom.value)
-  return r?.rules?.banBelowStars || 0
-})
-
-const myBanBelow = computed(() => {
-  if (!currentRoom.value) return 0
-  try {
-    const raw = localStorage.getItem('nchat:bans')
-    if (!raw) return 0
-    const all = JSON.parse(raw)
-    return all[currentRoom.value]?.['__me__'] || 0
-  } catch {
-    return 0
-  }
-})
 
 // 密码房间加入提示
 const passwordPrompt = ref(null) // { name }
@@ -237,15 +202,7 @@ function onCreateRoom(name, options) {
   refreshStorageStats()
 }
 
-// 审核/邀请/星标事件
-function onApprove(peerId) {
-  if (currentRoom.value) approveJoin(currentRoom.value, peerId)
-}
-
-function onReject(peerId) {
-  if (currentRoom.value) rejectJoin(currentRoom.value, peerId, '申请被拒绝')
-}
-
+// 邀请/星标事件
 function onInvite(peerId) {
   if (currentRoom.value) inviteMember(currentRoom.value, peerId)
 }
@@ -274,22 +231,11 @@ function onKickMember(peerId) {
 }
 
 // 房间管理事件
-async function onSwitchRoom(room) {
-  await switchToRoom(room)
-  showRoomManager.value = false
-}
-
 async function onClearStorage(room) {
   if (!confirm(`确定删除并退出「${room}」？将清空该房间的所有本地数据（消息/记录），房间可再次加入。`)) return
   // 与退出房间一致：清数据 + 广播离开 + 移除已加入标记
   await clearRoomStorage(room)
   await leaveRoomByName(room)
-}
-
-async function onDeleteRoom(room) {
-  if (!confirm(`确定离开并删除「${room}」？将退出房间并清空所有本地数据。`)) return
-  await deleteRoomCompletely(room)
-  showRoomManager.value = false
 }
 
 // 信令服务器事件
@@ -379,11 +325,6 @@ async function onExitRoom() {
   if (!room) return
   if (!confirm(`确定退出「${room}」吗？\n退出将清除该房间的所有聊天记录与保存信息，且不可恢复。`)) return
   await clearRoomStorage(room)
-  await leaveCurrentRoom()
-}
-
-// 离开房间（仅退出视图，保留数据——移动端返回列表用）
-async function onLeaveRoom() {
   await leaveCurrentRoom()
 }
 
@@ -482,7 +423,6 @@ function onLocated(msgId) {
 
 // 响应式布局辅助
 const inRoom = computed(() => !!currentRoom.value)
-const memberCount = computed(() => members.value.length)
 
 function onOpenTopology() {
   showTopology.value = true

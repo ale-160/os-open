@@ -33,7 +33,7 @@ pnpm --filter typev dev        # localhost:8526
 pnpm --filter typev build      # 静态导出（构建链自动带 APP_BASE_PATH=/typev）
 pnpm --filter typev lint
 pnpm --filter typev typecheck
-pnpm --filter typev test       # vitest 单测（GIF 帧采样/尺寸封顶/编码往返）
+pnpm --filter typev test       # vitest 单测（GIF 帧采样/尺寸封顶；编码往返测试随编码器在 @os/shared）
 ```
 
 技术栈：Next.js（静态导出）+ React + zustand + Tailwind CSS。许可随 [os-open](https://github.com/ale-160/os-open) 仓库（Apache-2.0）。

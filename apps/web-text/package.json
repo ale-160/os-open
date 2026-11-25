@@ -11,10 +11,11 @@
   "author": "web-text Team",
   "license": "Apache-2.0",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 8529",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 8529",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "preview": "npx serve out"
   },

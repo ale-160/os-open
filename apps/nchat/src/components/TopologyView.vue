@@ -23,7 +23,7 @@
 </template>
 
 <script setup>
-const props = defineProps({
+defineProps({
   domains: { type: Array, default: () => [] }
 })
 

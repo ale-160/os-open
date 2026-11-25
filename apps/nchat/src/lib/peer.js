@@ -39,7 +39,6 @@ import {
   deleteRoomStars,
   getRoomBans,
   setBan,
-  deleteRoomBans,
   lcanPut,
   lcanGet,
   lcanDelete,
@@ -66,15 +65,9 @@ import {
   responsible as lcanResponsible,
   DEFAULT_K as LCAN_DEFAULT_K
 } from './lcan.js'
-import { sha256 } from '@noble/hashes/sha2.js'
-import { sign as edSign, verify as edVerify, hashPassword } from './crypto.js'
-import {
-  sendFileMessage,
-  _pushFileChunks,
-  _pushFileChunksToPeer,
-  _onFileChunkBin,
-  _assembleFile
-} from './fileTransfer.js'
+import { sign as edSign, hashPassword, sha256Hex, aesGcmDecrypt } from './crypto.js'
+// 推送侧分片（_pushFileChunks/_pushFileChunksToPeer）与入站聚合（_onFileChunkBin）由 PeerNetwork 方法实现
+import { makeThumbnailFromBlob, _onFileRequest, _assembleFile } from './fileTransfer.js'
 
 const DEBUG = false
 function dbg(...args) {
@@ -85,7 +78,7 @@ function dbg(...args) {
 /** 探测上限：256KB（Chromium usrsctp 上限，512KB 任何浏览器都会断通道） */
 const PROBE_MAX_BYTES = 262144
 /** 探测降级链：256KB → 128KB → 64KB → 32KB */
-const PROBE_TIERS = [262144, 131072, 65536, 32768]
+const PROBE_TIERS = [PROBE_MAX_BYTES, 131072, 65536, 32768]
 /** 单档探测超时（ms） */
 const PROBE_TIMEOUT = 1500
 /** 探测结果缓存有效期：24h（同设备不重复探测） */
@@ -655,7 +648,7 @@ export class PeerNetwork extends EventTarget {
     this.connections.clear()
     this._connKeyByPeerJsId.clear()
     // 销毁所有域的 Peer 实例
-    for (const [key, d] of this.peers) {
+    for (const [, d] of this.peers) {
       if (d.reconnectTimer) {
         clearTimeout(d.reconnectTimer)
         d.reconnectTimer = null
@@ -821,9 +814,9 @@ export class PeerNetwork extends EventTarget {
    * 绑定 bin 连接事件到指定 connKey 的 entry。
    * @param {string} connKey
    * @param {DataConnection} binConn
-   * @param {boolean} [pending=false]  json entry 尚未建立（暂存模式）
+   * @param {boolean} [_pending=false]  json entry 尚未建立（暂存模式）
    */
-  _wireBinaryConnection(connKey, binConn, pending = false) {
+  _wireBinaryConnection(connKey, binConn, _pending = false) {
     let entry = this.connections.get(connKey)
     // pending 模式：entry 可能不存在，仅绑定 data 事件，待 entry 出现后补登记
     if (entry) {
@@ -2089,7 +2082,6 @@ export class PeerNetwork extends EventTarget {
       const override = getStarsOverride(name)
       if (override[peerId] !== undefined) s = override[peerId]
       if (stars !== undefined && stars !== null) s = stars
-      const existing = r.members.get(peerId)
       r.members.set(peerId, { peerJsId, name: name2, stars: s })
     }
     if (typeof memberCount === 'number') {
@@ -4042,7 +4034,6 @@ export class PeerNetwork extends EventTarget {
   async _lcanEvictLowRef(n) {
     const db = await import('./db.js').then((m) => m).catch(() => null)
     if (!db) return
-    const idb = db._idbProxy || null
     // 直接用 openMessagesDB 不可访问（私有），通过 lcanDelete 逐条删
     // 策略：从 holder 表找引用最少的 key，再查本地是否有，有则删
     const all = getAllHolders()

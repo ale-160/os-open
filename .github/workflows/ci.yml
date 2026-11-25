@@ -44,6 +44,18 @@ jobs:
           pnpm --filter web-text lint
           pnpm --filter typev lint
           pnpm --filter pet lint
+          pnpm --filter nchat lint
+
+      - name: Apps typecheck
+        run: |
+          pnpm --filter web-img typecheck
+          pnpm --filter web-text typecheck
+          pnpm --filter pet typecheck
+
+      - name: "@os/shared typecheck / unit tests"
+        run: |
+          pnpm --filter @os/shared typecheck
+          pnpm --filter @os/shared test
 
       - name: web-img encoder tests (GIF/TIFF roundtrip)
         run: |
@@ -79,6 +91,7 @@ jobs:
         run: |
           test -f out/index.html
           test -f out/gallery/index.html
+          test -f out/migrate/index.html
           test -f out/img/index.html
           test -f out/text/index.html
           test -f out/chat/index.html

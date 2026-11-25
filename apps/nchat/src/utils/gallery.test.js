@@ -9,7 +9,7 @@ const DB_NAME = 'ale-os-assets'
 
 beforeEach(() => {
   // 每个用例独立的 IndexedDB
-  indexedDB = new IDBFactory()
+  globalThis.indexedDB = new IDBFactory()
 })
 
 /** 不带版本号打开现有库，读取其版本与存储列表 */
