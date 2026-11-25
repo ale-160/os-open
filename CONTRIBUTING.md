@@ -14,6 +14,7 @@ pnpm install
 
 pnpm dev          # 壳的开发服务器（localhost:8525）
 pnpm test         # 单元测试
+pnpm typecheck    # 全部包的类型检查（pnpm -r --if-present typecheck）
 pnpm build        # 全量构建 → out/
 pnpm e2e          # Playwright e2e（自动 serve out/）
 ```
@@ -30,7 +31,7 @@ apps/
 ├── pet/        # 应用：咕咕桌宠（/pet/）
 └── burger/     # 应用：麦堡突击队静态游戏（/burger/）
 packages/
-├── shared/          # @os/shared：系统资产库、跨应用语言同步、cn()（运行时公共库）
+├── shared/          # @os/shared：系统资产库、跨应用语言同步、cn()、GIF 编码（运行时公共库）
 ├── tsconfig/        # @os/tsconfig：共享 tsconfig
 ├── eslint-config/   # @os/eslint-config：共享 ESLint flat config
 └── next-preset/     # @os/next-preset：Next.js 静态导出统一预设
@@ -76,13 +77,15 @@ scripts/             # build-all（构建编排）、compose（产物合成）�
 - **系统图库 / 剪贴板**（IndexedDB，本机存储）：`import { saveAsset, getClipboardItem, listAssets, setClipboardItem } from '@os/shared/os-assets'`
   —— `saveAsset` 存产物、`getClipboardItem` 取剪贴板，实现跨应用数据流转；
 - **统一语言**：`import { useOsLanguage } from '@os/shared/os-language'`（React）或 `read/write/subscribeOsLanguage`（非 React；不能引入 React 的应用如 Vue 改从 `@os/shared/os-language-core` 引用）
-  —— 读写共享键 `ale-os-language`（`zh`/`en`），默认中文，跨 iframe 实时同步，无需自己监听 storage 事件。
+  —— 读写共享键 `ale-os-language`（`zh`/`en`），默认中文，跨 iframe 实时同步，无需自己监听 storage 事件；
+- **GIF 编码**：`import { encodeGIF, encodeAnimatedGIF, GifAnimationEncoder } from '@os/shared/gif-encoder'`
+  —— 纯 TS GIF89a 编码器（零依赖）：`encodeGIF` 单帧、`encodeAnimatedGIF` 多帧一次性编码；长动画请用流式 `GifAnimationEncoder` 逐帧 `addFrame` 再 `finish()`，只保留压缩后字节，避免整段原始像素堆在内存里导致 OOM（图片工具箱、TypeV 共用）。
 
 ## 规范
 
 - **语言**：代码注释与 UI 文案以中文为主，标识符用英文；
 - **提交信息**：`feat:/fix:/chore:/docs:` 前缀，一句话说清改动；
-- **测试**：改动壳请保证 `pnpm test` 与 `pnpm e2e` 通过；新功能鼓励补测试；
+- **测试**：改动壳请保证 `pnpm test` 与 `pnpm e2e` 通过；改动 `@os/shared` 请跑其单测（`pnpm --filter @os/shared test`），它被多个应用共用；提交前建议跑一遍 `pnpm typecheck`；新功能鼓励补测试；
 - **依赖**：pnpm 严格隔离，直接 import 未声明的依赖会构建失败——请在对应 package.json 中显式声明；跨应用共享的依赖用 `catalog:` 引用统一版本，不要单独写版本号。
 
 ## PR 预览
